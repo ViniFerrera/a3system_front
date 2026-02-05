@@ -1,26 +1,89 @@
-import React, { useState, useMemo } from "react";
+// Apenas o trecho de renderização do Card foi alterado para incluir o .toFixed(2)
+// O restante da lógica permanece, mas como solicitado, segue o arquivo completo atualizado.
+
+import React, { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
+import { MultiSelect } from "@/components/ui/MultiSelect";
 import { StockItem, PriceRule } from "@/types";
-import { Box, AlertTriangle, Plus, Edit2, Trash2 } from "lucide-react";
+import {
+	Box,
+	AlertTriangle,
+	Plus,
+	Edit2,
+	Trash2,
+	Search,
+	Link,
+	Printer,
+	Layers,
+	Settings,
+} from "lucide-react";
 import { api } from "@/services/api";
+
+interface StockItemWithToner extends StockItem {
+	is_toner?: boolean;
+	print_yield?: number;
+	maquinas_associadas_ids?: number[];
+}
+
+interface Machine {
+	id: number;
+	nome: string;
+}
+
 export const StockModule = ({
 	stock,
 	setStock,
 	priceTable,
 }: {
-	stock: StockItem[];
+	stock: StockItemWithToner[];
 	setStock: Function;
 	priceTable: PriceRule[];
 }) => {
+	const [searchTerm, setSearchTerm] = useState("");
 	const [isModalOpen, setIsModalOpen] = useState(false);
-	const [editingItem, setEditingItem] = useState<StockItem | null>(null);
-	const [formData, setFormData] = useState<Partial<StockItem>>({});
+	const [editingItem, setEditingItem] = useState<StockItemWithToner | null>(
+		null
+	);
+	const [machinesList, setMachinesList] = useState<Machine[]>([]);
+
+	useEffect(() => {
+		api
+			.get("/machinery")
+			.then((res) => setMachinesList(res.data))
+			.catch(console.error);
+	}, []);
+
+	const machineOptions = useMemo(
+		() => machinesList.map((m) => m.nome),
+		[machinesList]
+	);
+
+	const initialFormState: Partial<StockItemWithToner> = {
+		nome: "",
+		unidade: "",
+		saldo: 0,
+		minimo: 10,
+		associacao_material: "",
+		associacao_especificacao: "",
+		associacao_tamanho: "",
+		is_toner: false,
+		print_yield: 1500,
+		maquinas_associadas_ids: [],
+	};
+
+	const [formData, setFormData] =
+		useState<Partial<StockItemWithToner>>(initialFormState);
+	const [selectedMachineNames, setSelectedMachineNames] = useState<string[]>(
+		[]
+	);
+
 	const uniqueMaterials = useMemo(() => {
 		const mats = new Set<string>();
 		if (priceTable) priceTable.forEach((p) => mats.add(p.Material));
 		return Array.from(mats).sort();
 	}, [priceTable]);
+
 	const uniqueSpecs = useMemo(() => {
 		const specs = new Set<string>();
 		if (priceTable)
@@ -29,6 +92,7 @@ export const StockModule = ({
 			});
 		return Array.from(specs).sort();
 	}, [priceTable]);
+
 	const uniqueSizes = useMemo(() => {
 		const sizes = new Set<string>();
 		if (priceTable)
@@ -37,249 +101,425 @@ export const StockModule = ({
 			});
 		return Array.from(sizes).sort();
 	}, [priceTable]);
+
+	const filteredStock = useMemo(() => {
+		let filtered = stock;
+		if (searchTerm) {
+			const lowerTerm = searchTerm.toLowerCase();
+			filtered = stock.filter((item) => {
+				const nomeMatch = item.nome?.toLowerCase().includes(lowerTerm);
+				const assocMatch = item.associacao_material
+					?.toLowerCase()
+					.includes(lowerTerm);
+				return nomeMatch || assocMatch;
+			});
+		}
+		return filtered;
+	}, [stock, searchTerm]);
+
+	const groupedStock = useMemo(() => {
+		const groups: Record<string, StockItemWithToner[]> = {};
+		const tonerKey = "Toners & Tintas";
+		const othersKey = "Outros / Sem Categoria";
+
+		filteredStock.forEach((item) => {
+			let key = item.associacao_material;
+			if (item.is_toner) {
+				key = tonerKey;
+			} else if (!key) {
+				key = othersKey;
+			}
+			if (!groups[key]) groups[key] = [];
+			groups[key].push(item);
+		});
+
+		const sortedKeys = Object.keys(groups).sort((a, b) => {
+			if (a === tonerKey) return -1;
+			if (b === tonerKey) return 1;
+			if (a === othersKey) return 1;
+			if (b === othersKey) return -1;
+			return a.localeCompare(b);
+		});
+
+		return { groups, sortedKeys };
+	}, [filteredStock]);
+
 	const handleSave = async () => {
 		if (!formData.nome || !formData.unidade) {
 			alert("Nome e Unidade são obrigatórios.");
 			return;
 		}
+
+		const selectedIds = machinesList
+			.filter((m) => selectedMachineNames.includes(m.nome))
+			.map((m) => m.id);
+
+		const payload = {
+			nome: formData.nome,
+			unidade: formData.unidade,
+			saldo: Number(formData.saldo),
+			minimo: Number(formData.minimo),
+			associacao_material: formData.associacao_material || "",
+			associacao_especificacao: formData.associacao_especificacao || "",
+			associacao_tamanho: formData.associacao_tamanho || "",
+			is_toner: formData.is_toner ? 1 : 0,
+			print_yield: Number(formData.print_yield) || 1500,
+			maquinas_associadas_ids: JSON.stringify(selectedIds),
+		};
+
 		try {
-			if (editingItem) {
-				const res = await api.put(`/stock/${editingItem.id}`, formData);
-				setStock((prev: StockItem[]) =>
-					prev.map((item) => (item.id === editingItem.id ? res.data : item))
+			if (editingItem && editingItem.id) {
+				const res = await api.put(`/stock/${editingItem.id}`, payload);
+				const updatedItem = {
+					...res.data,
+					id: Number(res.data.id),
+					maquinas_associadas_ids: selectedIds,
+				};
+				setStock((prev: StockItemWithToner[]) =>
+					prev.map((item) => (item.id === editingItem.id ? updatedItem : item))
 				);
 			} else {
-				const res = await api.post("/stock", formData);
-				setStock((prev: StockItem[]) => [...prev, res.data]);
+				const res = await api.post("/stock", payload);
+				const newItem = {
+					...res.data,
+					id: Number(res.data.id),
+					maquinas_associadas_ids: selectedIds,
+				};
+				setStock((prev: StockItemWithToner[]) => [...prev, newItem]);
 			}
 			setIsModalOpen(false);
 			setEditingItem(null);
-			setFormData({});
+			setFormData(initialFormState);
+			setSelectedMachineNames([]);
 		} catch (err) {
-			alert("Erro ao salvar item de estoque");
+			console.error(err);
+			alert("Erro ao salvar item.");
 		}
 	};
+
 	const handleDelete = async (id: number) => {
-		if (confirm("Excluir este item?")) {
+		if (!id) return;
+		if (confirm("Tem certeza que deseja excluir este item?")) {
 			try {
 				await api.delete(`/stock/${id}`);
-				setStock((prev: StockItem[]) => prev.filter((item) => item.id !== id));
+				setStock((prev: StockItemWithToner[]) =>
+					prev.filter((item) => String(item.id) !== String(id))
+				);
 			} catch (err) {
-				alert("Erro ao excluir item");
+				alert("Erro ao excluir item.");
 			}
 		}
 	};
-	const openModal = (item?: StockItem) => {
+
+	const openModal = (item?: StockItemWithToner) => {
 		if (item) {
 			setEditingItem(item);
 			setFormData(item);
+			const names = machinesList
+				.filter((m) => item.maquinas_associadas_ids?.includes(m.id))
+				.map((m) => m.nome);
+			setSelectedMachineNames(names);
 		} else {
 			setEditingItem(null);
-			setFormData({
-				saldo: 0,
-				minimo: 10,
-				associacao_material: "",
-				associacao_especificacao: "",
-				associacao_tamanho: "",
-			});
+			setFormData(initialFormState);
+			setSelectedMachineNames([]);
 		}
 		setIsModalOpen(true);
 	};
+
 	return (
-		<div className='space-y-6'>
-			{" "}
-			<div className='flex justify-between items-center'>
-				{" "}
-				<h2 className='text-2xl font-bold text-slate-800'>
-					Controle de Estoque
-				</h2>{" "}
-				<button
-					onClick={() => openModal()}
-					className='flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition shadow-sm font-medium'
-				>
-					{" "}
-					<Plus className='w-4 h-4' /> Novo Item{" "}
-				</button>{" "}
-			</div>{" "}
-			<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-				{" "}
-				{stock.map((item) => (
-					<Card
-						key={item.id}
-						className='p-6 relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300'
+		<div className='space-y-6 pb-20'>
+			<div className='flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-[10px] border border-slate-200 shadow-sm'>
+				<div>
+					<h2 className='text-xl font-bold text-slate-800 flex items-center gap-2'>
+						<Box className='w-5 h-5 text-indigo-600' /> Controle de Estoque
+					</h2>
+					<p className='text-xs text-slate-500 mt-1'>
+						Gerencie papéis, insumos e toners.
+					</p>
+				</div>
+
+				<div className='flex w-full md:w-auto gap-3'>
+					<div className='relative group flex-1 md:w-56'>
+						<Search className='absolute left-3 top-2.5 w-4 h-4 text-slate-400' />
+						<input
+							type='text'
+							placeholder='Buscar...'
+							className='w-full pl-9 pr-4 py-2 border border-slate-200 rounded-[8px] focus:ring-2 focus:ring-indigo-500 text-sm outline-none'
+							value={searchTerm}
+							onChange={(e) => setSearchTerm(e.target.value)}
+						/>
+					</div>
+					<button
+						onClick={() => openModal()}
+						className='flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-[8px] hover:bg-slate-900 transition text-sm font-medium'
 					>
-						{" "}
-						<div
-							className={`absolute top-0 left-0 w-1.5 h-full ${
-								item.saldo < item.minimo ? "bg-red-500" : "bg-emerald-500"
-							}`}
-						></div>{" "}
-						<div className='flex justify-between items-start pl-2 mb-4'>
-							{" "}
-							<div>
-								{" "}
-								<h4 className='font-bold text-slate-700 text-lg'>
-									{item.nome}
-								</h4>{" "}
-								<p className='text-xs font-medium text-slate-400 mt-1 uppercase tracking-wide'>
-									Mínimo: {item.minimo} {item.unidade}
-								</p>{" "}
-							</div>{" "}
-							<div
-								className={`p-2 rounded-[10px] ${
-									item.saldo < item.minimo
-										? "bg-red-50 text-red-500"
-										: "bg-slate-50 text-slate-400"
-								}`}
-							>
-								<Box className='w-6 h-6' />
-							</div>{" "}
-						</div>{" "}
-						<div className='flex justify-between items-end pl-2'>
-							{" "}
-							<div>
-								{" "}
-								<span
-									className={`text-4xl font-bold tracking-tight ${
-										item.saldo < item.minimo ? "text-red-600" : "text-slate-800"
-									}`}
-								>
-									{item.saldo}
-								</span>{" "}
-								<span className='text-sm text-slate-500 ml-1.5 font-medium'>
-									{item.unidade}
-								</span>{" "}
-							</div>{" "}
-							<div className='flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity'>
-								{" "}
-								<button
-									onClick={() => openModal(item)}
-									className='p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[10px]'
-								>
-									<Edit2 className='w-4 h-4' />
-								</button>{" "}
-								<button
-									onClick={() => handleDelete(item.id!)}
-									className='p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-[10px]'
-								>
-									<Trash2 className='w-4 h-4' />
-								</button>{" "}
-							</div>{" "}
-						</div>{" "}
-						{item.saldo < item.minimo && (
-							<div className='mt-4 ml-2 text-xs font-bold text-red-600 bg-red-50 px-3 py-1.5 rounded-[10px] inline-flex items-center gap-2'>
-								{" "}
-								<AlertTriangle className='w-3.5 h-3.5' /> Nível Crítico{" "}
+						<Plus className='w-4 h-4' /> Novo Item
+					</button>
+				</div>
+			</div>
+
+			<div className='space-y-8'>
+				{groupedStock.sortedKeys.map((groupKey) => {
+					const items = groupedStock.groups[groupKey];
+					const isTonerGroup = groupKey === "Toners & Tintas";
+
+					return (
+						<div key={groupKey} className='animate-in fade-in duration-500'>
+							<div className='flex items-center gap-2 mb-3 border-b border-slate-200 pb-2'>
+								{isTonerGroup ? (
+									<Printer className='w-5 h-5 text-indigo-600' />
+								) : (
+									<Layers className='w-5 h-5 text-slate-400' />
+								)}
+								<h3 className='text-lg font-bold text-slate-700 capitalize'>
+									{groupKey}
+								</h3>
+								<span className='text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold'>
+									{items.length}
+								</span>
 							</div>
-						)}{" "}
-						<div className='mt-3 pl-2 pt-3 border-t border-slate-100 text-[10px] text-slate-400'>
-							{" "}
-							<span className='font-bold uppercase tracking-wider block mb-1'>
-								Associação de Baixa
-							</span>{" "}
-							{item.associacao_material ? (
-								<div className='flex flex-wrap gap-1'>
-									{" "}
-									<span className='bg-slate-100 px-1.5 py-0.5 rounded'>
-										{item.associacao_material}
-									</span>{" "}
-									{item.associacao_especificacao && (
-										<span className='bg-slate-100 px-1.5 py-0.5 rounded'>
-											{item.associacao_especificacao}
-										</span>
-									)}{" "}
-									{item.associacao_tamanho && (
-										<span className='bg-slate-100 px-1.5 py-0.5 rounded'>
-											{item.associacao_tamanho}
-										</span>
-									)}{" "}
-								</div>
-							) : (
-								<span>Nenhuma</span>
-							)}{" "}
-						</div>{" "}
-					</Card>
-				))}{" "}
-			</div>{" "}
+
+							<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'>
+								{items.map((item) => (
+									<Card
+										key={item.id}
+										className={`p-3 relative group hover:border-indigo-300 transition-all duration-200 bg-white flex flex-col justify-between ${
+											item.saldo < item.minimo
+												? "border-red-200 bg-red-50/30"
+												: ""
+										}`}
+									>
+										<div className='flex justify-between items-start mb-2'>
+											<div className='pr-6'>
+												<h4 className='font-bold text-slate-700 text-sm leading-tight line-clamp-2'>
+													{item.nome}
+												</h4>
+												<div className='flex flex-wrap gap-1 mt-1.5'>
+													{item.is_toner ? (
+														<span className='text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 font-medium'>
+															{item.print_yield} pgs/un
+														</span>
+													) : (
+														<>
+															{item.associacao_especificacao && (
+																<span className='text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded'>
+																	{item.associacao_especificacao}
+																</span>
+															)}
+															{item.associacao_tamanho && (
+																<span className='text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded'>
+																	{item.associacao_tamanho}
+																</span>
+															)}
+														</>
+													)}
+													{item.maquinas_associadas_ids &&
+														item.maquinas_associadas_ids.length > 0 && (
+															<span className='text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 font-medium flex items-center gap-1'>
+																<Settings className='w-3 h-3' />{" "}
+																{item.maquinas_associadas_ids.length} Maq.
+															</span>
+														)}
+												</div>
+											</div>
+											<div className='absolute top-3 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity'>
+												<button
+													onClick={() => openModal(item)}
+													className='p-1 text-slate-400 hover:text-indigo-600 transition'
+												>
+													<Edit2 className='w-3.5 h-3.5' />
+												</button>
+												<button
+													onClick={() => handleDelete(item.id!)}
+													className='p-1 text-slate-400 hover:text-red-600 transition'
+												>
+													<Trash2 className='w-3.5 h-3.5' />
+												</button>
+											</div>
+										</div>
+
+										<div className='flex items-end justify-between mt-2 pt-2 border-t border-slate-100 border-dashed'>
+											<div className='flex flex-col'>
+												<span className='text-[10px] text-slate-400 uppercase font-bold'>
+													Saldo
+												</span>
+												<div className='flex items-baseline gap-1'>
+													<span
+														className={`text-xl font-bold ${
+															item.saldo < item.minimo
+																? "text-red-600"
+																: "text-slate-800"
+														}`}
+													>
+														{/* CORREÇÃO: DUAS CASAS DECIMAIS */}
+														{Number(item.saldo).toFixed(2)}
+													</span>
+													<span className='text-xs text-slate-500'>
+														{item.unidade}
+													</span>
+												</div>
+											</div>
+											{item.saldo < item.minimo && (
+												<AlertTriangle className='w-4 h-4 text-red-500 mb-1' />
+											)}
+										</div>
+									</Card>
+								))}
+							</div>
+						</div>
+					);
+				})}
+
+				{filteredStock.length === 0 && (
+					<div className='text-center py-12 text-slate-400'>
+						<Search className='w-8 h-8 mx-auto mb-2 opacity-50' />
+						<p>Nenhum item encontrado.</p>
+					</div>
+				)}
+			</div>
+
 			<Modal
 				isOpen={isModalOpen}
 				onClose={() => setIsModalOpen(false)}
 				title={editingItem ? "Editar Item" : "Novo Item"}
 				size='md'
 			>
-				{" "}
-				<div className='space-y-5'>
-					{" "}
+				<div className='space-y-4'>
+					<div className='bg-indigo-50 p-3 rounded-[8px] border border-indigo-100 flex items-center justify-between'>
+						<div className='flex items-center gap-2'>
+							<Printer className='w-4 h-4 text-indigo-600' />
+							<div>
+								<p className='text-xs font-bold text-indigo-900'>
+									Item de Impressão (Toner)?
+								</p>
+								<p className='text-[10px] text-indigo-600'>
+									Habilita vínculo com máquinas e rendimento.
+								</p>
+							</div>
+						</div>
+						<label className='relative inline-flex items-center cursor-pointer'>
+							<input
+								type='checkbox'
+								className='sr-only peer'
+								checked={formData.is_toner}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+										is_toner: e.target.checked,
+										associacao_material: e.target.checked
+											? ""
+											: formData.associacao_material,
+									})
+								}
+							/>
+							<div className='w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-indigo-600'></div>
+						</label>
+					</div>
+
 					<div>
-						<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
+						<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
 							Nome *
 						</label>
 						<input
 							type='text'
-							className='w-full border border-slate-200 p-2.5 rounded-[10px] outline-none focus:ring-2 focus:ring-indigo-500'
+							className='w-full border border-slate-200 p-2 rounded-[8px] outline-none focus:ring-2 focus:ring-indigo-500 text-sm'
 							value={formData.nome || ""}
 							onChange={(e) =>
 								setFormData({ ...formData, nome: e.target.value })
 							}
+							placeholder='Ex: Papel Sulfite A4'
 						/>
-					</div>{" "}
-					<div className='grid grid-cols-2 gap-4'>
-						{" "}
+					</div>
+
+					<div className='grid grid-cols-2 gap-3'>
 						<div>
-							<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
+							<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
 								Unidade
 							</label>
 							<input
 								type='text'
-								className='w-full border border-slate-200 p-2.5 rounded-[10px] outline-none focus:ring-2 focus:ring-indigo-500'
+								className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
 								value={formData.unidade || ""}
 								onChange={(e) =>
 									setFormData({ ...formData, unidade: e.target.value })
 								}
-								placeholder='Ex: fls'
+								placeholder='Ex: un, cx, kg'
 							/>
-						</div>{" "}
+						</div>
 						<div>
-							<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
+							<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
 								Mínimo
 							</label>
 							<input
 								type='number'
-								className='w-full border border-slate-200 p-2.5 rounded-[10px] outline-none focus:ring-2 focus:ring-indigo-500'
+								className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
 								value={formData.minimo || 0}
 								onChange={(e) =>
 									setFormData({ ...formData, minimo: Number(e.target.value) })
 								}
 							/>
-						</div>{" "}
-					</div>{" "}
+						</div>
+					</div>
+
 					<div>
-						<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-							Saldo
+						<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
+							Saldo Atual
 						</label>
 						<input
 							type='number'
-							className='w-full border border-slate-200 p-2.5 rounded-[10px] outline-none focus:ring-2 focus:ring-indigo-500'
+							className='w-full border border-slate-200 p-2 rounded-[8px] text-sm bg-slate-50'
 							value={formData.saldo || 0}
 							onChange={(e) =>
 								setFormData({ ...formData, saldo: Number(e.target.value) })
 							}
 						/>
-					</div>{" "}
-					<div className='bg-slate-50 p-4 rounded-[10px] border border-slate-200'>
-						{" "}
-						<p className='text-xs font-bold text-slate-500 uppercase mb-3 border-b border-slate-200 pb-2'>
-							Associação Automática de Baixa
-						</p>{" "}
-						<div className='space-y-3'>
-							{" "}
+					</div>
+
+					{formData.is_toner ? (
+						<div className='space-y-4 animate-in slide-in-from-top-2'>
+							<div className='bg-slate-50 p-3 rounded-[8px] border border-slate-200'>
+								<label className='block text-xs font-bold text-slate-600 uppercase mb-1'>
+									Rendimento (Cópias/Impressões)
+								</label>
+								<div className='flex items-center gap-2'>
+									<input
+										type='number'
+										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+										value={formData.print_yield || 1500}
+										onChange={(e) =>
+											setFormData({
+												...formData,
+												print_yield: Number(e.target.value),
+											})
+										}
+									/>
+									<span className='text-xs text-slate-400 whitespace-nowrap'>
+										p/ unidade
+									</span>
+								</div>
+							</div>
 							<div>
-								{" "}
-								<label className='block text-[10px] font-bold text-slate-400 uppercase mb-1'>
-									Material
-								</label>{" "}
+								<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
+									Vincular a Máquinas
+								</label>
+								<MultiSelect
+									options={machineOptions}
+									selected={selectedMachineNames}
+									onChange={setSelectedMachineNames}
+									placeholder='Selecione as máquinas...'
+								/>
+							</div>
+						</div>
+					) : (
+						<div className='bg-slate-50 p-3 rounded-[8px] border border-slate-200'>
+							<p className='text-xs font-bold text-slate-600 uppercase mb-2 flex items-center gap-1'>
+								<Link className='w-3 h-3' /> Vínculo com Tabela de Preços
+								(Papel)
+							</p>
+							<div className='space-y-2'>
 								<select
-									className='w-full border border-slate-200 p-2 rounded-[10px] outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm'
+									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
 									value={formData.associacao_material || ""}
 									onChange={(e) =>
 										setFormData({
@@ -288,24 +528,17 @@ export const StockModule = ({
 										})
 									}
 								>
-									{" "}
-									<option value=''>Selecione...</option>{" "}
+									<option value=''>-- Material (Categoria Mãe) --</option>
 									{uniqueMaterials.map((m) => (
 										<option key={m} value={m}>
 											{m}
 										</option>
-									))}{" "}
-								</select>{" "}
-							</div>{" "}
-							<div className='grid grid-cols-2 gap-3'>
-								{" "}
-								<div>
-									{" "}
-									<label className='block text-[10px] font-bold text-slate-400 uppercase mb-1'>
-										Especificação (Gramatura)
-									</label>{" "}
+									))}
+								</select>
+
+								<div className='grid grid-cols-2 gap-2'>
 									<select
-										className='w-full border border-slate-200 p-2 rounded-[10px] outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm'
+										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm disabled:opacity-50'
 										value={formData.associacao_especificacao || ""}
 										onChange={(e) =>
 											setFormData({
@@ -313,23 +546,17 @@ export const StockModule = ({
 												associacao_especificacao: e.target.value,
 											})
 										}
+										disabled={!formData.associacao_material}
 									>
-										{" "}
-										<option value=''>Qualquer</option>{" "}
+										<option value=''>Gramatura (Qualquer)</option>
 										{uniqueSpecs.map((s) => (
 											<option key={s} value={s}>
 												{s}
 											</option>
-										))}{" "}
-									</select>{" "}
-								</div>{" "}
-								<div>
-									{" "}
-									<label className='block text-[10px] font-bold text-slate-400 uppercase mb-1'>
-										Tamanho (Papel)
-									</label>{" "}
+										))}
+									</select>
 									<select
-										className='w-full border border-slate-200 p-2 rounded-[10px] outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm'
+										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm disabled:opacity-50'
 										value={formData.associacao_tamanho || ""}
 										onChange={(e) =>
 											setFormData({
@@ -337,29 +564,36 @@ export const StockModule = ({
 												associacao_tamanho: e.target.value,
 											})
 										}
+										disabled={!formData.associacao_material}
 									>
-										{" "}
-										<option value=''>Qualquer</option>{" "}
+										<option value=''>Tamanho (Qualquer)</option>
 										{uniqueSizes.map((s) => (
 											<option key={s} value={s}>
 												{s}
 											</option>
-										))}{" "}
-									</select>{" "}
-								</div>{" "}
-							</div>{" "}
-						</div>{" "}
-					</div>{" "}
-					<div className='flex justify-end pt-4 border-t border-slate-100'>
+										))}
+									</select>
+								</div>
+							</div>
+						</div>
+					)}
+
+					<div className='flex justify-end pt-4 border-t border-slate-100 gap-2'>
+						<button
+							onClick={() => setIsModalOpen(false)}
+							className='px-4 py-2 text-slate-500 hover:text-slate-700 font-medium text-sm'
+						>
+							Cancelar
+						</button>
 						<button
 							onClick={handleSave}
-							className='bg-indigo-600 text-white px-6 py-2.5 rounded-[10px] hover:bg-indigo-700 font-bold shadow-md'
+							className='bg-indigo-600 text-white px-6 py-2 rounded-[8px] hover:bg-indigo-700 font-bold text-sm shadow-sm'
 						>
-							Salvar Item
+							Salvar
 						</button>
-					</div>{" "}
-				</div>{" "}
-			</Modal>{" "}
+					</div>
+				</div>
+			</Modal>
 		</div>
 	);
 };

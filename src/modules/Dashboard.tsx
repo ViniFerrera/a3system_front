@@ -27,6 +27,7 @@ import {
 	ArrowUpRight,
 	Filter,
 } from "lucide-react";
+
 export const DashboardModule = ({
 	orders,
 	expenses,
@@ -41,14 +42,45 @@ export const DashboardModule = ({
 	const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 		.toISOString()
 		.split("T")[0];
+
 	const [startDate, setStartDate] = useState(defaultStart);
 	const [endDate, setEndDate] = useState(defaultEnd);
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
+
+	// NOVO: Filtro de Status de Pagamento (Default: PAGO)
+	const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string[]>([
+		"PAGO",
+	]);
+	const paymentStatusOptions = ["PAGO", "PARCIAL", "NAO_PAGO"];
+
+	// 1. Identifica todos os anos disponíveis nos dados
+	const allYears = useMemo(() => {
+		const years = new Set<string>();
+		orders.forEach((o) => {
+			const dateStr = o.data_conclusao || o.data;
+			if (dateStr) years.add(new Date(dateStr).getFullYear().toString());
+		});
+		expenses.forEach((e) => {
+			if (e.vencimento)
+				years.add(new Date(e.vencimento).getFullYear().toString());
+		});
+		// Garante que o ano atual sempre esteja na lista
+		const currentYear = new Date().getFullYear().toString();
+		if (!years.has(currentYear)) years.add(currentYear);
+		return Array.from(years).sort();
+	}, [orders, expenses]);
+
+	// 2. Estado para os anos selecionados (Default: Ano Atual)
+	const [selectedYears, setSelectedYears] = useState<string[]>([
+		new Date().getFullYear().toString(),
+	]);
+
 	const allServices = useMemo(() => {
 		const services = new Set<string>();
 		orders.forEach((o) => o.items.forEach((i) => services.add(i.servico)));
 		return Array.from(services);
 	}, [orders]);
+
 	const filterByDate = (dateStr: string, start: string, end: string) => {
 		const date = new Date(dateStr);
 		const s = start ? new Date(start) : null;
@@ -56,20 +88,35 @@ export const DashboardModule = ({
 		if (e) e.setHours(23, 59, 59, 999);
 		return (!s || date >= s) && (!e || date <= e);
 	};
+
+	// --- LÓGICA DE FILTRAGEM ATUALIZADA ---
 	const currentOrders = useMemo(() => {
 		return orders.filter((o) => {
+			// Apenas ordens concluídas entram no faturamento
 			if (o.status !== "CONCLUIDA") return false;
+
+			// Filtro de Data
 			if (!filterByDate(o.data_conclusao || o.data, startDate, endDate))
 				return false;
+
+			// Filtro de Serviços
 			if (selectedServices.length > 0) {
 				const hasService = o.items.some((i) =>
 					selectedServices.includes(i.servico)
 				);
 				if (!hasService) return false;
 			}
+
+			// Filtro de Status de Pagamento
+			if (selectedPaymentStatus.length > 0) {
+				const status = o.status_pagamento || "NAO_PAGO";
+				if (!selectedPaymentStatus.includes(status)) return false;
+			}
+
 			return true;
 		});
-	}, [orders, startDate, endDate, selectedServices]);
+	}, [orders, startDate, endDate, selectedServices, selectedPaymentStatus]);
+
 	const currentExpenses = useMemo(() => {
 		return expenses.filter((e) => {
 			if (e.status !== "PAGO") return false;
@@ -77,15 +124,21 @@ export const DashboardModule = ({
 			return true;
 		});
 	}, [expenses, startDate, endDate]);
+
 	const calculateOrderTotal = (order: Order) => {
-		if (selectedServices.length === 0) return order.total;
-		return order.items.reduce((acc, item) => {
-			if (selectedServices.includes(item.servico)) {
-				return acc + item.total;
-			}
-			return acc;
-		}, 0);
+		// Se filtrou por serviço, soma apenas os itens daquele serviço
+		if (selectedServices.length > 0) {
+			return order.items.reduce((acc, item) => {
+				if (selectedServices.includes(item.servico)) {
+					return acc + item.total;
+				}
+				return acc;
+			}, 0);
+		}
+		// Total global (inclui juros/taxas extras se houver)
+		return order.total;
 	};
+
 	const kpis = useMemo(() => {
 		const revenue = currentOrders.reduce(
 			(acc, o) => acc + calculateOrderTotal(o),
@@ -96,6 +149,7 @@ export const DashboardModule = ({
 		const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
 		return { revenue, expense, profit, margin };
 	}, [currentOrders, currentExpenses, selectedServices]);
+
 	const monthlyData = useMemo(() => {
 		const data = Array(12)
 			.fill(0)
@@ -109,11 +163,23 @@ export const DashboardModule = ({
 					lucro: 0,
 				};
 			});
+
 		orders
 			.filter((o) => o.status === "CONCLUIDA")
 			.forEach((o) => {
 				const d = new Date(o.data_conclusao || o.data);
-				if (d.getFullYear() === new Date().getFullYear()) {
+				// Filtro de Ano
+				if (selectedYears.includes(d.getFullYear().toString())) {
+					// Filtro de Pagamento
+					const status = o.status_pagamento || "NAO_PAGO";
+					if (
+						selectedPaymentStatus.length > 0 &&
+						!selectedPaymentStatus.includes(status)
+					) {
+						return;
+					}
+
+					// Filtro de Serviço
 					if (
 						selectedServices.length === 0 ||
 						o.items.some((i) => selectedServices.includes(i.servico))
@@ -122,22 +188,32 @@ export const DashboardModule = ({
 					}
 				}
 			});
+
 		expenses
 			.filter((e) => e.status === "PAGO")
 			.forEach((e) => {
 				const d = new Date(e.vencimento);
-				if (d.getFullYear() === new Date().getFullYear())
+				if (selectedYears.includes(d.getFullYear().toString()))
 					data[d.getMonth()].despesa += e.valor;
 			});
+
 		data.forEach((d) => (d.lucro = d.receita - d.despesa));
 		return data;
-	}, [orders, expenses, selectedServices]);
+	}, [
+		orders,
+		expenses,
+		selectedServices,
+		selectedYears,
+		selectedPaymentStatus,
+	]);
+
 	const dailyData = useMemo(() => {
 		const activeStartDate = startDate
 			? new Date(startDate)
 			: new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 		const activeEndDate = endDate ? new Date(endDate) : new Date();
 		const daysMap = new Map<string, { revenue: number; volume: number }>();
+
 		currentOrders.forEach((o) => {
 			const dateKey = new Date(o.data_conclusao || o.data)
 				.toISOString()
@@ -148,6 +224,7 @@ export const DashboardModule = ({
 				volume: current.volume + 1,
 			});
 		});
+
 		const result = [];
 		let curr = new Date(activeStartDate);
 		while (curr <= activeEndDate) {
@@ -163,10 +240,12 @@ export const DashboardModule = ({
 			});
 			curr.setDate(curr.getDate() + 1);
 		}
+		// Reduz pontos se houver muitos dias para não quebrar o gráfico
 		return result.length > 31
 			? result.filter((_, i) => i % Math.ceil(result.length / 30) === 0)
 			: result;
 	}, [currentOrders, startDate, endDate, selectedServices]);
+
 	const topServices = useMemo(() => {
 		const map = new Map<string, { volume: number; revenue: number }>();
 		currentOrders.forEach((o) => {
@@ -188,6 +267,7 @@ export const DashboardModule = ({
 			.sort((a, b) => b.revenue - a.revenue)
 			.slice(0, 5);
 	}, [currentOrders, selectedServices]);
+
 	const topClients = useMemo(() => {
 		const map = new Map<string, { volume: number; revenue: number }>();
 		currentOrders.forEach((o) => {
@@ -202,35 +282,15 @@ export const DashboardModule = ({
 			.sort((a, b) => b.revenue - a.revenue)
 			.slice(0, 5);
 	}, [currentOrders, selectedServices]);
-	const VariationBadge = ({
-		val,
-		isInverse = false,
-	}: {
-		val: number;
-		isInverse?: boolean;
-	}) => {
-		const isPositive = val >= 0;
-		const isGood = isInverse ? !isPositive : isPositive;
-		const Color = isGood ? "text-emerald-600" : "text-red-600";
-		const Icon = isPositive ? ArrowUpRight : ArrowDownRight;
-		return (
-			<div
-				className={`flex items-center gap-1 text-xs font-bold ${Color} bg-white/80 px-1.5 py-0.5 rounded-[5px]`}
-			>
-				<Icon className='w-3 h-3' /> {Math.abs(val).toFixed(1)}%
-			</div>
-		);
-	};
+
 	return (
 		<div className='space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0'>
-			{" "}
+			{/* BARRA DE FILTROS SUPERIOR */}
 			<Card className='p-4 bg-white sticky top-0 z-20 shadow-sm border-b border-indigo-100 overflow-visible'>
-				{" "}
 				<div className='flex flex-col md:flex-row gap-4 items-end min-w-max md:min-w-0'>
-					{" "}
 					<div className='flex items-center gap-2 text-indigo-600 font-bold uppercase text-xs w-full md:w-auto mb-2 md:mb-0'>
 						<Filter className='w-4 h-4' /> Filtros
-					</div>{" "}
+					</div>
 					<div className='w-full md:w-40'>
 						<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
 							Início
@@ -241,7 +301,7 @@ export const DashboardModule = ({
 							value={startDate}
 							onChange={(e) => setStartDate(e.target.value)}
 						/>
-					</div>{" "}
+					</div>
 					<div className='w-full md:w-40'>
 						<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
 							Fim
@@ -252,7 +312,32 @@ export const DashboardModule = ({
 							value={endDate}
 							onChange={(e) => setEndDate(e.target.value)}
 						/>
-					</div>{" "}
+					</div>
+					{/* Filtro de Ano (Gráfico Mensal) */}
+					<div className='w-full md:w-32'>
+						<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
+							Ano (Visualização)
+						</label>
+						<MultiSelect
+							options={allYears}
+							selected={selectedYears}
+							onChange={setSelectedYears}
+							placeholder='Anos'
+						/>
+					</div>
+					{/* Filtro de Status de Pagamento (Novo) */}
+					<div className='w-full md:w-48'>
+						<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
+							Status Pagamento
+						</label>
+						<MultiSelect
+							options={paymentStatusOptions}
+							selected={selectedPaymentStatus}
+							onChange={setSelectedPaymentStatus}
+							placeholder='Todos'
+						/>
+					</div>
+					{/* Filtro de Serviços */}
 					<div className='w-full md:w-64'>
 						<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
 							Serviços (Múltiplos)
@@ -263,21 +348,24 @@ export const DashboardModule = ({
 							onChange={setSelectedServices}
 							placeholder='Todos os serviços'
 						/>
-					</div>{" "}
+					</div>
 					<button
 						onClick={() => {
 							setStartDate(defaultStart);
 							setEndDate(defaultEnd);
 							setSelectedServices([]);
+							setSelectedYears([new Date().getFullYear().toString()]);
+							setSelectedPaymentStatus(["PAGO"]);
 						}}
 						className='text-xs font-bold text-red-500 hover:text-red-700 px-4 py-2.5 h-full transition'
 					>
 						REDEFINIR
-					</button>{" "}
-				</div>{" "}
-			</Card>{" "}
+					</button>
+				</div>
+			</Card>
+
+			{/* CARTÕES DE KPI */}
 			<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6'>
-				{" "}
 				<Card className='p-6 border-l-[4px] border-emerald-500'>
 					<div className='flex justify-between items-start'>
 						<div>
@@ -292,7 +380,7 @@ export const DashboardModule = ({
 							<TrendingUp className='w-5 h-5' />
 						</div>
 					</div>
-				</Card>{" "}
+				</Card>
 				<Card className='p-6 border-l-[4px] border-red-500'>
 					<div className='flex justify-between items-start'>
 						<div>
@@ -307,7 +395,7 @@ export const DashboardModule = ({
 							<ArrowDownRight className='w-5 h-5' />
 						</div>
 					</div>
-				</Card>{" "}
+				</Card>
 				<Card className='p-6 border-l-[4px] border-indigo-500'>
 					<div className='flex justify-between items-start'>
 						<div>
@@ -322,7 +410,7 @@ export const DashboardModule = ({
 							<Wallet className='w-5 h-5' />
 						</div>
 					</div>
-				</Card>{" "}
+				</Card>
 				<Card className='p-6 border-l-[4px] border-amber-500'>
 					<div className='flex justify-between items-start'>
 						<div>
@@ -337,22 +425,23 @@ export const DashboardModule = ({
 							<ArrowUpRight className='w-5 h-5' />
 						</div>
 					</div>
-				</Card>{" "}
-			</div>{" "}
+				</Card>
+			</div>
+
+			{/* GRÁFICOS PRINCIPAIS */}
 			<div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-				{" "}
+				{/* GRÁFICO MENSAL (FLUXO DE CAIXA) */}
 				<Card className='p-6 lg:col-span-2 h-[400px]'>
-					{" "}
 					<div className='flex flex-col md:flex-row justify-between items-center mb-6'>
-						{" "}
 						<div className='mb-2 md:mb-0'>
 							<h4 className='text-lg font-bold text-slate-800'>
-								Fluxo de Caixa (Anual)
+								Fluxo de Caixa (Consolidado)
 							</h4>
 							<p className='text-xs text-slate-400'>
-								Receitas e Despesas consolidadas mês a mês
+								Status Pagamento Filtrado:{" "}
+								{selectedPaymentStatus.join(", ") || "Nenhum"}
 							</p>
-						</div>{" "}
+						</div>
 						<div className='flex gap-4 text-xs font-medium'>
 							<div className='flex items-center gap-1'>
 								<div className='w-3 h-3 bg-emerald-500 rounded-sm'></div>{" "}
@@ -364,78 +453,75 @@ export const DashboardModule = ({
 							<div className='flex items-center gap-1'>
 								<div className='w-3 h-3 bg-indigo-500 rounded-full'></div> Lucro
 							</div>
-						</div>{" "}
-					</div>{" "}
+						</div>
+					</div>
 					<ResponsiveContainer width='100%' height='85%'>
-						{" "}
 						<ComposedChart data={monthlyData}>
-							{" "}
 							<CartesianGrid
 								strokeDasharray='3 3'
 								vertical={false}
 								stroke='#e2e8f0'
-							/>{" "}
+							/>
 							<XAxis
 								dataKey='name'
 								axisLine={false}
 								tickLine={false}
 								tick={{ fill: "#64748b", fontSize: 12 }}
-							/>{" "}
+							/>
 							<YAxis
 								axisLine={false}
 								tickLine={false}
 								tick={{ fill: "#64748b", fontSize: 12 }}
-							/>{" "}
+							/>
 							<Tooltip
 								cursor={{ fill: "#f8fafc" }}
 								contentStyle={{ borderRadius: "10px" }}
 								formatter={(value: number) => Utils.formatCurrency(value)}
-							/>{" "}
+							/>
 							<Bar
 								dataKey='receita'
 								fill='#10b981'
 								radius={[4, 4, 0, 0]}
 								barSize={20}
-							/>{" "}
+							/>
 							<Bar
 								dataKey='despesa'
 								fill='#f87171'
 								radius={[4, 4, 0, 0]}
 								barSize={20}
-							/>{" "}
+							/>
 							<Line
 								type='monotone'
 								dataKey='lucro'
 								stroke='#6366f1'
 								strokeWidth={3}
 								dot={{ r: 4, fill: "#6366f1" }}
-							/>{" "}
-						</ComposedChart>{" "}
-					</ResponsiveContainer>{" "}
-				</Card>{" "}
+							/>
+						</ComposedChart>
+					</ResponsiveContainer>
+				</Card>
+
+				{/* GRÁFICO TOP SERVIÇOS */}
 				<Card className='p-6 h-[400px]'>
-					{" "}
 					<h4 className='text-lg font-bold text-slate-800 mb-1'>
 						Top Serviços
-					</h4>{" "}
+					</h4>
 					<p className='text-xs text-slate-400 mb-6'>
 						Comparativo Volume vs Receita
-					</p>{" "}
+					</p>
 					<ResponsiveContainer width='100%' height='80%'>
-						{" "}
 						<ComposedChart
 							data={topServices}
 							layout='vertical'
 							margin={{ left: 20, right: 20 }}
 						>
-							{" "}
 							<CartesianGrid
 								strokeDasharray='3 3'
 								horizontal={true}
 								vertical={false}
 								stroke='#e2e8f0'
-							/>{" "}
-							<XAxis type='number' hide />{" "}
+							/>
+							<XAxis type='number' hide />
 							<YAxis
 								dataKey='name'
 								type='category'
@@ -443,7 +529,7 @@ export const DashboardModule = ({
 								tickLine={false}
 								width={100}
 								tick={{ fill: "#475569", fontSize: 11, fontWeight: 600 }}
-							/>{" "}
+							/>
 							<Tooltip
 								cursor={{ fill: "transparent" }}
 								contentStyle={{
@@ -451,8 +537,8 @@ export const DashboardModule = ({
 									border: "none",
 									boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
 								}}
-							/>{" "}
-							<Legend verticalAlign='top' height={36} />{" "}
+							/>
+							<Legend verticalAlign='top' height={36} />
 							<Bar
 								dataKey='volume'
 								name='Qtd'
@@ -469,7 +555,7 @@ export const DashboardModule = ({
 										fontWeight: "bold",
 									}}
 								/>
-							</Bar>{" "}
+							</Bar>
 							<Bar
 								dataKey='revenue'
 								name='Receita'
@@ -483,33 +569,32 @@ export const DashboardModule = ({
 									formatter={(val: number) => `R$${val.toFixed(2)}`}
 									style={{ fill: "#8b5cf6", fontSize: "10px" }}
 								/>
-							</Bar>{" "}
-						</ComposedChart>{" "}
-					</ResponsiveContainer>{" "}
-				</Card>{" "}
+							</Bar>
+						</ComposedChart>
+					</ResponsiveContainer>
+				</Card>
+
+				{/* GRÁFICO TOP CLIENTES */}
 				<Card className='p-6 h-[400px]'>
-					{" "}
 					<h4 className='text-lg font-bold text-slate-800 mb-1'>
 						Top Clientes
-					</h4>{" "}
+					</h4>
 					<p className='text-xs text-slate-400 mb-6'>
 						Quem mais compra (Vol vs Valor)
-					</p>{" "}
+					</p>
 					<ResponsiveContainer width='100%' height='80%'>
-						{" "}
 						<ComposedChart
 							data={topClients}
 							layout='vertical'
 							margin={{ left: 20, right: 20 }}
 						>
-							{" "}
 							<CartesianGrid
 								strokeDasharray='3 3'
 								horizontal={true}
 								vertical={false}
 								stroke='#e2e8f0'
-							/>{" "}
-							<XAxis type='number' hide />{" "}
+							/>
+							<XAxis type='number' hide />
 							<YAxis
 								dataKey='name'
 								type='category'
@@ -517,7 +602,7 @@ export const DashboardModule = ({
 								tickLine={false}
 								width={100}
 								tick={{ fill: "#475569", fontSize: 11, fontWeight: 600 }}
-							/>{" "}
+							/>
 							<Tooltip
 								cursor={{ fill: "transparent" }}
 								contentStyle={{
@@ -526,7 +611,7 @@ export const DashboardModule = ({
 									boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
 								}}
 								formatter={(value: number) => Utils.formatCurrency(value)}
-							/>{" "}
+							/>
 							<Bar
 								dataKey='volume'
 								name='Pedidos'
@@ -543,7 +628,7 @@ export const DashboardModule = ({
 										fontWeight: "bold",
 									}}
 								/>
-							</Bar>{" "}
+							</Bar>
 							<Bar
 								dataKey='revenue'
 								name='Total Gasto'
@@ -557,44 +642,43 @@ export const DashboardModule = ({
 									formatter={(val: number) => `R$${val.toFixed(2)}`}
 									style={{ fill: "#f59e0b", fontSize: "10px" }}
 								/>
-							</Bar>{" "}
-						</ComposedChart>{" "}
-					</ResponsiveContainer>{" "}
-				</Card>{" "}
-			</div>{" "}
+							</Bar>
+						</ComposedChart>
+					</ResponsiveContainer>
+				</Card>
+			</div>
+
+			{/* EVOLUÇÃO DIÁRIA */}
 			<Card className='p-6 h-[350px]'>
-				{" "}
 				<h4 className='text-lg font-bold text-slate-800 mb-6'>
 					Evolução de Receita e Volume Diário
-				</h4>{" "}
+				</h4>
 				<ResponsiveContainer width='100%' height='80%'>
-					{" "}
 					<ComposedChart data={dailyData}>
-						{" "}
 						<CartesianGrid
 							strokeDasharray='3 3'
 							vertical={false}
 							stroke='#e2e8f0'
-						/>{" "}
+						/>
 						<XAxis
 							dataKey='date'
 							axisLine={false}
 							tickLine={false}
 							tick={{ fill: "#64748b", fontSize: 12 }}
-						/>{" "}
+						/>
 						<YAxis
 							yAxisId='left'
 							axisLine={false}
 							tickLine={false}
 							tick={{ fill: "#64748b", fontSize: 12 }}
-						/>{" "}
+						/>
 						<YAxis
 							yAxisId='right'
 							orientation='right'
 							axisLine={false}
 							tickLine={false}
 							tick={{ fill: "#94a3b8", fontSize: 12 }}
-						/>{" "}
+						/>
 						<Tooltip
 							contentStyle={{
 								borderRadius: "10px",
@@ -604,8 +688,8 @@ export const DashboardModule = ({
 							formatter={(value: number, name: string) =>
 								name === "receita" ? Utils.formatCurrency(value) : value
 							}
-						/>{" "}
-						<Legend verticalAlign='top' height={36} />{" "}
+						/>
+						<Legend verticalAlign='top' height={36} />
 						<Bar
 							yAxisId='right'
 							dataKey='volume'
@@ -614,7 +698,7 @@ export const DashboardModule = ({
 							barSize={30}
 							radius={[5, 5, 0, 0]}
 							opacity={0.5}
-						/>{" "}
+						/>
 						<Line
 							yAxisId='left'
 							type='monotone'
@@ -623,10 +707,10 @@ export const DashboardModule = ({
 							stroke='#4f46e5'
 							strokeWidth={3}
 							dot={{ r: 4, fill: "#4f46e5" }}
-						/>{" "}
-					</ComposedChart>{" "}
-				</ResponsiveContainer>{" "}
-			</Card>{" "}
+						/>
+					</ComposedChart>
+				</ResponsiveContainer>
+			</Card>
 		</div>
 	);
 };

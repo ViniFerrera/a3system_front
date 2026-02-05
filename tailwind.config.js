@@ -1,1 +1,19 @@
-/** @type {import('tailwindcss').Config} */ export default { content: [ "./index.html", "./src/**/*.{js,ts,jsx,tsx}", ], theme: { extend: { borderRadius: { DEFAULT: '10px', md: '10px', lg: '10px', xl: '15px', }, colors: { primary: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81', } } }, }, plugins: [], }
+/** @type {import('tailwindcss').Config} */ export default {
+	content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+	theme: {
+		extend: {
+			borderRadius: { DEFAULT: "10px", md: "10px", lg: "10px", xl: "15px" },
+			colors: {
+				primary: {
+					50: "#eef2ff",
+					100: "#e0e7ff",
+					500: "#6366f1",
+					600: "#4f46e5",
+					700: "#4338ca",
+					900: "#312e81",
+				},
+			},
+		},
+	},
+	plugins: [],
+};

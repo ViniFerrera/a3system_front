@@ -1,27 +1,216 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
-import { MultiSelect } from "@/components/ui/MultiSelect";
 import { Utils } from "@/utils";
 import { Order, Client, PriceRule, OrderItem } from "@/types";
+import { MultiSelect } from "@/components/ui/MultiSelect";
 import {
 	Plus,
 	Edit2,
 	CheckCircle,
-	Save,
 	Trash2,
-	XCircle,
 	Paperclip,
 	Clock,
 	Check,
 	X,
 	FileText,
-	DownloadCloud,
-	Filter,
-	MoreHorizontal,
+	Printer,
+	ChevronDown,
+	ChevronUp,
+	Search,
+	Calendar,
+	List,
+	TrendingUp,
+	TrendingDown,
+	AlertCircle,
+	FolderOpen,
+	Eraser,
+	Minus,
+	CreditCard,
+	Settings,
+	Save,
+	RefreshCcw, // Ícone adicionado
 } from "lucide-react";
 import { api } from "@/services/api";
+import { LineChart, Line, ResponsiveContainer } from "recharts";
+
+interface Machine {
+	id: number;
+	nome: string;
+	tipo: string;
+}
+
+interface OrderItemWithMachine extends OrderItem {
+	maquina_id?: number;
+	maquina_nome?: string;
+}
+
+// COMPONENTE SEARCHABLE SELECT (MANTIDO IGUAL)
+const SearchableSelect = ({
+	options,
+	value,
+	onChange,
+	placeholder = "Selecione...",
+	fullClients,
+}: {
+	options: { id: number; label: string }[];
+	value: number;
+	onChange: (val: number) => void;
+	placeholder?: string;
+	fullClients?: Client[];
+}) => {
+	const [isOpen, setIsOpen] = useState(false);
+	const [search, setSearch] = useState("");
+	const wrapperRef = useRef<HTMLDivElement>(null);
+
+	const selectedOption = options.find((o) => o.id === value);
+
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (
+				wrapperRef.current &&
+				!wrapperRef.current.contains(event.target as Node)
+			) {
+				setIsOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => document.removeEventListener("mousedown", handleClickOutside);
+	}, []);
+
+	const filteredOptions = useMemo(() => {
+		const term = search.toLowerCase();
+		if (fullClients) {
+			return fullClients
+				.filter(
+					(c) =>
+						c.nome.toLowerCase().includes(term) ||
+						(c.telefone || "").includes(term)
+				)
+				.map((c) => ({ id: Number(c.id), label: c.nome }));
+		}
+		return options.filter((o) => o.label.toLowerCase().includes(term));
+	}, [search, options, fullClients]);
+
+	return (
+		<div className='relative w-full' ref={wrapperRef}>
+			<div
+				className='w-full border border-slate-200 rounded-[10px] p-2.5 bg-white text-sm flex justify-between items-center cursor-pointer hover:border-indigo-300 transition-colors shadow-sm'
+				onClick={() => setIsOpen(!isOpen)}
+			>
+				<span
+					className={
+						selectedOption ? "text-slate-800 font-medium" : "text-slate-400"
+					}
+				>
+					{selectedOption ? selectedOption.label : placeholder}
+				</span>
+				<ChevronDown className='w-4 h-4 text-slate-400' />
+			</div>
+			{isOpen && (
+				<div className='absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-[10px] shadow-xl max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100'>
+					<div className='p-2 border-b border-slate-100 bg-slate-50 sticky top-0'>
+						<div className='flex items-center gap-2 bg-white border border-slate-200 rounded-[6px] px-2 py-1.5'>
+							<Search className='w-3.5 h-3.5 text-slate-400' />
+							<input
+								type='text'
+								className='w-full text-xs outline-none py-0.5 text-slate-700'
+								placeholder='Buscar nome ou telefone...'
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+								autoFocus
+							/>
+						</div>
+					</div>
+					<div className='overflow-y-auto flex-1 custom-scrollbar'>
+						{filteredOptions.length > 0 ? (
+							filteredOptions.map((opt) => (
+								<div
+									key={opt.id}
+									className={`px-3 py-2.5 text-sm cursor-pointer border-l-2 border-transparent hover:bg-indigo-50 hover:border-indigo-500 transition-all ${
+										opt.id === value
+											? "bg-indigo-50 text-indigo-700 font-bold border-indigo-500"
+											: "text-slate-600"
+									}`}
+									onClick={() => {
+										onChange(opt.id);
+										setIsOpen(false);
+										setSearch("");
+									}}
+								>
+									{opt.label}
+								</div>
+							))
+						) : (
+							<div className='p-4 text-xs text-slate-400 text-center flex flex-col items-center gap-1'>
+								<AlertCircle className='w-4 h-4' />
+								Nenhum cliente encontrado.
+							</div>
+						)}
+					</div>
+				</div>
+			)}
+		</div>
+	);
+};
+
+// COMPONENTES AUXILIARES VISUAIS (MANTIDOS IGUAIS)
+const MiniSparkline = ({ data, color }: { data: number[]; color: string }) => {
+	const chartData = data.map((val, i) => ({ i, val }));
+	return (
+		<div className='h-[40px] w-[80px]'>
+			<ResponsiveContainer width='100%' height='100%'>
+				<LineChart data={chartData}>
+					<Line
+						type='monotone'
+						dataKey='val'
+						stroke={color}
+						strokeWidth={2}
+						dot={false}
+						isAnimationActive={false}
+					/>
+				</LineChart>
+			</ResponsiveContainer>
+		</div>
+	);
+};
+
+const VariationIndicator = ({
+	val,
+	label = "mês",
+}: {
+	val: number;
+	label?: string;
+}) => {
+	const isNeutral = val === 0;
+	const isPositive = val > 0;
+	if (isNeutral) {
+		return (
+			<div className='flex items-center gap-1 mt-2 text-[10px] font-bold text-slate-400'>
+				<Minus className='w-3 h-3' />
+				<span>0% {label}</span>
+			</div>
+		);
+	}
+	return (
+		<div
+			className={`flex items-center gap-1 mt-2 text-[10px] font-bold ${
+				isPositive ? "text-emerald-600" : "text-red-500"
+			}`}
+		>
+			{isPositive ? (
+				<TrendingUp className='w-3 h-3' />
+			) : (
+				<TrendingDown className='w-3 h-3' />
+			)}
+			<span>
+				{isPositive ? "+" : ""}
+				{val.toFixed(0)}% {label}
+			</span>
+		</div>
+	);
+};
 
 export const OrderModule = ({
 	clients,
@@ -29,25 +218,85 @@ export const OrderModule = ({
 	orders,
 	setOrders,
 	onStockUpdate,
+	machinery = [],
+	setClients,
 }: {
 	clients: Client[];
 	priceTable: PriceRule[];
 	orders: Order[];
 	setOrders: Function;
 	onStockUpdate: Function;
+	machinery?: Machine[];
+	setClients: Function;
 }) => {
 	const [isModalOpen, setIsModalOpen] = useState(false);
+	const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+	const [isQuickClientOpen, setIsQuickClientOpen] = useState(false);
 	const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-	const [popoverId, setPopoverId] = useState<number | null>(null);
+	const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
+	const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
+	const [machinesList, setMachinesList] = useState<Machine[]>(machinery);
+	const [isRefreshing, setIsRefreshing] = useState(false);
 
-	// Novo campo: desconto_pontual
+	// Configuração Taxa Débito
+	const [debitTaxPercent, setDebitTaxPercent] = useState(0);
+
+	// Novo Cliente Rápido
+	const [quickClientData, setQuickClientData] = useState({
+		nome: "",
+		telefone: "",
+		email: "",
+	});
+
+	// Filtros de Data
+	const [filterStart, setFilterStart] = useState(() => {
+		const d = new Date();
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+	});
+	const [filterEnd, setFilterEnd] = useState(() => {
+		const d = new Date();
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+			2,
+			"0"
+		)}-${String(d.getDate()).padStart(2, "0")}`;
+	});
+
+	const [filterClient, setFilterClient] = useState(0);
+	const [filterServices, setFilterServices] = useState<string[]>([]);
+	const [filterPaymentStatus, setFilterPaymentStatus] = useState<
+		"TODOS" | "PAGO" | "NAO_PAGO" | "PARCIAL"
+	>("TODOS");
+	const [filterOrderStatus, setFilterOrderStatus] = useState<
+		"TODOS" | "ABERTA" | "CONCLUIDA" | "CANCELADA"
+	>("ABERTA");
+
+	useEffect(() => {
+		api
+			.get("/machinery")
+			.then((res) => {
+				if (Array.isArray(res.data)) setMachinesList(res.data);
+			})
+			.catch(console.error);
+
+		api
+			.get("/config/taxa_debito")
+			.then((res) => {
+				if (res.data.value) setDebitTaxPercent(Number(res.data.value));
+			})
+			.catch(console.error);
+	}, []);
+
+	// --- FORM STATE ---
 	const [formData, setFormData] = useState<Partial<Order>>({
 		cliente_id: 0,
 		descricao: "",
 		items: [],
 		anexos: [],
 		status_pagamento: "NAO_PAGO",
+		forma_pagamento: "",
+		taxa_extra: 0,
 		desconto_pontual: 0,
+		data: new Date().toISOString(),
 	});
 
 	const [tempItem, setTempItem] = useState({
@@ -55,22 +304,238 @@ export const OrderModule = ({
 		material: "",
 		cor: "",
 		quantidade: 0,
-		gramatura: "", // Corresponde a "Especificação" no formulário
-		tamanho: "", // Corresponde a "Tamanho"
+		gramatura: "",
+		tamanho: "",
 		is_double_sided: false,
+		maquina_id: 0,
 	});
 
-	const [filterStart, setFilterStart] = useState("");
-	const [filterEnd, setFilterEnd] = useState("");
-	const [filterClient, setFilterClient] = useState("");
-	const [filterServices, setFilterServices] = useState<string[]>([]);
+	// --- EFEITO: Calcular Taxa ao Mudar Forma de Pagamento ---
+	useEffect(() => {
+		if (formData.forma_pagamento === "DEBITO" && debitTaxPercent > 0) {
+			const subtotal =
+				(formData.items?.reduce((acc, i) => acc + i.total, 0) || 0) *
+				(1 - (formData.desconto_pontual || 0) / 100);
+			const extra = subtotal * (debitTaxPercent / 100);
+			setFormData((prev) => ({ ...prev, taxa_extra: extra }));
+		} else if (
+			formData.forma_pagamento !== "DEBITO" &&
+			formData.taxa_extra !== 0 &&
+			!editingOrder
+		) {
+			setFormData((prev) => ({ ...prev, taxa_extra: 0 }));
+		}
+	}, [
+		formData.forma_pagamento,
+		formData.items,
+		formData.desconto_pontual,
+		debitTaxPercent,
+	]);
 
-	// --- Filtros em Cascata para Novo Item ---
+	// --- FUNÇÃO DE REFRESH MANUAL (PONTO 3) ---
+	const handleRefreshOrders = async () => {
+		setIsRefreshing(true);
+		try {
+			const res = await api.get("/orders");
+			// Processamento de dados se necessário (ex: parse de anexos/items)
+			const processed = res.data.map((o: any) => ({
+				...o,
+				items: typeof o.items === "string" ? JSON.parse(o.items) : o.items,
+				anexos: typeof o.anexos === "string" ? JSON.parse(o.anexos) : o.anexos,
+			}));
+			setOrders(processed);
+		} catch (err) {
+			console.error("Erro ao atualizar ordens:", err);
+			alert("Não foi possível atualizar a lista.");
+		} finally {
+			setTimeout(() => setIsRefreshing(false), 500); // Visual delay
+		}
+	};
+
+	const sanitizeOrderResponse = (data: any): Order => {
+		return {
+			...data,
+			id: Number(data.id),
+			items:
+				typeof data.items === "string"
+					? JSON.parse(data.items)
+					: data.items || [],
+			anexos:
+				typeof data.anexos === "string"
+					? JSON.parse(data.anexos)
+					: data.anexos || [],
+			total: Number(data.total || 0),
+			cliente_id: Number(data.cliente_id || 0),
+			cliente_nome: data.cliente_nome || "Cliente",
+			status: data.status || "ABERTA",
+			taxa_extra: Number(data.taxa_extra || 0),
+		};
+	};
+
+	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+		if (e.target.files) {
+			const files = Array.from(e.target.files);
+			setFilesToUpload((prev) => [...prev, ...files]);
+			const newFileNames = files.map((f) => f.name);
+			setFormData((prev) => ({
+				...prev,
+				anexos: [...(prev.anexos || []), ...newFileNames],
+			}));
+		}
+	};
+
+	// --- CÁLCULO DE KPIS ---
+	const summary = useMemo(() => {
+		const now = new Date();
+		const currentMonth = now.getMonth();
+		const currentYear = now.getFullYear();
+
+		const getMonthData = (dateStr: string) => {
+			const d = new Date(dateStr);
+			const isThisMonth =
+				d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+			const isLastMonth =
+				currentMonth === 0
+					? d.getMonth() === 11 && d.getFullYear() === currentYear - 1
+					: d.getMonth() === currentMonth - 1 &&
+					  d.getFullYear() === currentYear;
+			return { isThisMonth, isLastMonth };
+		};
+
+		const thisMonthOrders = orders.filter(
+			(o) => getMonthData(o.data).isThisMonth
+		).length;
+		const lastMonthOrders = orders.filter(
+			(o) => getMonthData(o.data).isLastMonth
+		).length;
+		const variationTotal =
+			lastMonthOrders === 0
+				? thisMonthOrders > 0
+					? 100
+					: 0
+				: ((thisMonthOrders - lastMonthOrders) / lastMonthOrders) * 100;
+
+		const thisMonthOpen = orders.filter(
+			(o) => o.status === "ABERTA" && getMonthData(o.data).isThisMonth
+		).length;
+		const lastMonthOpen = orders.filter(
+			(o) => o.status === "ABERTA" && getMonthData(o.data).isLastMonth
+		).length;
+		const variationOpen =
+			lastMonthOpen === 0
+				? thisMonthOpen > 0
+					? 100
+					: 0
+				: ((thisMonthOpen - lastMonthOpen) / lastMonthOpen) * 100;
+
+		const thisMonthCompleted = orders.filter(
+			(o) =>
+				o.status === "CONCLUIDA" &&
+				o.data_conclusao &&
+				getMonthData(o.data_conclusao).isThisMonth
+		).length;
+		const lastMonthCompleted = orders.filter(
+			(o) =>
+				o.status === "CONCLUIDA" &&
+				o.data_conclusao &&
+				getMonthData(o.data_conclusao).isLastMonth
+		).length;
+		const variationCompleted =
+			lastMonthCompleted === 0
+				? thisMonthCompleted > 0
+					? 100
+					: 0
+				: ((thisMonthCompleted - lastMonthCompleted) / lastMonthCompleted) *
+				  100;
+
+		const totalDurationMs = orders.reduce((acc, o) => {
+			if (o.status === "CONCLUIDA" && o.data_conclusao) {
+				const diff =
+					new Date(o.data_conclusao).getTime() - new Date(o.data).getTime();
+				return diff > 0 ? acc + diff : acc;
+			}
+			return acc;
+		}, 0);
+		const countDuration = orders.filter(
+			(o) => o.status === "CONCLUIDA" && o.data_conclusao
+		).length;
+		const avgTimeHours =
+			countDuration > 0
+				? totalDurationMs / countDuration / (1000 * 60 * 60)
+				: 0;
+		const avgTimeDisplay =
+			avgTimeHours > 24
+				? `${(avgTimeHours / 24).toFixed(1)} dias`
+				: `${avgTimeHours.toFixed(1)} horas`;
+
+		const totalOrders = orders.length;
+		const openOrdersSnapshot = orders.filter(
+			(o) => o.status === "ABERTA"
+		).length;
+		const completedOrdersSnapshot = orders.filter(
+			(o) => o.status === "CONCLUIDA"
+		).length;
+
+		const sparklineData = Array(7)
+			.fill(0)
+			.map((_, i) => {
+				const d = new Date();
+				d.setDate(d.getDate() - (6 - i));
+				d.setHours(0, 0, 0, 0);
+				return orders.filter((o) => {
+					const od = new Date(o.data);
+					od.setHours(0, 0, 0, 0);
+					return od.getTime() === d.getTime();
+				}).length;
+			});
+
+		return {
+			totalOrders,
+			openOrdersSnapshot,
+			completedOrdersSnapshot,
+			avgTimeDisplay,
+			variationTotal,
+			variationOpen,
+			variationCompleted,
+			sparklineData,
+		};
+	}, [orders]);
+
+	const filteredOrders = useMemo(() => {
+		return orders.filter((o) => {
+			const orderDateString = new Date(o.data).toISOString().split("T")[0];
+			if (filterStart && orderDateString < filterStart) return false;
+			if (filterEnd && orderDateString > filterEnd) return false;
+			if (filterClient !== 0 && o.cliente_id !== filterClient) return false;
+			if (filterServices.length > 0) {
+				const hasService = o.items.some((i) =>
+					filterServices.includes(i.servico)
+				);
+				if (!hasService) return false;
+			}
+			if (filterPaymentStatus !== "TODOS") {
+				const pag = o.status_pagamento || "NAO_PAGO";
+				if (pag !== filterPaymentStatus) return false;
+			}
+			if (filterOrderStatus !== "TODOS") {
+				if (o.status !== filterOrderStatus) return false;
+			}
+			return true;
+		});
+	}, [
+		orders,
+		filterStart,
+		filterEnd,
+		filterClient,
+		filterServices,
+		filterPaymentStatus,
+		filterOrderStatus,
+	]);
+
 	const uniqueServices = useMemo(
 		() => [...new Set(priceTable.map((p) => p.Servico))].sort(),
 		[priceTable]
 	);
-
 	const availableMaterials = useMemo(() => {
 		if (!tempItem.servico) return [];
 		return [
@@ -81,9 +546,7 @@ export const OrderModule = ({
 			),
 		].sort();
 	}, [tempItem.servico, priceTable]);
-
 	const availableSpecs = useMemo(() => {
-		// Gramatura
 		if (!tempItem.material) return [];
 		return [
 			...new Set(
@@ -92,29 +555,24 @@ export const OrderModule = ({
 						(p) =>
 							p.Servico === tempItem.servico && p.Material === tempItem.material
 					)
-					.map((p) => p.Gramatura)
+					.map((p) => p.Gramatura || "")
 			),
 		]
-			.filter(Boolean)
+			.filter((g) => g !== "")
 			.sort();
 	}, [tempItem.servico, tempItem.material, priceTable]);
-
 	const availableSizes = useMemo(() => {
-		// Tamanho
 		if (!tempItem.material) return [];
-		// Filtra considerando a gramatura se ela foi selecionada, senao pega todos do material
 		const baseFilter = priceTable.filter(
 			(p) => p.Servico === tempItem.servico && p.Material === tempItem.material
 		);
 		const refinedFilter = tempItem.gramatura
 			? baseFilter.filter((p) => p.Gramatura === tempItem.gramatura)
 			: baseFilter;
-
 		return [...new Set(refinedFilter.map((p) => p.Papel))]
 			.filter(Boolean)
 			.sort();
 	}, [tempItem.servico, tempItem.material, tempItem.gramatura, priceTable]);
-
 	const availableColors = useMemo(() => {
 		if (!tempItem.material) return [];
 		const baseFilter = priceTable.filter(
@@ -127,7 +585,6 @@ export const OrderModule = ({
 			);
 		if (tempItem.tamanho)
 			refinedFilter = refinedFilter.filter((p) => p.Papel === tempItem.tamanho);
-
 		return [...new Set(refinedFilter.map((p) => p.Cor))].filter(Boolean).sort();
 	}, [
 		tempItem.servico,
@@ -137,17 +594,45 @@ export const OrderModule = ({
 		priceTable,
 	]);
 
+	const isHyphen = (val: string) =>
+		val === "-" || val === " - " || val.trim() === "-";
+	const shouldHideField = (options: string[]) =>
+		options.length === 1 && isHyphen(options[0]);
+
+	useEffect(() => {
+		if (availableMaterials.length === 1 && isHyphen(availableMaterials[0]))
+			setTempItem((prev) => ({ ...prev, material: availableMaterials[0] }));
+	}, [availableMaterials]);
+	useEffect(() => {
+		const spec = availableSpecs[0] || "";
+		if (availableSpecs.length === 1 && isHyphen(spec))
+			setTempItem((prev) => ({ ...prev, gramatura: spec }));
+	}, [availableSpecs]);
+	useEffect(() => {
+		if (availableSizes.length === 1 && isHyphen(availableSizes[0]))
+			setTempItem((prev) => ({ ...prev, tamanho: availableSizes[0] }));
+	}, [availableSizes]);
+	useEffect(() => {
+		if (availableColors.length === 1 && isHyphen(availableColors[0]))
+			setTempItem((prev) => ({ ...prev, cor: availableColors[0] }));
+	}, [availableColors]);
+
 	const handleAddItem = () => {
+		// CORREÇÃO PONTO 1: Adicionado tempItem.tamanho (Papel) na chamada
+		// para diferenciar A3 de A4 e buscar o preço correto.
 		const pricing = Utils.calculatePrice(
 			priceTable,
 			tempItem.servico,
 			tempItem.material,
 			tempItem.cor,
 			Number(tempItem.quantidade),
-			tempItem.gramatura
+			tempItem.gramatura,
+			tempItem.tamanho // <--- Item Faltante adicionado aqui
 		);
-
-		const newItem: OrderItem = {
+		const selectedMachine = machinesList.find(
+			(m) => m.id == tempItem.maquina_id
+		);
+		const newItem: OrderItemWithMachine = {
 			id: Date.now(),
 			servico: tempItem.servico,
 			material: tempItem.material,
@@ -155,66 +640,94 @@ export const OrderModule = ({
 			quantidade: Number(tempItem.quantidade),
 			unitPrice: pricing.unit,
 			total: pricing.total,
-			ruleApplied: pricing.rule || "N/A",
+			ruleApplied: pricing.rule || "N/A", // Regra aplicada
 			gramatura: tempItem.gramatura,
+			tamanho: tempItem.tamanho, // Salva o tamanho
 			is_double_sided: tempItem.is_double_sided,
+			maquina_id: Number(tempItem.maquina_id),
+			maquina_nome: selectedMachine?.nome,
 		};
 		setFormData((prev) => ({
 			...prev,
 			items: [...(prev.items || []), newItem],
 		}));
-		// Reset parcial para facilitar nova adição
 		setTempItem((prev) => ({ ...prev, quantidade: 0 }));
-	};
-
-	const calculateTotalWithDiscount = () => {
-		const subtotal = formData.items?.reduce((acc, i) => acc + i.total, 0) || 0;
-		const discount = formData.desconto_pontual || 0;
-		return subtotal * (1 - discount / 100);
 	};
 
 	const handleSave = async () => {
 		const items = formData.items || [];
-		const total = calculateTotalWithDiscount();
-		const client = clients.find((c) => c.id == formData.cliente_id);
+		const subtotal =
+			(formData.items?.reduce((acc, i) => acc + i.total, 0) || 0) *
+			(1 - (formData.desconto_pontual || 0) / 100);
+		// Valor Final = Subtotal + Taxa Extra
+		const total = subtotal + (formData.taxa_extra || 0);
 
-		const orderPayload = {
-			...formData,
-			cliente_nome: client?.nome || "Desconhecido",
-			total: total,
-			status: editingOrder ? editingOrder.status : "ABERTA",
-			data: editingOrder ? editingOrder.data : new Date().toISOString(),
-			items: items,
-			anexos: formData.anexos || [],
-		};
+		const client = clients.find((c) => c.id == formData.cliente_id);
+		const dataPayload = new FormData();
+		dataPayload.append("cliente_id", String(formData.cliente_id || 0));
+		dataPayload.append("cliente_nome", client?.nome || "Desconhecido");
+		dataPayload.append("descricao", formData.descricao || "");
+		dataPayload.append("total", String(total));
+		dataPayload.append("status", editingOrder ? editingOrder.status : "ABERTA");
+		dataPayload.append(
+			"status_pagamento",
+			formData.status_pagamento || "NAO_PAGO"
+		);
+		dataPayload.append("forma_pagamento", formData.forma_pagamento || "");
+		dataPayload.append("taxa_extra", String(formData.taxa_extra || 0));
+
+		const dateValue = formData.data
+			? formData.data.split("T")[0]
+			: new Date().toISOString().split("T")[0];
+		dataPayload.append("data", dateValue);
+
+		dataPayload.append("items", JSON.stringify(items));
+		dataPayload.append(
+			"anexos",
+			JSON.stringify(Array.isArray(formData.anexos) ? formData.anexos : [])
+		);
+		filesToUpload.forEach((file) => dataPayload.append("files", file));
 
 		try {
+			let savedOrder: Order;
 			if (editingOrder && editingOrder.id) {
-				const res = await api.put(`/orders/${editingOrder.id}`, orderPayload);
+				const res = await api.put(`/orders/${editingOrder.id}`, dataPayload);
+				const mergedData = { ...editingOrder, ...formData, ...res.data };
+				savedOrder = sanitizeOrderResponse(mergedData);
 				setOrders((prev: Order[]) =>
-					prev.map((o) => (o.id === editingOrder.id ? res.data : o))
+					prev.map((o) => (o.id === editingOrder.id ? savedOrder : o))
 				);
 			} else {
-				const res = await api.post("/orders", orderPayload);
-				setOrders((prev: Order[]) => [res.data, ...prev]);
+				const res = await api.post("/orders", dataPayload);
+				const mergedData = {
+					...formData,
+					cliente_nome: client?.nome,
+					total,
+					...res.data,
+				};
+				savedOrder = sanitizeOrderResponse(mergedData);
+				setOrders((prev: Order[]) => [savedOrder, ...prev]);
 			}
 			setIsModalOpen(false);
 			setEditingOrder(null);
+			setFilesToUpload([]);
 			setFormData({
 				cliente_id: 0,
 				descricao: "",
 				items: [],
 				anexos: [],
 				status_pagamento: "NAO_PAGO",
+				forma_pagamento: "",
+				taxa_extra: 0,
 				desconto_pontual: 0,
+				data: new Date().toISOString(),
 			});
 		} catch (err) {
+			console.error(err);
 			alert("Erro ao salvar ordem");
 		}
 	};
 
-	// ... (handleDelete, updateStatus, handleFileUpload, filteredOrders, columns mantidos iguais) ...
-	// REPETINDO AS FUNÇÕES AUXILIARES PARA NÃO QUEBRAR O COMPONENTE
 	const handleDelete = async (id: number) => {
 		if (confirm("Tem certeza que deseja apagar esta ordem?")) {
 			try {
@@ -225,6 +738,7 @@ export const OrderModule = ({
 			}
 		}
 	};
+
 	const updateStatus = async (order: Order, updates: Partial<Order>) => {
 		if (updates.status === "CONCLUIDA" && order.status !== "CONCLUIDA") {
 			if (!confirm("Confirmar conclusão e dar baixa no estoque?")) return;
@@ -236,371 +750,663 @@ export const OrderModule = ({
 				...order,
 				...updates,
 			});
+			const mergedOrder = { ...order, ...updates, ...res.data };
+			const updatedOrder = sanitizeOrderResponse(mergedOrder);
 			setOrders((prev: Order[]) =>
-				prev.map((o) => (o.id === order.id ? res.data : o))
+				prev.map((o) => (o.id === order.id ? updatedOrder : o))
 			);
 			if (updates.status === "CONCLUIDA") onStockUpdate(order.items);
-			setPopoverId(null);
 		} catch (err) {
 			alert("Erro ao atualizar status");
 		}
 	};
-	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-		if (e.target.files) {
-			const newFiles = Array.from(e.target.files).map((f) => f.name);
-			setFormData((prev) => ({
-				...prev,
-				anexos: [...(prev.anexos || []), ...newFiles],
-			}));
+
+	// SALVAR CONFIG DE TAXA
+	const handleSaveConfig = async () => {
+		try {
+			await api.post("/config", {
+				key: "taxa_debito",
+				value: String(debitTaxPercent),
+			});
+			alert("Taxa salva com sucesso!");
+			setIsConfigModalOpen(false);
+		} catch (err) {
+			alert("Erro ao salvar configuração.");
 		}
 	};
-	const filteredOrders = useMemo(() => {
-		return orders.filter((o) => {
-			if (filterStart && new Date(o.data) < new Date(filterStart)) return false;
-			if (filterEnd) {
-				const end = new Date(filterEnd);
-				end.setHours(23, 59, 59, 999);
-				if (new Date(o.data) > end) return false;
-			}
-			if (filterClient && o.cliente_id !== Number(filterClient)) return false;
-			if (filterServices.length > 0) {
-				const hasService = o.items.some((i) =>
-					filterServices.includes(i.servico)
-				);
-				if (!hasService) return false;
-			}
-			return true;
-		});
-	}, [orders, filterStart, filterEnd, filterClient, filterServices]);
-	const columns = useMemo(() => {
-		return {
-			ABERTA: filteredOrders.filter((o) => o.status === "ABERTA"),
-			CONCLUIDA: filteredOrders.filter((o) => o.status === "CONCLUIDA"),
-			CANCELADA: filteredOrders.filter((o) => o.status === "CANCELADA"),
-		};
-	}, [filteredOrders]);
+
+	// SALVAR NOVO CLIENTE RÁPIDO
+	const handleQuickClientSave = async () => {
+		if (!quickClientData.nome) return alert("Nome é obrigatório");
+		try {
+			const res = await api.post("/clients", {
+				nome: quickClientData.nome,
+				telefone: quickClientData.telefone,
+				email: quickClientData.email,
+				tipo: "PF",
+			});
+			setClients((prev: Client[]) => [...prev, res.data]);
+			setFormData((prev) => ({ ...prev, cliente_id: res.data.id }));
+			setIsQuickClientOpen(false);
+			setQuickClientData({ nome: "", telefone: "", email: "" });
+		} catch (e) {
+			alert("Erro ao criar cliente");
+		}
+	};
+
+	const openModal = (order?: Order) => {
+		if (order) {
+			setEditingOrder(order);
+			setFormData({
+				...order,
+				items:
+					typeof order.items === "string"
+						? JSON.parse(order.items)
+						: order.items || [],
+				anexos:
+					typeof order.anexos === "string"
+						? JSON.parse(order.anexos)
+						: order.anexos || [],
+				taxa_extra: order.taxa_extra || 0,
+			});
+		} else {
+			setEditingOrder(null);
+			setFilesToUpload([]);
+			setFormData({
+				items: [],
+				anexos: [],
+				status_pagamento: "NAO_PAGO",
+				forma_pagamento: "",
+				taxa_extra: 0,
+				desconto_pontual: 0,
+				data: new Date().toISOString(),
+			});
+		}
+		setIsModalOpen(true);
+	};
+
+	const clientOptions = useMemo(
+		() => [
+			{ id: 0, label: "Todos Clientes" },
+			...clients.map((c) => ({ id: Number(c.id), label: c.nome })),
+		],
+		[clients]
+	);
+	const clientOptionsForForm = useMemo(
+		() => clients.map((c) => ({ id: Number(c.id), label: c.nome })),
+		[clients]
+	);
 
 	return (
-		<div className='flex flex-col h-[calc(100vh-theme(spacing.32))] space-y-4'>
-			{/* ... (Barra de Filtros e Grid Kanban mantidos iguais ao anterior) ... */}
-			<div className='sticky top-0 z-40 bg-slate-50 pb-2'>
-				<div className='flex flex-col md:flex-row justify-between items-start gap-4'>
-					<div className='flex flex-wrap gap-2 w-full md:w-auto items-end'>
-						<div className='flex items-center gap-2 bg-white border border-slate-200 rounded-[10px] p-2 w-full md:w-auto shadow-sm'>
-							<Filter className='w-4 h-4 text-indigo-500' />
-							<input
-								type='date'
-								className='text-xs outline-none bg-transparent w-full md:w-auto'
-								value={filterStart}
-								onChange={(e) => setFilterStart(e.target.value)}
-							/>
-							<span className='text-slate-300'>|</span>
-							<input
-								type='date'
-								className='text-xs outline-none bg-transparent w-full md:w-auto'
-								value={filterEnd}
-								onChange={(e) => setFilterEnd(e.target.value)}
-							/>
-						</div>
-						<div className='w-full md:w-40 z-50'>
-							<MultiSelect
-								options={uniqueServices}
-								selected={filterServices}
-								onChange={setFilterServices}
-								placeholder='Serviços'
-							/>
-						</div>
-						<select
-							className='text-xs border border-slate-200 rounded-[10px] p-2 bg-white outline-none h-[42px] shadow-sm'
-							value={filterClient}
-							onChange={(e) => setFilterClient(e.target.value)}
-						>
-							<option value=''>Todos Clientes</option>{" "}
-							{clients.map((c) => (
-								<option key={c.id} value={c.id}>
-									{c.nome}
-								</option>
-							))}
-						</select>
-						<button
-							onClick={() => {
-								setFilterStart("");
-								setFilterEnd("");
-								setFilterClient("");
-								setFilterServices([]);
-							}}
-							className='text-xs text-red-500 font-bold px-2 h-[42px]'
-						>
-							X
-						</button>
+		<div className='flex flex-col space-y-6 pb-12'>
+			{/* 1. CARDS RESUMO */}
+			<div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
+				<Card className='p-4 flex justify-between items-center bg-slate-50 border border-slate-100 shadow-sm relative overflow-hidden group'>
+					<div className='absolute left-0 top-0 bottom-0 w-1 bg-indigo-500'></div>
+					<div>
+						<p className='text-xs text-slate-500 font-medium capitalize'>
+							Total de ordens
+						</p>
+						<h3 className='text-2xl font-bold text-slate-800 mt-1'>
+							{summary.totalOrders}
+						</h3>
+						<VariationIndicator val={summary.variationTotal} />
 					</div>
-					<button
-						onClick={() => {
-							setEditingOrder(null);
-							setFormData({
-								items: [],
-								anexos: [],
-								status_pagamento: "NAO_PAGO",
-								desconto_pontual: 0,
-							});
-							setIsModalOpen(true);
-						}}
-						className='flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition shadow-sm font-medium w-full md:w-auto justify-center'
-					>
-						<Plus className='w-4 h-4' /> Nova OS
-					</button>
+					<MiniSparkline data={summary.sparklineData} color='#6366f1' />
+				</Card>
+
+				<Card className='p-4 flex justify-between items-center bg-amber-50/30 border border-amber-100 shadow-sm relative overflow-hidden group'>
+					<div className='absolute left-0 top-0 bottom-0 w-1 bg-amber-500'></div>
+					<div>
+						<p className='text-xs text-slate-500 font-medium capitalize'>
+							Ordens abertas
+						</p>
+						<h3 className='text-2xl font-bold text-slate-800 mt-1'>
+							{summary.openOrdersSnapshot}
+						</h3>
+						<VariationIndicator val={summary.variationOpen} />
+					</div>
+					<div className='opacity-50'>
+						<MiniSparkline
+							data={[2, 4, 1, 5, 2, 1, summary.openOrdersSnapshot]}
+							color='#f59e0b'
+						/>
+					</div>
+				</Card>
+
+				<Card className='p-4 flex justify-between items-center bg-emerald-50/30 border border-emerald-100 shadow-sm relative overflow-hidden group'>
+					<div className='absolute left-0 top-0 bottom-0 w-1 bg-emerald-500'></div>
+					<div>
+						<p className='text-xs text-slate-500 font-medium capitalize'>
+							Ordens concluídas
+						</p>
+						<h3 className='text-2xl font-bold text-slate-800 mt-1'>
+							{summary.completedOrdersSnapshot}
+						</h3>
+						<VariationIndicator val={summary.variationCompleted} />
+					</div>
+					<div className='opacity-50'>
+						<MiniSparkline data={[1, 2, 3, 4, 3, 5, 6]} color='#10b981' />
+					</div>
+				</Card>
+				<Card className='p-4 flex justify-between items-center bg-blue-50/30 border border-blue-100 shadow-sm relative overflow-hidden group'>
+					<div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-500'></div>
+					<div>
+						<p className='text-xs text-slate-500 font-medium capitalize'>
+							Tempo médio
+						</p>
+						<h3 className='text-xl font-bold text-slate-800 mt-1'>
+							{summary.avgTimeDisplay}
+						</h3>
+						<div className='flex items-center gap-1 mt-2 text-[10px] text-blue-500'>
+							<Clock className='w-3 h-3' /> Conclusão
+						</div>
+					</div>
+					<div className='opacity-50'>
+						<MiniSparkline data={[10, 12, 11, 10, 9, 8, 10]} color='#3b82f6' />
+					</div>
+				</Card>
+			</div>
+
+			{/* 2. FILTROS */}
+			<div className='bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-end'>
+				<div className='flex items-center gap-2 border border-slate-200 rounded-[10px] p-2 bg-slate-50 w-full md:w-auto hover:border-indigo-200 transition-colors'>
+					<Calendar className='w-4 h-4 text-slate-400' />
+					<input
+						type='date'
+						className='bg-transparent text-sm outline-none text-slate-600'
+						value={filterStart}
+						onChange={(e) => setFilterStart(e.target.value)}
+					/>
+					<span className='text-slate-300'>|</span>
+					<input
+						type='date'
+						className='bg-transparent text-sm outline-none text-slate-600'
+						value={filterEnd}
+						onChange={(e) => setFilterEnd(e.target.value)}
+					/>
+				</div>
+				<div className='w-full md:w-64'>
+					<MultiSelect
+						options={uniqueServices}
+						selected={filterServices}
+						onChange={setFilterServices}
+						placeholder='Filtrar Serviços'
+					/>
+				</div>
+				<div className='w-full md:w-64'>
+					<SearchableSelect
+						options={clientOptions}
+						value={filterClient}
+						onChange={setFilterClient}
+						placeholder='Filtrar por Cliente'
+						fullClients={clients}
+					/>
+				</div>
+
+				{/* PONTO 3: Botão Refresh Adicionado */}
+				<button
+					onClick={handleRefreshOrders}
+					disabled={isRefreshing}
+					className={`ml-auto p-2.5 rounded-[10px] transition border border-slate-200 ${
+						isRefreshing
+							? "bg-slate-50 text-slate-300 cursor-not-allowed"
+							: "bg-white text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
+					}`}
+					title='Atualizar Lista'
+				>
+					<RefreshCcw
+						className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+					/>
+				</button>
+
+				<button
+					onClick={() => setIsConfigModalOpen(true)}
+					className='bg-slate-100 text-slate-600 hover:bg-slate-200 p-2.5 rounded-[10px] transition'
+					title='Configurações (Taxas)'
+				>
+					<Settings className='w-4 h-4' />
+				</button>
+				<button
+					onClick={() => openModal()}
+					className='bg-indigo-600 text-white px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition font-bold text-sm flex items-center gap-2 shadow-md shadow-indigo-200'
+				>
+					<Plus className='w-4 h-4' /> Nova Ordem
+				</button>
+			</div>
+
+			{/* 3. TABS STATUS */}
+			<div className='flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-200 pb-1'>
+				<div className='flex gap-1'>
+					{[
+						{ key: "TODOS", label: "Todas" },
+						{
+							key: "PAGO",
+							label: "Pagas",
+							color: "text-emerald-600 bg-emerald-50",
+						},
+						{
+							key: "NAO_PAGO",
+							label: "Não Pagas",
+							color: "text-red-600 bg-red-50",
+						},
+						{
+							key: "PARCIAL",
+							label: "Parcial",
+							color: "text-amber-600 bg-amber-50",
+						},
+					].map((tab) => (
+						<button
+							key={tab.key}
+							onClick={() => setFilterPaymentStatus(tab.key as any)}
+							className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-all ${
+								filterPaymentStatus === tab.key
+									? "border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50/50"
+									: "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+							}`}
+						>
+							{tab.label}
+						</button>
+					))}
 				</div>
 			</div>
 
-			<div className='flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 min-h-0 pb-20 md:pb-0 z-0'>
-				{Object.entries(columns).map(([status, list]) => (
-					<div
-						key={status}
-						className='flex flex-col bg-slate-100 rounded-[10px] h-full overflow-hidden border border-slate-200'
-					>
-						<div className='p-3 bg-white border-b border-slate-200 flex justify-between items-center sticky top-0 z-10'>
-							<h3 className='font-bold text-slate-700 uppercase text-xs tracking-wider'>
-								{status}
-							</h3>
-							<span className='bg-slate-100 text-slate-600 px-2 py-0.5 rounded-[10px] text-xs font-bold'>
-								{list.length}
-							</span>
-						</div>
-						<div className='p-3 space-y-3 overflow-y-auto custom-scrollbar flex-1'>
-							{list.map((order) => (
-								<Card
-									key={order.id}
-									className='p-4 hover:border-indigo-300 group cursor-default relative'
-								>
-									<div className='flex justify-between items-start mb-2'>
-										<span className='font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 rounded-[5px]'>
-											#{order.id}
-										</span>
-										<div className='flex gap-2'>
-											<button
+			{/* 4. TABELA */}
+			<div className='bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden'>
+				<div className='overflow-x-auto min-h-[300px]'>
+					<table className='w-full text-left text-sm text-slate-600'>
+						<thead className='bg-slate-50 text-slate-500 font-bold uppercase text-[11px] border-b border-slate-200'>
+							<tr>
+								<th className='p-4 w-20'>ID</th>
+								<th className='p-4'>Cliente</th>
+								<th className='p-4'>Criação</th>
+								<th className='p-4'>Conclusão</th>
+								<th className='p-4'>Serviços</th>
+								<th className='p-4'>Total</th>
+								<th className='p-4'>Pagamento</th>
+								<th className='p-4'>Status</th>
+								<th className='p-4 text-right'>Ações</th>
+							</tr>
+						</thead>
+						<tbody className='divide-y divide-slate-100'>
+							{filteredOrders.length > 0 ? (
+								filteredOrders.map((order) => {
+									const isExpanded = expandedOrderId === order.id;
+									return (
+										<React.Fragment key={order.id}>
+											<tr
+												className={`hover:bg-slate-50 transition-colors cursor-pointer ${
+													isExpanded ? "bg-indigo-50/30" : ""
+												}`}
 												onClick={() =>
-													setPopoverId(
-														popoverId === order.id ? null : order.id ?? null
+													setExpandedOrderId(
+														isExpanded ? null : Number(order.id)
 													)
 												}
-												className='text-slate-300 hover:text-indigo-500 relative'
 											>
-												<MoreHorizontal className='w-4 h-4' />
-												{popoverId === order.id && (
-													<div className='absolute right-0 top-6 bg-white shadow-xl border border-slate-100 rounded-[10px] p-2 z-50 w-32 flex flex-col gap-1'>
-														<button
-															onClick={() =>
-																updateStatus(order, {
-																	status_pagamento: "PAGO",
-																})
-															}
-															className='text-xs text-left px-2 py-1.5 hover:bg-emerald-50 text-emerald-700 rounded-[5px]'
-														>
-															Pago
-														</button>
-														<button
-															onClick={() =>
-																updateStatus(order, {
-																	status_pagamento: "PARCIAL",
-																})
-															}
-															className='text-xs text-left px-2 py-1.5 hover:bg-amber-50 text-amber-700 rounded-[5px]'
-														>
-															Parcial
-														</button>
-														<button
-															onClick={() =>
-																updateStatus(order, {
-																	status_pagamento: "NAO_PAGO",
-																})
-															}
-															className='text-xs text-left px-2 py-1.5 hover:bg-red-50 text-red-700 rounded-[5px]'
-														>
-															Não Pago
-														</button>
-														<div className='h-px bg-slate-100 my-1'></div>
-														<button
-															onClick={() => handleDelete(order.id!)}
-															className='text-xs text-left px-2 py-1.5 hover:bg-red-50 text-red-600 rounded-[5px] flex items-center gap-2'
-														>
-															<Trash2 className='w-3 h-3' /> Apagar
-														</button>
-													</div>
-												)}
-											</button>
-											<button
-												onClick={() => {
-													setEditingOrder(order);
-													setFormData(order);
-													setIsModalOpen(true);
-												}}
-												className='text-slate-300 hover:text-indigo-500'
-											>
-												<Edit2 className='w-4 h-4' />
-											</button>
-										</div>
-									</div>
-									<div className='flex justify-between items-start mb-1'>
-										<h4 className='font-bold text-slate-800 text-base mb-1'>
-											{order.cliente_nome}
-										</h4>
-										<Badge status={order.status_pagamento || "NAO_PAGO"} />
-									</div>
-									<p className='text-xs text-slate-500 line-clamp-2 mb-3 leading-relaxed'>
-										{order.descricao || "Sem descrição detalhada."}
-									</p>
-									<div className='flex items-center gap-3 text-[10px] text-slate-400 mb-3 bg-slate-50 p-2 rounded-[10px]'>
-										<div className='flex items-center gap-1'>
-											<Clock className='w-3 h-3' />
-											<span>{Utils.formatDateTime(order.data)}</span>
-										</div>
-										{order.anexos && order.anexos.length > 0 && (
-											<div className='flex items-center gap-1 text-indigo-500 font-medium'>
-												<Paperclip className='w-3 h-3' />
-												<span>{order.anexos.length}</span>
-											</div>
-										)}
-									</div>
-									<div className='flex flex-col gap-2 pt-2 border-t border-slate-100'>
-										<div className='flex justify-between items-center'>
-											<span className='font-bold text-slate-700 text-lg'>
-												{Utils.formatCurrency(order.total)}
-											</span>
-										</div>
-									</div>
-								</Card>
-							))}
-						</div>
-					</div>
-				))}
+												<td className='p-4 font-mono text-xs text-slate-400'>
+													#{order.id}
+												</td>
+												<td className='p-4 font-bold text-slate-700'>
+													{order.cliente_nome}
+												</td>
+												<td className='p-4 text-xs'>
+													{Utils.formatDateTime(order.data)}
+												</td>
+												<td className='p-4 text-xs'>
+													{order.data_conclusao ? (
+														<span className='text-emerald-600 font-medium'>
+															{Utils.formatDateTime(order.data_conclusao)}
+														</span>
+													) : (
+														<span className='text-slate-400 italic'>--</span>
+													)}
+												</td>
+												<td
+													className='p-4 text-xs max-w-[200px] truncate'
+													title={order.items.map((i) => i.servico).join(", ")}
+												>
+													{order.items.length > 0 ? (
+														<div className='flex gap-1 overflow-hidden'>
+															{order.items.slice(0, 2).map((i, idx) => (
+																<span
+																	key={idx}
+																	className='inline-flex items-center px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[10px] text-slate-600 whitespace-nowrap'
+																>
+																	{i.servico}
+																</span>
+															))}
+														</div>
+													) : (
+														"Sem itens"
+													)}
+												</td>
+												<td className='p-4 font-bold text-slate-800'>
+													{Utils.formatCurrency(order.total)}
+													{(order.taxa_extra || 0) > 0 && (
+														<span className='text-[9px] text-slate-400 block'>
+															(+ juros)
+														</span>
+													)}
+												</td>
+												<td className='p-4'>
+													<Badge
+														status={order.status_pagamento || "NAO_PAGO"}
+													/>
+												</td>
+												<td className='p-4'>
+													<span
+														className={`px-2 py-1 rounded-[6px] text-[10px] font-bold border uppercase tracking-wide
+													${
+														order.status === "ABERTA"
+															? "bg-blue-50 text-blue-600 border-blue-100"
+															: order.status === "CONCLUIDA"
+															? "bg-emerald-50 text-emerald-600 border-emerald-100"
+															: "bg-slate-100 text-slate-500 border-slate-200"
+													}`}
+													>
+														{order.status}
+													</span>
+												</td>
+												<td
+													className='p-4 text-right flex justify-end gap-2'
+													onClick={(e) => e.stopPropagation()}
+												>
+													<button
+														onClick={() => openModal(order)}
+														className='p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[6px] transition'
+													>
+														<Edit2 className='w-4 h-4' />
+													</button>
+													<button
+														onClick={() => handleDelete(order.id!)}
+														className='p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-[6px] transition'
+													>
+														<Trash2 className='w-4 h-4' />
+													</button>
+													<button
+														onClick={() =>
+															setExpandedOrderId(
+																isExpanded ? null : Number(order.id)
+															)
+														}
+														className='p-1.5 text-slate-400 hover:text-indigo-600'
+													>
+														{isExpanded ? (
+															<ChevronUp className='w-4 h-4' />
+														) : (
+															<ChevronDown className='w-4 h-4' />
+														)}
+													</button>
+												</td>
+											</tr>
+											{isExpanded && (
+												<tr className='bg-slate-50/50'>
+													<td
+														colSpan={9}
+														className='p-4 border-b border-indigo-100'
+													>
+														<div className='grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-2 duration-300 origin-top'>
+															{/* Detalhes (Item 1) */}
+															<div className='col-span-2 space-y-3'>
+																<div className='bg-white p-4 rounded-[10px] border-l-4 border-indigo-500 shadow-sm'>
+																	<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-2'>
+																		<List className='w-4 h-4 text-indigo-500' />{" "}
+																		Detalhes do Pedido
+																	</h5>
+																	<ul className='space-y-2'>
+																		{order.items.map((item, idx) => (
+																			<li
+																				key={idx}
+																				className='flex justify-between text-xs border-b border-slate-50 last:border-0 pb-2'
+																			>
+																				<span className='text-slate-700'>
+																					<strong className='text-indigo-600'>
+																						{item.quantidade}x
+																					</strong>{" "}
+																					{item.servico} - {item.material}{" "}
+																					{item.gramatura
+																						? `(${item.gramatura})`
+																						: ""}
+																					<span className='text-slate-400 text-[10px] ml-1'>
+																						({item.cor})
+																					</span>
+																				</span>
+																				<span className='font-bold text-slate-600'>
+																					{Utils.formatCurrency(item.total)}
+																				</span>
+																			</li>
+																		))}
+																	</ul>
+																	{(order.taxa_extra || 0) > 0 && (
+																		<div className='flex justify-end mt-2 pt-2 border-t border-slate-100 text-[10px] text-red-500 font-bold'>
+																			+ Juros/Taxas:{" "}
+																			{Utils.formatCurrency(
+																				order.taxa_extra || 0
+																			)}
+																		</div>
+																	)}
+																</div>
+																<div className='bg-white p-4 rounded-[10px] border-l-4 border-amber-400 shadow-sm'>
+																	<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-2'>
+																		Descrição / Obs
+																	</h5>
+																	<p className='text-xs text-slate-600 italic leading-relaxed'>
+																		{order.descricao ||
+																			"Nenhuma observação registrada."}
+																	</p>
+																</div>
+															</div>
+															{/* Coluna 2 */}
+															<div className='space-y-3'>
+																<div className='bg-white p-4 rounded-[10px] border-l-4 border-slate-400 shadow-sm'>
+																	<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-3'>
+																		Financeiro
+																	</h5>
+																	<div className='space-y-2 mb-3'>
+																		<div className='flex justify-between text-xs'>
+																			<span className='text-slate-500'>
+																				Forma:
+																			</span>
+																			<span className='font-bold text-slate-700'>
+																				{order.forma_pagamento || "N/D"}
+																			</span>
+																		</div>
+																		<div className='flex justify-between text-xs'>
+																			<span className='text-slate-500'>
+																				Total:
+																			</span>
+																			<span className='font-bold text-indigo-600'>
+																				{Utils.formatCurrency(order.total)}
+																			</span>
+																		</div>
+																	</div>
+																	{/* Ações */}
+																	<div className='flex flex-col gap-2 pt-2 border-t border-slate-100'>
+																		<div className='flex gap-1'>
+																			{["PAGO", "PARCIAL", "NAO_PAGO"].map(
+																				(btn) => (
+																					<button
+																						key={btn}
+																						onClick={() =>
+																							updateStatus(order, {
+																								status_pagamento: btn as any,
+																							})
+																						}
+																						className={`flex-1 text-[9px] font-bold py-1 rounded border transition-colors ${
+																							order.status_pagamento === btn
+																								? "bg-slate-800 text-white"
+																								: "text-slate-400 hover:bg-slate-100"
+																						}`}
+																					>
+																						{btn.replace("_", " ")}
+																					</button>
+																				)
+																			)}
+																		</div>
+																	</div>
+																</div>
+																<div className='bg-white p-4 rounded-[10px] border-l-4 border-blue-400 shadow-sm'>
+																	<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-2 flex items-center gap-2'>
+																		<FolderOpen className='w-4 h-4 text-blue-500' />{" "}
+																		Arquivos
+																	</h5>
+																	<div className='mb-3 bg-slate-50 p-2 rounded border border-slate-200 text-[10px] text-slate-500 font-mono break-all'>
+																		C:\Users\vinie\OneDrive\01_A3_Art_Copy\Ordens\
+																		{order.data.split("T")[0]}\OS{order.id}_
+																		{order.cliente_nome.replace(/\s+/g, "_")}
+																	</div>
+																</div>
+															</div>
+														</div>
+													</td>
+												</tr>
+											)}
+										</React.Fragment>
+									);
+								})
+							) : (
+								<tr>
+									<td colSpan={9} className='p-12 text-center text-slate-400'>
+										Nenhuma ordem encontrada.
+									</td>
+								</tr>
+							)}
+						</tbody>
+					</table>
+				</div>
 			</div>
 
+			{/* MODAL PRINCIPAL */}
 			<Modal
 				isOpen={isModalOpen}
 				onClose={() => setIsModalOpen(false)}
-				title={editingOrder ? "Editar OS" : "Nova Ordem"}
+				title={editingOrder ? "Editar Ordem" : "Nova Ordem"}
 				size='lg'
 			>
 				<div className='space-y-6'>
-					<div className='grid grid-cols-1 md:grid-cols-2 gap-5'>
-						<div>
-							<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-								Cliente *
-							</label>
-							<select
-								className='w-full border border-slate-200 rounded-[10px] p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none text-sm'
-								value={formData.cliente_id}
-								onChange={(e) =>
-									setFormData({
-										...formData,
-										cliente_id: Number(e.target.value),
-									})
-								}
+					<div className='grid grid-cols-1 md:grid-cols-12 gap-5'>
+						<div className='md:col-span-8 flex gap-2 items-end'>
+							<div className='flex-1'>
+								<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
+									Cliente *
+								</label>
+								<SearchableSelect
+									options={clientOptionsForForm}
+									value={formData.cliente_id || 0}
+									onChange={(val) =>
+										setFormData({ ...formData, cliente_id: val })
+									}
+									placeholder='Busque nome ou telefone...'
+									fullClients={clients}
+								/>
+							</div>
+							<button
+								onClick={() => setIsQuickClientOpen(true)}
+								className='bg-indigo-50 text-indigo-600 p-2.5 rounded-[10px] hover:bg-indigo-100 transition'
+								title='Novo Cliente Rápido'
 							>
-								<option value='0'>Selecione...</option>
-								{clients.map((c) => (
-									<option key={c.id} value={c.id}>
-										{c.nome}
-									</option>
-								))}
-							</select>
+								<Plus className='w-4 h-4' />
+							</button>
 						</div>
-						<div>
+						<div className='md:col-span-4'>
 							<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-								Pagamento
+								Data
 							</label>
-							<div className='flex gap-2'>
-								<button
-									onClick={() =>
-										setFormData({ ...formData, status_pagamento: "NAO_PAGO" })
+							<input
+								type='date'
+								className='w-full border border-slate-200 rounded-[10px] p-2.5 bg-white text-sm'
+								value={formData.data ? formData.data.split("T")[0] : ""}
+								onChange={(e) =>
+									setFormData({ ...formData, data: e.target.value })
+								}
+							/>
+						</div>
+					</div>
+
+					<div className='bg-slate-50 p-4 rounded-[10px] border border-slate-200'>
+						<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-2'>
+							<CreditCard className='w-4 h-4' /> Financeiro
+						</h5>
+						<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+							<div>
+								<label className='block text-xs font-bold text-slate-500 mb-1'>
+									Status
+								</label>
+								<select
+									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+									value={formData.status_pagamento || "NAO_PAGO"}
+									onChange={(e) =>
+										setFormData({
+											...formData,
+											status_pagamento: e.target.value as any,
+										})
 									}
-									className={`flex-1 py-2 text-xs font-bold rounded-[10px] border ${
-										formData.status_pagamento === "NAO_PAGO"
-											? "bg-red-50 text-red-700 border-red-200"
-											: "text-slate-500 border-slate-200"
-									}`}
 								>
-									Não Pago
-								</button>
-								<button
-									onClick={() =>
-										setFormData({ ...formData, status_pagamento: "PARCIAL" })
+									<option value='NAO_PAGO'>Não Pago</option>
+									<option value='PARCIAL'>Parcial</option>
+									<option value='PAGO'>Pago</option>
+								</select>
+							</div>
+							<div>
+								<label className='block text-xs font-bold text-slate-500 mb-1'>
+									Forma Pagamento
+								</label>
+								<select
+									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+									value={formData.forma_pagamento || ""}
+									onChange={(e) =>
+										setFormData({
+											...formData,
+											forma_pagamento: e.target.value,
+										})
 									}
-									className={`flex-1 py-2 text-xs font-bold rounded-[10px] border ${
-										formData.status_pagamento === "PARCIAL"
-											? "bg-amber-50 text-amber-700 border-amber-200"
-											: "text-slate-500 border-slate-200"
-									}`}
 								>
-									Parcial
-								</button>
-								<button
-									onClick={() =>
-										setFormData({ ...formData, status_pagamento: "PAGO" })
+									<option value=''>Selecione...</option>
+									<option value='DINHEIRO'>Dinheiro</option>
+									<option value='PIX'>PIX</option>
+									<option value='DEBITO'>Cartão de Débito</option>
+									<option value='CREDITO'>Cartão de Crédito</option>
+								</select>
+							</div>
+							<div>
+								<label className='block text-xs font-bold text-slate-500 mb-1'>
+									Taxa Extra / Juros (R$)
+								</label>
+								<input
+									type='number'
+									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm bg-white'
+									value={formData.taxa_extra || 0}
+									onChange={(e) =>
+										setFormData({
+											...formData,
+											taxa_extra: Number(e.target.value),
+										})
 									}
-									className={`flex-1 py-2 text-xs font-bold rounded-[10px] border ${
-										formData.status_pagamento === "PAGO"
-											? "bg-emerald-50 text-emerald-700 border-emerald-200"
-											: "text-slate-500 border-slate-200"
-									}`}
-								>
-									Pago
-								</button>
+								/>
 							</div>
 						</div>
 					</div>
-					<div>
-						<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-							Anexos
-						</label>
-						<label className='relative cursor-pointer w-full bg-white border border-slate-200 border-dashed rounded-[10px] p-2 flex items-center justify-center gap-2 hover:bg-indigo-50 transition border-indigo-200'>
-							<input
-								type='file'
-								multiple
-								className='hidden'
-								onChange={handleFileUpload}
-							/>
-							<Paperclip className='w-4 h-4 text-indigo-500' />
-							<span className='text-sm text-slate-600 font-medium'>
-								Adicionar arquivos
-							</span>
-						</label>
-						{formData.anexos && formData.anexos.length > 0 && (
-							<div className='mt-2 flex flex-wrap gap-2'>
-								{formData.anexos.map((file, idx) => (
-									<span
-										key={idx}
-										className='text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-[5px] flex items-center gap-1 border border-slate-200'
-									>
-										<FileText className='w-3 h-3' /> {file}
-									</span>
-								))}
-							</div>
-						)}
-					</div>
+
+					{/* ... Campos Descrição e Itens ... */}
 					<div>
 						<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
 							Descrição Detalhada
 						</label>
 						<textarea
-							rows={4}
-							className='w-full border border-slate-200 rounded-[10px] p-3 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none resize-none text-sm'
+							rows={2}
+							className='w-full border border-slate-200 rounded-[10px] p-3 text-sm'
 							value={formData.descricao}
 							onChange={(e) =>
 								setFormData({ ...formData, descricao: e.target.value })
 							}
-							placeholder='Descreva todos os detalhes do serviço aqui...'
 						/>
 					</div>
+
+					{/* ÁREA DE INSERÇÃO DE ITENS */}
 					<div className='bg-slate-50 p-5 rounded-[10px] border border-slate-200 shadow-inner'>
 						<div className='grid grid-cols-2 md:grid-cols-12 gap-3 items-end'>
-							<div className='md:col-span-12 flex justify-between items-center mb-2 border-b border-slate-200 pb-2'>
-								<span className='text-xs font-bold text-indigo-600 uppercase'>
-									Novo Item
-								</span>
-							</div>
-
-							{/* LINHA 1: Serviço e Material */}
+							{/* 1. Serviço */}
 							<div className='md:col-span-4'>
 								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
 									1. Serviço
@@ -627,102 +1433,142 @@ export const OrderModule = ({
 									))}
 								</select>
 							</div>
+
+							{/* 2. Material */}
+							{!shouldHideField(availableMaterials) && (
+								<div className='md:col-span-4'>
+									<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
+										2. Material
+									</label>
+									<select
+										className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
+										value={tempItem.material}
+										onChange={(e) =>
+											setTempItem({
+												...tempItem,
+												material: e.target.value,
+												cor: "",
+												gramatura: "",
+												tamanho: "",
+											})
+										}
+										disabled={!tempItem.servico}
+									>
+										<option value=''>...</option>
+										{availableMaterials.map((m) => (
+											<option key={m} value={m}>
+												{m}
+											</option>
+										))}
+									</select>
+								</div>
+							)}
+
+							{/* 3. Especificação / Gramatura */}
+							{!shouldHideField(availableSpecs) && (
+								<div className='md:col-span-4'>
+									<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
+										3. Especificação
+									</label>
+									<select
+										className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
+										value={tempItem.gramatura || ""}
+										onChange={(e) =>
+											setTempItem({
+												...tempItem,
+												gramatura: e.target.value,
+												tamanho: "",
+												cor: "",
+											})
+										}
+										disabled={!availableSpecs.length}
+									>
+										<option value=''>N/A</option>
+										{availableSpecs.map((g) => (
+											<option key={g} value={g}>
+												{g}
+											</option>
+										))}
+									</select>
+								</div>
+							)}
+
+							{/* 4. Tamanho */}
+							{!shouldHideField(availableSizes) && (
+								<div className='md:col-span-3'>
+									<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
+										4. Tamanho
+									</label>
+									<select
+										className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
+										value={tempItem.tamanho || ""}
+										onChange={(e) =>
+											setTempItem({ ...tempItem, tamanho: e.target.value })
+										}
+										disabled={!availableSizes.length}
+									>
+										<option value=''>N/A</option>
+										{availableSizes.map((s) => (
+											<option key={s} value={s}>
+												{s}
+											</option>
+										))}
+									</select>
+								</div>
+							)}
+
+							{/* 5. Cor */}
+							{!shouldHideField(availableColors) && (
+								<div className='md:col-span-3'>
+									<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
+										5. Cor
+									</label>
+									<select
+										className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
+										value={tempItem.cor}
+										onChange={(e) =>
+											setTempItem({ ...tempItem, cor: e.target.value })
+										}
+										disabled={!tempItem.material}
+									>
+										<option value=''>...</option>
+										{availableColors.map((c) => (
+											<option key={c} value={c}>
+												{c}
+											</option>
+										))}
+									</select>
+								</div>
+							)}
+
+							{/* 6. Maquinário */}
 							<div className='md:col-span-4'>
-								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-									2. Material
+								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1'>
+									<Printer className='w-3 h-3' /> Maquinário (Estoque)
 								</label>
 								<select
-									className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
-									value={tempItem.material}
+									className='w-full text-sm border border-slate-200 p-2 rounded-[10px] bg-white'
+									value={tempItem.maquina_id || 0}
 									onChange={(e) =>
 										setTempItem({
 											...tempItem,
-											material: e.target.value,
-											cor: "",
-											gramatura: "",
-											tamanho: "",
+											maquina_id: Number(e.target.value),
 										})
 									}
-									disabled={!tempItem.servico}
 								>
-									<option value=''>...</option>
-									{availableMaterials.map((m) => (
-										<option key={m} value={m}>
-											{m}
-										</option>
-									))}
-								</select>
-							</div>
-							<div className='md:col-span-4'>
-								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-									3. Especificação
-								</label>
-								<select
-									className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
-									value={tempItem.gramatura || ""}
-									onChange={(e) =>
-										setTempItem({
-											...tempItem,
-											gramatura: e.target.value,
-											tamanho: "",
-											cor: "",
-										})
-									}
-									disabled={!availableSpecs.length}
-								>
-									<option value=''>N/A</option>
-									{availableSpecs.map((g) => (
-										<option key={g} value={g}>
-											{g}
+									<option value='0'>Nenhum / Manual</option>
+									{machinesList.map((m) => (
+										<option key={m.id} value={m.id}>
+											{m.nome}
 										</option>
 									))}
 								</select>
 							</div>
 
-							{/* LINHA 2: Tamanho, Cor, Qtd, Checkbox e Botão */}
-							<div className='md:col-span-3'>
-								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-									4. Tamanho
-								</label>
-								<select
-									className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
-									value={tempItem.tamanho || ""}
-									onChange={(e) =>
-										setTempItem({ ...tempItem, tamanho: e.target.value })
-									}
-									disabled={!availableSizes.length}
-								>
-									<option value=''>N/A</option>
-									{availableSizes.map((s) => (
-										<option key={s} value={s}>
-											{s}
-										</option>
-									))}
-								</select>
-							</div>
-							<div className='md:col-span-3'>
-								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-									5. Cor
-								</label>
-								<select
-									className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
-									value={tempItem.cor}
-									onChange={(e) =>
-										setTempItem({ ...tempItem, cor: e.target.value })
-									}
-									disabled={!tempItem.material}
-								>
-									<option value=''>...</option>
-									{availableColors.map((c) => (
-										<option key={c} value={c}>
-											{c}
-										</option>
-									))}
-								</select>
-							</div>
+							{/* 7. Quantidade */}
 							<div className='md:col-span-2'>
 								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-									6. Qtd
+									Qtd
 								</label>
 								<input
 									type='number'
@@ -736,7 +1582,9 @@ export const OrderModule = ({
 									}
 								/>
 							</div>
-							<div className='md:col-span-2 flex items-center h-full pb-2'>
+
+							{/* 8. Frente e Verso */}
+							<div className='md:col-span-8 flex items-center h-full pb-2'>
 								<label className='flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-600'>
 									<input
 										type='checkbox'
@@ -752,115 +1600,204 @@ export const OrderModule = ({
 									Frente/Verso
 								</label>
 							</div>
-							<div className='md:col-span-2'>
+
+							{/* Botão Adicionar */}
+							<div className='md:col-span-4'>
 								<button
 									onClick={handleAddItem}
 									disabled={!tempItem.quantidade}
 									className='w-full bg-slate-800 text-white text-sm py-2 rounded-[10px] hover:bg-slate-900 transition h-[38px] mt-auto'
 								>
-									Adicionar
+									Adicionar Item
 								</button>
 							</div>
 						</div>
 					</div>
 
-					{/* Lista de Itens */}
-					<div className='space-y-2 max-h-48 overflow-y-auto custom-scrollbar bg-white rounded-[10px] border border-slate-100 p-1'>
-						{formData.items?.length === 0 ? (
-							<div className='p-8 text-center text-slate-400 text-sm'>
-								Nenhum item adicionado ainda.
-							</div>
-						) : (
-							formData.items?.map((item, idx) => (
-								<div
-									key={idx}
-									className='flex justify-between items-center p-3 hover:bg-slate-50 transition border-b border-slate-50 last:border-0'
-								>
-									<div>
-										<p className='font-bold text-sm text-slate-800'>
-											{item.servico} - {item.material}{" "}
-											{item.gramatura ? `(${item.gramatura})` : ""}
-										</p>
-										<div className='flex gap-2 text-[10px] text-slate-500 mt-0.5 uppercase tracking-wide'>
-											<span className='bg-slate-100 px-1.5 rounded'>
-												{item.cor}
-											</span>
-											<span>Qtd: {item.quantidade}</span>
-											{item.is_double_sided && (
-												<span className='bg-indigo-50 text-indigo-600 px-1.5 rounded'>
-													F/V
-												</span>
-											)}
-										</div>
+					{/* LISTA DE ITENS ADICIONADOS (PONTO 2: MAIS DETALHES) */}
+					<div className='space-y-2 max-h-40 overflow-y-auto custom-scrollbar bg-white rounded-[10px] border border-slate-100 p-1'>
+						{formData.items?.map((item: any, idx) => (
+							<div
+								key={idx}
+								className='flex justify-between items-center p-2 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition'
+							>
+								<div className='flex-1 pr-2'>
+									<p className='font-bold text-xs text-slate-800'>
+										{item.servico} - {item.material}
+									</p>
+									<div className='flex flex-wrap gap-2 text-[10px] text-slate-500 mt-0.5'>
+										<span>Qtd: {item.quantidade}</span>
+										{item.tamanho && <span>| {item.tamanho}</span>}
+										{item.gramatura && <span>| {item.gramatura}</span>}
+										{item.cor && <span>| {item.cor}</span>}
 									</div>
-									<div className='text-right flex items-center gap-4'>
-										<p className='font-bold text-slate-700'>
-											{Utils.formatCurrency(item.total)}
+									{item.ruleApplied && item.ruleApplied !== "N/A" && (
+										<p className='text-[9px] text-indigo-500 mt-0.5'>
+											Regra: {item.ruleApplied}
 										</p>
-										<button
-											onClick={() =>
-												setFormData((prev) => ({
-													...prev,
-													items: prev.items?.filter((_, i) => i !== idx),
-												}))
-											}
-											className='text-slate-300 hover:text-red-500 transition'
-										>
-											<Trash2 className='w-4 h-4' />
-										</button>
-									</div>
+									)}
 								</div>
-							))
-						)}
+								<div className='flex items-center gap-3 pl-2 border-l border-slate-100'>
+									<span className='font-bold text-xs text-slate-700 whitespace-nowrap'>
+										{Utils.formatCurrency(item.total)}
+									</span>
+									<button
+										onClick={() =>
+											setFormData((prev) => ({
+												...prev,
+												items: prev.items?.filter((_, i) => i !== idx),
+											}))
+										}
+										className='text-slate-300 hover:text-red-500 transition'
+									>
+										<Trash2 className='w-3.5 h-3.5' />
+									</button>
+								</div>
+							</div>
+						))}
 					</div>
 
-					{/* Rodapé do Modal com Desconto */}
-					<div className='pt-5 border-t border-slate-100'>
-						<div className='flex justify-between items-center mb-4'>
-							<div className='flex items-center gap-3'>
-								<label className='text-xs font-bold text-slate-500 uppercase'>
-									Desconto Pontual (%)
-								</label>
-								<input
-									type='number'
-									className='w-20 border border-slate-200 rounded-[10px] p-2 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none'
-									value={formData.desconto_pontual || 0}
-									onChange={(e) =>
-										setFormData({
-											...formData,
-											desconto_pontual: Number(e.target.value),
-										})
-									}
-								/>
-							</div>
-							<div className='text-right'>
-								<p className='text-xs text-slate-400 font-bold uppercase mb-1'>
-									Total Final
-								</p>
-								<p className='text-3xl font-bold text-indigo-600 tracking-tight'>
-									{Utils.formatCurrency(
-										(formData.items?.reduce((acc, i) => acc + i.total, 0) ||
-											0) *
-											(1 - (formData.desconto_pontual || 0) / 100)
-									)}
-								</p>
-							</div>
+					<div className='pt-5 border-t border-slate-100 flex justify-between items-center'>
+						<div className='flex items-center gap-3'>
+							<label className='text-xs font-bold text-slate-500 uppercase'>
+								Desconto (%)
+							</label>
+							<input
+								type='number'
+								className='w-16 border border-slate-200 rounded-[8px] p-2 text-sm text-center font-bold text-slate-700 outline-none'
+								value={formData.desconto_pontual || 0}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+										desconto_pontual: Number(e.target.value),
+									})
+								}
+							/>
 						</div>
-						<div className='flex justify-end gap-3'>
-							<button
-								onClick={() => setIsModalOpen(false)}
-								className='text-slate-500 hover:text-slate-700 font-medium px-4'
-							>
-								Cancelar
-							</button>
-							<button
-								onClick={handleSave}
-								disabled={!formData.cliente_id || formData.items?.length === 0}
-								className='bg-indigo-600 text-white px-8 py-3 rounded-[10px] hover:bg-indigo-700 font-bold shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
-							>
-								Salvar Ordem
-							</button>
+						<div className='text-right'>
+							<p className='text-xs text-slate-400 font-bold uppercase mb-1'>
+								Total Final
+							</p>
+							<p className='text-2xl font-bold text-indigo-600 tracking-tight'>
+								{Utils.formatCurrency(
+									(formData.items?.reduce((acc, i) => acc + i.total, 0) || 0) *
+										(1 - (formData.desconto_pontual || 0) / 100) +
+										(formData.taxa_extra || 0)
+								)}
+							</p>
 						</div>
+					</div>
+					<div className='flex justify-end gap-3'>
+						<button
+							onClick={() => setIsModalOpen(false)}
+							className='text-slate-500 hover:text-slate-700 font-medium px-4 text-sm'
+						>
+							Cancelar
+						</button>
+						<button
+							onClick={handleSave}
+							className='bg-indigo-600 text-white px-6 py-2.5 rounded-[10px] hover:bg-indigo-700 font-bold shadow-md text-sm'
+						>
+							Salvar Ordem
+						</button>
+					</div>
+				</div>
+			</Modal>
+
+			{/* MODAL CONFIGURAÇÃO TAXA */}
+			<Modal
+				isOpen={isConfigModalOpen}
+				onClose={() => setIsConfigModalOpen(false)}
+				title='Configuração de Taxas'
+				size='sm'
+			>
+				<div className='space-y-4'>
+					<div>
+						<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
+							Taxa Cartão de Débito (%)
+						</label>
+						<input
+							type='number'
+							className='w-full border border-slate-200 p-2.5 rounded-[10px]'
+							value={debitTaxPercent}
+							onChange={(e) => setDebitTaxPercent(Number(e.target.value))}
+						/>
+						<p className='text-[10px] text-slate-400 mt-1'>
+							Essa porcentagem será aplicada automaticamente ao total quando a
+							forma de pagamento for "Cartão de Débito".
+						</p>
+					</div>
+					<div className='flex justify-end pt-2'>
+						<button
+							onClick={handleSaveConfig}
+							className='bg-indigo-600 text-white px-4 py-2 rounded-[10px] font-bold text-sm'
+						>
+							Salvar Configuração
+						</button>
+					</div>
+				</div>
+			</Modal>
+
+			{/* MODAL CLIENTE RÁPIDO */}
+			<Modal
+				isOpen={isQuickClientOpen}
+				onClose={() => setIsQuickClientOpen(false)}
+				title='Novo Cliente Rápido'
+				size='sm'
+			>
+				<div className='space-y-4'>
+					<div>
+						<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
+							Nome *
+						</label>
+						<input
+							type='text'
+							className='w-full border border-slate-200 p-2 rounded-[8px]'
+							value={quickClientData.nome}
+							onChange={(e) =>
+								setQuickClientData({ ...quickClientData, nome: e.target.value })
+							}
+						/>
+					</div>
+					<div>
+						<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
+							Telefone
+						</label>
+						<input
+							type='text'
+							className='w-full border border-slate-200 p-2 rounded-[8px]'
+							value={quickClientData.telefone}
+							onChange={(e) =>
+								setQuickClientData({
+									...quickClientData,
+									telefone: e.target.value,
+								})
+							}
+						/>
+					</div>
+					<div>
+						<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
+							E-mail
+						</label>
+						<input
+							type='email'
+							className='w-full border border-slate-200 p-2 rounded-[8px]'
+							value={quickClientData.email}
+							onChange={(e) =>
+								setQuickClientData({
+									...quickClientData,
+									email: e.target.value,
+								})
+							}
+						/>
+					</div>
+					<div className='flex justify-end pt-2'>
+						<button
+							onClick={handleQuickClientSave}
+							className='bg-emerald-600 text-white px-4 py-2 rounded-[10px] font-bold text-sm'
+						>
+							Criar Cliente
+						</button>
 					</div>
 				</div>
 			</Modal>
