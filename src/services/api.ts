@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Certifique-se que esta porta (8085) é a MESMA que está no server.ts
 export const api = axios.create({
-	baseURL: "http://192.168.100.153:8081/api",
+	baseURL: "http://192.168.100.113:8081/api",
 	// baseURL: "http://Vini:7071/api",
 	timeout: 30000, // 30 segundos de timeout para uploads
 });
