@@ -1,0 +1,19 @@
+## Atualização do Frontend 
+
+1. Gere a nova versão (Build), Isso vai atualizar a pasta dist dentro do seu projeto:
+    cd C:\Aplicacoes\a3system\frontend
+    npm install  #(Só se adicionou libs novas)
+    npm run build
+
+2. Limpe a "Casa" (IIS):
+    a. Vá até a pasta do servidor: C:\inetpub\wwwroot\A3System
+    b. ⚠️ Cuidado com o web.config
+        Apague os arquivos antigos (index.html, pasta assets, etc).
+
+    c. Acesse a pasta C:\Aplicacoes\a3system\frontend\Dist;
+    d. Copie os novos arquivos (Pasta Assets, Index.html)
+    e. Cole tudo que copiou dentro da C:\inetpub\wwwroot\A3System
+
+3. Entrar no IIS:
+    a. Na aba esquerda navegar até o A3System, clicar nele com botão normal;
+    b. Na direita clicar em Stop, e depois start.
