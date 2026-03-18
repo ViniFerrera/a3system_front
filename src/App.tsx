@@ -126,6 +126,17 @@ const App = () => {
 		setUser(null);
 	};
 
+	// ─── Contadores do menu (deve ficar ANTES dos returns condicionais) ────────
+	const counts = useMemo(() => {
+		const openOrders = orders.filter((o) => o.status === "ABERTA").length;
+		const lowStock = stock.filter((s) => (s.saldo || 0) <= (s.minimo || 0)).length;
+		const limitStr = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+		const pendingExpenses = expenses.filter(
+			(e) => e.status === "PENDENTE" && e.vencimento <= limitStr
+		).length;
+		return { orders: openOrders, stock: lowStock, expenses: pendingExpenses };
+	}, [orders, stock, expenses]);
+
 	// ─── Telas de carregamento / login ────────────────────────────────────────
 	if (!authReady) {
 		return (
@@ -136,17 +147,6 @@ const App = () => {
 	}
 
 	if (!user) return <LoginPage />;
-
-	// ─── Contadores do menu ───────────────────────────────────────────────────
-	const counts = useMemo(() => {
-		const openOrders = orders.filter((o) => o.status === "ABERTA").length;
-		const lowStock = stock.filter((s) => (s.saldo || 0) <= (s.minimo || 0)).length;
-		const limitStr = new Date(Date.now() + 86400000).toISOString().split("T")[0];
-		const pendingExpenses = expenses.filter(
-			(e) => e.status === "PENDENTE" && e.vencimento <= limitStr
-		).length;
-		return { orders: openOrders, stock: lowStock, expenses: pendingExpenses };
-	}, [orders, stock, expenses]);
 
 	// ─── Navegação ────────────────────────────────────────────────────────────
 	const navItems: NavItem[] = [
