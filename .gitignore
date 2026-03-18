@@ -1,0 +1,24 @@
+# Variáveis de ambiente — NUNCA commitar
+.env
+.env.local
+.env.production
+
+# Dependências
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/

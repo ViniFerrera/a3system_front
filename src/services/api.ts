@@ -1,20 +1,34 @@
 import axios from "axios";
 
-// Certifique-se que esta porta (8085) é a MESMA que está no server.ts
+const API_BASE =
+	(import.meta.env.VITE_API_URL as string) || "http://localhost:3333/api";
+
 export const api = axios.create({
-	baseURL: "http://192.168.100.113:8081/api",
-	// baseURL: "http://Vini:7071/api",
-	timeout: 30000, // 30 segundos de timeout para uploads
+	baseURL: API_BASE,
+	timeout: 30000,
 });
 
-// Interceptor para garantir que FormData não tenha Content-Type forçado errado
+// ─── Interceptor: injeta o JWT em todas as requisições ───────────────────────
 api.interceptors.request.use((config) => {
-	if (config.data instanceof FormData) {
-		// Deixar undefined permite que o navegador defina o boundary corretamente
-		// Se houver algum cabeçalho padrão de Content-Type, removemos ele aqui
-		if (config.headers) {
-			delete config.headers["Content-Type"];
-		}
+	const token = localStorage.getItem("a3_token");
+	if (token && config.headers) {
+		config.headers.Authorization = `Bearer ${token}`;
+	}
+	// Deixa o browser definir o Content-Type correto para FormData (boundary)
+	if (config.data instanceof FormData && config.headers) {
+		delete config.headers["Content-Type"];
 	}
 	return config;
 });
+
+// ─── Interceptor: redireciona para login se token expirar ────────────────────
+api.interceptors.response.use(
+	(res) => res,
+	(err) => {
+		if (err.response?.status === 401) {
+			localStorage.removeItem("a3_token");
+			window.location.reload();
+		}
+		return Promise.reject(err);
+	}
+);

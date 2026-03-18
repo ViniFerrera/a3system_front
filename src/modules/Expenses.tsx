@@ -228,15 +228,25 @@ export const ExpensesModule = ({
 	};
 
 	const handleDownloadTemplate = () => {
-		const templateData = [
-			["Descrição", "Vencimento", "Obs", "Valor", "Status"],
-			["Conta Luz", "15/12/2025", "Referente Dezembro", 150.5, "PENDENTE"],
-			["Internet", "20/12/2025", "Vivo Fibra", 99.9, "PAGO"],
-		];
+		// Exporta os dados reais cadastrados — se vazio, baixa um modelo de exemplo
+		const hasData = safeExpenses.length > 0;
+		const rows = hasData
+			? safeExpenses.map((e) => ({
+					Descrição: e.produto,
+					Vencimento: e.vencimento,
+					Obs: e.obs || "",
+					Valor: e.valor,
+					Status: e.status,
+			  }))
+			: [
+					{ Descrição: "Conta Luz", Vencimento: "2025-12-15", Obs: "Referente Dezembro", Valor: 150.5, Status: "PENDENTE" },
+					{ Descrição: "Internet", Vencimento: "2025-12-20", Obs: "Vivo Fibra", Valor: 99.9, Status: "PAGO" },
+			  ];
+
 		const wb = XLSX.utils.book_new();
-		const ws = XLSX.utils.aoa_to_sheet(templateData);
-		XLSX.utils.book_append_sheet(wb, ws, "Modelo");
-		XLSX.writeFile(wb, "modelo_despesas.xlsx");
+		const ws = XLSX.utils.json_to_sheet(rows);
+		XLSX.utils.book_append_sheet(wb, ws, "Despesas");
+		XLSX.writeFile(wb, hasData ? "despesas.xlsx" : "modelo_despesas.xlsx");
 	};
 
 	// --- RESTANTE DA LÓGICA (CRUD e UI) ---
@@ -357,7 +367,7 @@ export const ExpensesModule = ({
 						onClick={handleDownloadTemplate}
 						className='flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2 rounded-[10px] hover:bg-slate-50 transition shadow-sm text-sm font-medium'
 					>
-						<Download className='w-4 h-4' /> Modelo .xlsx
+						<Download className='w-4 h-4' /> {safeExpenses.length > 0 ? "Exportar .xlsx" : "Modelo .xlsx"}
 					</button>
 
 					<input
