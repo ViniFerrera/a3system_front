@@ -318,7 +318,7 @@ const App = () => {
 				<main className="flex-1 overflow-y-auto p-4 md:p-7 mt-14 md:mt-0">
 					<div className="max-w-7xl mx-auto">
 						{activeTab === "dashboard" && (
-							<DashboardModule orders={orders} expenses={expenses} />
+							<DashboardModule orders={orders} expenses={expenses} stock={stock} />
 						)}
 						{activeTab === "ai" && <AiInsightsModule />}
 						{activeTab === "orders" && (
