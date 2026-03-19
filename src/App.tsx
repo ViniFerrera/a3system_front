@@ -208,7 +208,7 @@ const App = () => {
 			<aside
 				className={`fixed inset-y-0 left-0 w-64 bg-slate-900 flex flex-col z-40 transform transition-transform duration-300 ease-in-out md:translate-x-0 shadow-2xl ${
 					isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-				} md:static pt-16 md:pt-0`}
+				} md:sticky md:top-0 md:h-screen pt-16 md:pt-0`}
 			>
 				{/* Logo */}
 				<div className="hidden md:flex items-center gap-3 px-5 py-6 border-b border-slate-800">
