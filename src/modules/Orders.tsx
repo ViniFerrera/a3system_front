@@ -30,7 +30,10 @@ import {
 	CreditCard,
 	Settings,
 	Save,
-	RefreshCcw, // Ícone adicionado
+	RefreshCcw,
+	CheckCircle2,
+	XCircle,
+	BarChart2,
 } from "lucide-react";
 import { api } from "@/services/api";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
@@ -268,7 +271,7 @@ export const OrderModule = ({
 	>("TODOS");
 	const [filterOrderStatus, setFilterOrderStatus] = useState<
 		"TODOS" | "ABERTA" | "CONCLUIDA" | "CANCELADA"
-	>("ABERTA");
+	>("TODOS");
 
 	useEffect(() => {
 		api
@@ -975,7 +978,25 @@ export const OrderModule = ({
 				</button>
 			</div>
 
-			{/* 3. TABS STATUS */}
+			{/* 3. STATUS ORDEM + TABS PAGAMENTO */}
+			<div className='flex flex-wrap gap-2 mb-2'>
+				{([
+					{ key: "TODOS", label: "Todas", icon: <BarChart2 className="w-3.5 h-3.5" />, active: "bg-indigo-500 text-white border-indigo-500", inactive: "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50" },
+					{ key: "ABERTA", label: "Abertas", icon: <Clock className="w-3.5 h-3.5" />, active: "bg-blue-500 text-white border-blue-500", inactive: "bg-white text-blue-600 border-blue-200 hover:bg-blue-50" },
+					{ key: "CONCLUIDA", label: "Concluídas", icon: <CheckCircle2 className="w-3.5 h-3.5" />, active: "bg-emerald-500 text-white border-emerald-500", inactive: "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50" },
+					{ key: "CANCELADA", label: "Canceladas", icon: <XCircle className="w-3.5 h-3.5" />, active: "bg-slate-600 text-white border-slate-600", inactive: "bg-white text-slate-500 border-slate-200 hover:bg-slate-50" },
+				] as const).map((btn) => {
+					const count = orders.filter((o) => btn.key === "TODOS" || o.status === btn.key).length;
+					return (
+						<button key={btn.key} onClick={() => setFilterOrderStatus(btn.key as any)}
+							className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-semibold text-xs transition-all duration-150 shadow-sm ${filterOrderStatus === btn.key ? btn.active + " shadow-md" : btn.inactive}`}
+						>
+							{btn.icon}{btn.label}
+							<span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${filterOrderStatus === btn.key ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{count}</span>
+						</button>
+					);
+				})}
+			</div>
 			<div className='flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-200 pb-1'>
 				<div className='flex gap-1'>
 					{[
@@ -1252,9 +1273,7 @@ export const OrderModule = ({
 																		Arquivos
 																	</h5>
 																	<div className='mb-3 bg-slate-50 p-2 rounded border border-slate-200 text-[10px] text-slate-500 font-mono break-all'>
-																		C:\Users\vinie\OneDrive\01_A3_Art_Copy\Ordens\
-																		{order.data.split("T")[0]}\OS{order.id}_
-																		{order.cliente_nome.replace(/\s+/g, "_")}
+																		Ordens/{order.data.split("T")[0]}/OS{order.id}_{order.cliente_nome.replace(/\s+/g, "_")}
 																	</div>
 																</div>
 															</div>

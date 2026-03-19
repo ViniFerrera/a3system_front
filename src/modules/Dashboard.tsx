@@ -99,7 +99,7 @@ export const DashboardModule = ({
 	const [endDate, setEndDate] = useState(() => periodToDates("12m").end);
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 	const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string[]>([]);
-	const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("CONCLUIDA");
+	const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("ALL");
 
 	// ── Filtro inferior (gráficos + tabela OS abertas) ───────────────────────
 	const [bottomPeriod, setBottomPeriod] = useState<BottomPeriod>("30d");
@@ -179,23 +179,26 @@ export const DashboardModule = ({
 
 	// ── Gráfico Mensal (dinâmico baseado no período) ──────────────────────────
 	const monthlyData = useMemo(() => {
-		const months = new Map<string, { name: string; receita: number; despesa: number; lucro: number }>();
+		const months = new Map<string, { name: string; receita_concluida: number; receita_aberta: number; despesa: number; lucro: number }>();
 		let curr = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth(), 1);
 		const end = new Date(endDate);
 		while (curr <= end) {
 			const key = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}`;
 			const label = curr.toLocaleString("pt-BR", { month: "short", year: curr.getFullYear() !== now.getFullYear() ? "2-digit" : undefined });
-			months.set(key, { name: label, receita: 0, despesa: 0, lucro: 0 });
+			months.set(key, { name: label, receita_concluida: 0, receita_aberta: 0, despesa: 0, lucro: 0 });
 			curr.setMonth(curr.getMonth() + 1);
 		}
-		orders.filter((o) => orderStatusFilter === "ALL" || o.status === orderStatusFilter).forEach((o) => {
+		orders.forEach((o) => {
+			if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return;
 			const d = new Date(o.data_conclusao || o.data);
 			const key = toLocalDate(d).slice(0, 7);
 			const entry = months.get(key);
 			if (!entry) return;
 			if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return;
-			if (selectedServices.length === 0 || o.items.some((i) => selectedServices.includes(i.servico)))
-				entry.receita += calcOrderTotal(o);
+			const val = (selectedServices.length === 0 || o.items.some((i) => selectedServices.includes(i.servico))) ? calcOrderTotal(o) : 0;
+			if (val <= 0) return;
+			if (o.status === "CONCLUIDA") entry.receita_concluida += val;
+			else entry.receita_aberta += val;
 		});
 		expenses.filter((e) => e.status === "PAGO").forEach((e) => {
 			const d = new Date(e.vencimento);
@@ -203,7 +206,11 @@ export const DashboardModule = ({
 			const entry = months.get(key);
 			if (entry) entry.despesa += e.valor;
 		});
-		return Array.from(months.values()).map((d) => ({ ...d, lucro: d.receita - d.despesa }));
+		return Array.from(months.values()).map((d) => ({
+			...d,
+			receita: d.receita_concluida + d.receita_aberta,
+			lucro: d.receita_concluida + d.receita_aberta - d.despesa,
+		}));
 	}, [orders, expenses, selectedServices, selectedPaymentStatus, orderStatusFilter, startDate, endDate]);
 
 	// ── Dados do filtro inferior ──────────────────────────────────────────────
@@ -370,7 +377,7 @@ export const DashboardModule = ({
 							<MultiSelect options={allServices} selected={selectedServices} onChange={setSelectedServices} placeholder="Todos" />
 						</div>
 						<button
-							onClick={() => { setPeriodPreset("30d"); setSelectedServices([]); setSelectedPaymentStatus([]); setOrderStatusFilter("CONCLUIDA"); }}
+							onClick={() => { setPeriodPreset("12m"); setSelectedServices([]); setSelectedPaymentStatus([]); setOrderStatusFilter("ALL"); }}
 							className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-red-500 px-3 py-2 rounded-xl hover:bg-red-50 transition-all"
 						>
 							<RefreshCw className="w-3 h-3" /> Limpar
@@ -400,7 +407,8 @@ export const DashboardModule = ({
 							</p>
 						</div>
 						<div className="flex gap-3 text-[11px] font-semibold text-slate-500">
-							<span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-400 inline-block" />Receita</span>
+							<span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-400 inline-block" />Concluídas</span>
+							<span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-300 inline-block" />Abertas</span>
 							<span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-rose-400 inline-block" />Despesa</span>
 							<span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" />Lucro</span>
 						</div>
@@ -411,8 +419,9 @@ export const DashboardModule = ({
 							<XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
 							<YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
 							<Tooltip content={<CustomTooltip />} />
-							<Bar dataKey="receita" name="Receita" fill="#34d399" radius={[5, 5, 0, 0]} barSize={14} />
-							<Bar dataKey="despesa" name="Despesa" fill="#fb7185" radius={[5, 5, 0, 0]} barSize={14} />
+							<Bar dataKey="receita_concluida" name="Concluídas" stackId="receita" fill="#34d399" barSize={16} />
+							<Bar dataKey="receita_aberta" name="Abertas" stackId="receita" fill="#fbbf24" radius={[5, 5, 0, 0]} barSize={16} />
+							<Bar dataKey="despesa" name="Despesa" fill="#fb7185" radius={[5, 5, 0, 0]} barSize={16} />
 							<Line type="monotone" dataKey="lucro" name="Lucro" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
 						</ComposedChart>
 					</ResponsiveContainer>

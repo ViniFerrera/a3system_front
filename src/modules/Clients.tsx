@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { Client } from "@/types";
+import * as XLSX from "xlsx";
 import {
 	Plus,
 	Search,
@@ -12,6 +13,8 @@ import {
 	MapPin,
 	User,
 	Building2,
+	Download,
+	Upload,
 } from "lucide-react";
 import { api } from "@/services/api";
 
@@ -22,6 +25,7 @@ export const ClientsModule = ({
 	clients: Client[];
 	setClients: Function;
 }) => {
+	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -39,6 +43,88 @@ export const ClientsModule = ({
 				String(c.id).includes(term) // Pesquisa por ID
 		);
 	}, [clients, searchTerm]);
+
+	const normalizeKey = (key: string) =>
+		key
+			.normalize("NFD")
+			.replace(/[\u0300-\u036f]/g, "")
+			.toLowerCase()
+			.trim();
+
+	const handleExportExcel = () => {
+		const rows = clients.map((c) => ({
+			Tipo: c.tipo || "",
+			Nome: c.nome || "",
+			Email: c.email || "",
+			Telefone: c.telefone || "",
+			CPF_CNPJ: c.cpf_cnpj || "",
+			CEP: c.cep || "",
+			Endereco: c.endereco || "",
+			Numero: c.numero || "",
+			Complemento: c.complemento || "",
+			Indicador_Municipal: c.indicador_municipal || "",
+			Observacoes: c.observacoes || "",
+		}));
+		const wb = XLSX.utils.book_new();
+		const ws = XLSX.utils.json_to_sheet(rows);
+		XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+		XLSX.writeFile(wb, "clientes.xlsx");
+	};
+
+	const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = async (evt) => {
+			try {
+				const bstr = evt.target?.result;
+				const workbook = XLSX.read(bstr, { type: "binary" });
+				const wsname = workbook.SheetNames[0];
+				const ws = workbook.Sheets[wsname];
+				const rawData = XLSX.utils.sheet_to_json(ws);
+
+				const normalizedData = rawData.map((row: any) => {
+					const getValue = (possibleKeys: string[]) => {
+						const rowKeys = Object.keys(row);
+						const foundKey = rowKeys.find((k) =>
+							possibleKeys.includes(normalizeKey(k))
+						);
+						return foundKey ? row[foundKey] : undefined;
+					};
+
+					return {
+						tipo: getValue(["tipo", "type", "pessoa"]) || "PF",
+						nome: getValue(["nome", "name", "razao social", "razao"]) || "Cliente Importado",
+						email: getValue(["email", "e-mail"]) || "",
+						telefone: getValue(["telefone", "tel", "phone", "fone"]) || "",
+						cpf_cnpj: getValue(["cpf_cnpj", "cpf", "cnpj", "documento", "doc"]) || "",
+						cep: getValue(["cep", "zip"]) || "",
+						endereco: getValue(["endereco", "logradouro", "rua", "address"]) || "",
+						numero: getValue(["numero", "num", "nro"]) || "",
+						complemento: getValue(["complemento", "compl"]) || "",
+						indicador_municipal: getValue(["indicador_municipal", "inscricao municipal", "im"]) || "",
+						observacoes: getValue(["observacoes", "obs", "observacao", "notas"]) || "",
+					};
+				});
+
+				if (normalizedData.length > 0) {
+					const promises = normalizedData.map((item) => api.post("/clients", item));
+					await Promise.all(promises);
+					const res = await api.get("/clients");
+					setClients(res.data);
+					alert(`${normalizedData.length} clientes importados com sucesso.`);
+				} else {
+					alert("O arquivo parece estar vazio ou ilegível.");
+				}
+			} catch (err) {
+				console.error(err);
+				alert("Erro ao importar arquivo Excel.");
+			}
+		};
+		reader.readAsBinaryString(file);
+		if (fileInputRef.current) fileInputRef.current.value = "";
+	};
 
 	const handleSave = async () => {
 		// CORREÇÃO: Apenas Nome é obrigatório (Email removido da validação)
@@ -92,12 +178,33 @@ export const ClientsModule = ({
 				<h2 className='text-2xl font-bold text-slate-800'>
 					Gestão de Clientes
 				</h2>
-				<button
-					onClick={() => openModal()}
-					className='flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition shadow-sm font-medium'
-				>
-					<Plus className='w-4 h-4' /> Novo Cliente
-				</button>
+				<div className='flex gap-2'>
+					<button
+						onClick={handleExportExcel}
+						className='flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-[10px] hover:bg-slate-50 transition shadow-sm text-sm font-medium'
+					>
+						<Download className='w-4 h-4' /> Exportar
+					</button>
+					<input
+						type='file'
+						ref={fileInputRef}
+						onChange={handleImportExcel}
+						className='hidden'
+						accept='.csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel'
+					/>
+					<button
+						onClick={() => fileInputRef.current?.click()}
+						className='flex items-center gap-2 bg-slate-800 text-white px-4 py-2.5 rounded-[10px] hover:bg-slate-900 transition shadow-sm text-sm font-medium'
+					>
+						<Upload className='w-4 h-4' /> Importar
+					</button>
+					<button
+						onClick={() => openModal()}
+						className='flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition shadow-sm font-medium'
+					>
+						<Plus className='w-4 h-4' /> Novo Cliente
+					</button>
+				</div>
 			</div>
 			<div className='relative group'>
 				<Search className='absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors' />

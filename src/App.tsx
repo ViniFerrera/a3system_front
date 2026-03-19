@@ -13,6 +13,7 @@ import {
 	ChevronRight,
 	LogOut,
 	Shield,
+	HardDrive,
 } from "lucide-react";
 import { LoginPage } from "@/pages/Login";
 import { DashboardModule } from "@/modules/Dashboard";
@@ -24,6 +25,7 @@ import { ExpensesModule } from "@/modules/Expenses";
 import { MachineryModule } from "@/modules/Machinery";
 import { AiInsightsModule } from "@/modules/AiInsights";
 import { UsersModule } from "@/modules/Users";
+import { DatabaseSecurityModule } from "@/modules/DatabaseSecurity";
 import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
 import { api } from "@/services/api";
 
@@ -161,6 +163,7 @@ const App = () => {
 		{ id: "pricing", icon: Settings, label: "Preços", group: "Configuração" },
 		{ id: "expenses", icon: DollarSign, label: "Financeiro", group: "Configuração" },
 		{ id: "users", icon: Shield, label: "Usuários", group: "Configuração" },
+		{ id: "db-security", icon: HardDrive, label: "Banco de Dados", group: "Configuração" },
 	];
 
 	const groups = ["Principal", "Operacional", "Configuração"];
@@ -351,6 +354,7 @@ const App = () => {
 							<ExpensesModule expenses={expenses} setExpenses={setExpenses} />
 						)}
 						{activeTab === "users" && <UsersModule />}
+						{activeTab === "db-security" && <DatabaseSecurityModule />}
 					</div>
 				</main>
 			</div>

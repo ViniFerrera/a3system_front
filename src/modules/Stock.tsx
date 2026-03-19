@@ -1,11 +1,12 @@
 // Apenas o trecho de renderização do Card foi alterado para incluir o .toFixed(2)
 // O restante da lógica permanece, mas como solicitado, segue o arquivo completo atualizado.
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { MultiSelect } from "@/components/ui/MultiSelect";
 import { StockItem, PriceRule } from "@/types";
+import * as XLSX from "xlsx";
 import {
 	Box,
 	AlertTriangle,
@@ -17,6 +18,8 @@ import {
 	Printer,
 	Layers,
 	Settings,
+	Download,
+	Upload,
 } from "lucide-react";
 import { api } from "@/services/api";
 
@@ -40,6 +43,7 @@ export const StockModule = ({
 	setStock: Function;
 	priceTable: PriceRule[];
 }) => {
+	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [editingItem, setEditingItem] = useState<StockItemWithToner | null>(
@@ -143,6 +147,84 @@ export const StockModule = ({
 
 		return { groups, sortedKeys };
 	}, [filteredStock]);
+
+	const normalizeKey = (key: string) =>
+		key
+			.normalize("NFD")
+			.replace(/[\u0300-\u036f]/g, "")
+			.toLowerCase()
+			.trim();
+
+	const handleExportExcel = () => {
+		const rows = stock.map((item) => ({
+			Nome: item.nome || "",
+			Unidade: item.unidade || "",
+			Saldo: item.saldo ?? 0,
+			Minimo: item.minimo ?? 0,
+			Associacao_Material: item.associacao_material || "",
+			Associacao_Especificacao: item.associacao_especificacao || "",
+			Associacao_Tamanho: item.associacao_tamanho || "",
+			Is_Toner: item.is_toner ? 1 : 0,
+			Print_Yield: item.print_yield ?? 0,
+		}));
+		const wb = XLSX.utils.book_new();
+		const ws = XLSX.utils.json_to_sheet(rows);
+		XLSX.utils.book_append_sheet(wb, ws, "Estoque");
+		XLSX.writeFile(wb, "estoque.xlsx");
+	};
+
+	const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = async (evt) => {
+			try {
+				const bstr = evt.target?.result;
+				const workbook = XLSX.read(bstr, { type: "binary" });
+				const wsname = workbook.SheetNames[0];
+				const ws = workbook.Sheets[wsname];
+				const rawData = XLSX.utils.sheet_to_json(ws);
+
+				const normalizedData = rawData.map((row: any) => {
+					const getValue = (possibleKeys: string[]) => {
+						const rowKeys = Object.keys(row);
+						const foundKey = rowKeys.find((k) =>
+							possibleKeys.includes(normalizeKey(k))
+						);
+						return foundKey ? row[foundKey] : undefined;
+					};
+
+					return {
+						nome: getValue(["nome", "name", "item"]) || "Item Importado",
+						unidade: getValue(["unidade", "unid", "unit"]) || "un",
+						saldo: Number(getValue(["saldo", "quantidade", "qtd", "qty"]) || 0),
+						minimo: Number(getValue(["minimo", "min", "estoque minimo"]) || 10),
+						associacao_material: getValue(["associacao_material", "material", "categoria"]) || "",
+						associacao_especificacao: getValue(["associacao_especificacao", "especificacao", "gramatura"]) || "",
+						associacao_tamanho: getValue(["associacao_tamanho", "tamanho", "papel"]) || "",
+						is_toner: Number(getValue(["is_toner", "toner"]) || 0) ? 1 : 0,
+						print_yield: Number(getValue(["print_yield", "rendimento", "yield"]) || 1500),
+					};
+				});
+
+				if (normalizedData.length > 0) {
+					const promises = normalizedData.map((item) => api.post("/stock", item));
+					await Promise.all(promises);
+					const res = await api.get("/stock");
+					setStock(res.data);
+					alert(`${normalizedData.length} itens importados com sucesso.`);
+				} else {
+					alert("O arquivo parece estar vazio ou ilegível.");
+				}
+			} catch (err) {
+				console.error(err);
+				alert("Erro ao importar arquivo Excel.");
+			}
+		};
+		reader.readAsBinaryString(file);
+		if (fileInputRef.current) fileInputRef.current.value = "";
+	};
 
 	const handleSave = async () => {
 		if (!formData.nome || !formData.unidade) {
@@ -250,6 +332,25 @@ export const StockModule = ({
 							onChange={(e) => setSearchTerm(e.target.value)}
 						/>
 					</div>
+					<button
+						onClick={handleExportExcel}
+						className='flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2 rounded-[8px] hover:bg-slate-50 transition text-sm font-medium shadow-sm'
+					>
+						<Download className='w-4 h-4' /> Exportar
+					</button>
+					<input
+						type='file'
+						ref={fileInputRef}
+						onChange={handleImportExcel}
+						className='hidden'
+						accept='.csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel'
+					/>
+					<button
+						onClick={() => fileInputRef.current?.click()}
+						className='flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-[8px] hover:bg-slate-900 transition text-sm font-medium shadow-sm'
+					>
+						<Upload className='w-4 h-4' /> Importar
+					</button>
 					<button
 						onClick={() => openModal()}
 						className='flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-[8px] hover:bg-slate-900 transition text-sm font-medium'
