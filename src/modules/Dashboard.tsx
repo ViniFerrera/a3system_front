@@ -69,6 +69,10 @@ const KpiCard = ({ label, value, sub, icon, gradient, trend }: KpiCardProps) => 
 	</div>
 );
 
+// ─── Local date string (YYYY-MM-DD) sem conversão UTC ────────────────────────
+const toLocalDate = (d: Date) =>
+	`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 // ─── Compute dates from period preset ────────────────────────────────────────
 const periodToDates = (preset: PeriodPreset | BottomPeriod) => {
 	const end = new Date();
@@ -78,10 +82,7 @@ const periodToDates = (preset: PeriodPreset | BottomPeriod) => {
 	else if (preset === "3m") start.setMonth(end.getMonth() - 3);
 	else if (preset === "6m") start.setMonth(end.getMonth() - 6);
 	else if (preset === "12m") start.setFullYear(end.getFullYear() - 1);
-	return {
-		start: start.toISOString().split("T")[0],
-		end: end.toISOString().split("T")[0],
-	};
+	return { start: toLocalDate(start), end: toLocalDate(end) };
 };
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
@@ -93,9 +94,9 @@ export const DashboardModule = ({
 	const now = new Date();
 
 	// ── Filtros principais ───────────────────────────────────────────────────
-	const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("30d");
-	const [startDate, setStartDate] = useState(() => periodToDates("30d").start);
-	const [endDate, setEndDate] = useState(() => periodToDates("30d").end);
+	const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("12m");
+	const [startDate, setStartDate] = useState(() => periodToDates("12m").start);
+	const [endDate, setEndDate] = useState(() => periodToDates("12m").end);
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 	const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string[]>([]);
 	const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("CONCLUIDA");
@@ -121,11 +122,9 @@ export const DashboardModule = ({
 
 	// ── Helpers ──────────────────────────────────────────────────────────────
 	const filterByDate = (dateStr: string, start: string, end: string) => {
-		const date = new Date(dateStr);
-		const s = start ? new Date(start) : null;
-		const e = end ? new Date(end) : null;
-		if (e) e.setHours(23, 59, 59, 999);
-		return (!s || date >= s) && (!e || date <= e);
+		if (!dateStr) return false;
+		const dateLocal = toLocalDate(new Date(dateStr));
+		return (!start || dateLocal >= start) && (!end || dateLocal <= end);
 	};
 
 	const calcOrderTotal = (order: Order) => {
@@ -191,7 +190,7 @@ export const DashboardModule = ({
 		}
 		orders.filter((o) => orderStatusFilter === "ALL" || o.status === orderStatusFilter).forEach((o) => {
 			const d = new Date(o.data_conclusao || o.data);
-			const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+			const key = toLocalDate(d).slice(0, 7);
 			const entry = months.get(key);
 			if (!entry) return;
 			if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return;
@@ -200,7 +199,7 @@ export const DashboardModule = ({
 		});
 		expenses.filter((e) => e.status === "PAGO").forEach((e) => {
 			const d = new Date(e.vencimento);
-			const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+			const key = toLocalDate(d).slice(0, 7);
 			const entry = months.get(key);
 			if (entry) entry.despesa += e.valor;
 		});
@@ -217,7 +216,7 @@ export const DashboardModule = ({
 	const dailyData = useMemo(() => {
 		const daysMap = new Map<string, { receita: number; volume: number }>();
 		bottomOrders.forEach((o) => {
-			const key = new Date(o.data_conclusao || o.data).toISOString().split("T")[0];
+			const key = toLocalDate(new Date(o.data_conclusao || o.data));
 			const cur = daysMap.get(key) || { receita: 0, volume: 0 };
 			daysMap.set(key, { receita: cur.receita + o.total, volume: cur.volume + 1 });
 		});
@@ -226,7 +225,7 @@ export const DashboardModule = ({
 		const result = [];
 		let c = new Date(s);
 		while (c <= e) {
-			const key = c.toISOString().split("T")[0];
+			const key = toLocalDate(c);
 			const val = daysMap.get(key) || { receita: 0, volume: 0 };
 			result.push({ date: c.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), ...val });
 			c.setDate(c.getDate() + 1);
