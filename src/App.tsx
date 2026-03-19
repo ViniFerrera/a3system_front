@@ -12,6 +12,7 @@ import {
 	Bot,
 	ChevronRight,
 	LogOut,
+	Shield,
 } from "lucide-react";
 import { LoginPage } from "@/pages/Login";
 import { DashboardModule } from "@/modules/Dashboard";
@@ -22,6 +23,7 @@ import { ClientsModule } from "@/modules/Clients";
 import { ExpensesModule } from "@/modules/Expenses";
 import { MachineryModule } from "@/modules/Machinery";
 import { AiInsightsModule } from "@/modules/AiInsights";
+import { UsersModule } from "@/modules/Users";
 import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
 import { api } from "@/services/api";
 
@@ -158,6 +160,7 @@ const App = () => {
 		{ id: "machinery", icon: Printer, label: "Maquinário", group: "Operacional" },
 		{ id: "pricing", icon: Settings, label: "Preços", group: "Configuração" },
 		{ id: "expenses", icon: DollarSign, label: "Financeiro", group: "Configuração" },
+		{ id: "users", icon: Shield, label: "Usuários", group: "Configuração" },
 	];
 
 	const groups = ["Principal", "Operacional", "Configuração"];
@@ -347,6 +350,7 @@ const App = () => {
 						{activeTab === "expenses" && (
 							<ExpensesModule expenses={expenses} setExpenses={setExpenses} />
 						)}
+						{activeTab === "users" && <UsersModule />}
 					</div>
 				</main>
 			</div>

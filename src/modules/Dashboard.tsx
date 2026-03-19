@@ -1,27 +1,35 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
 	ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-	ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell,
-	LabelList, BarChart,
+	ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart,
 } from "recharts";
 import {
 	TrendingUp, Wallet, ArrowDownRight, ArrowUpRight, Filter,
 	CheckCircle2, Clock, XCircle, BarChart2, AlertTriangle, Receipt,
-	Target, Package, RefreshCw, DollarSign,
+	Target, Package, RefreshCw, DollarSign, ChevronDown,
 } from "lucide-react";
 import { Order, Expense, StockItem } from "@/types";
 import { Utils } from "@/utils";
 import { MultiSelect } from "@/components/ui/MultiSelect";
 
 type OrderStatusFilter = "CONCLUIDA" | "ABERTA" | "CANCELADA" | "ALL";
+type PeriodPreset = "30d" | "3m" | "6m" | "12m" | "custom";
+type BottomPeriod = "7d" | "30d" | "3m" | "6m";
 
 const PIE_COLORS: Record<string, string> = {
-	PAGO: "#10b981",
-	PARCIAL: "#f59e0b",
-	NAO_PAGO: "#f43f5e",
+	PAGO: "#10b981", PARCIAL: "#f59e0b", NAO_PAGO: "#f43f5e",
 };
 
-// ─── Custom Tooltip ──────────────────────────────────────────────────────────
+const paymentLabel: Record<string, string> = {
+	PAGO: "Pago", PARCIAL: "Parcial", NAO_PAGO: "Não Pago",
+};
+
+const paymentBadge: Record<string, string> = {
+	PAGO: "bg-emerald-100 text-emerald-700",
+	PARCIAL: "bg-amber-100 text-amber-700",
+	NAO_PAGO: "bg-red-100 text-red-600",
+};
+
 const CustomTooltip = ({ active, payload, label }: any) => {
 	if (!active || !payload?.length) return null;
 	return (
@@ -31,37 +39,27 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 				<div key={i} className="flex items-center gap-2 mt-1">
 					<span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color || p.fill }} />
 					<span className="text-slate-500 text-xs">{p.name}:</span>
-					<span className="font-bold text-slate-800 text-xs ml-auto">
-						{Utils.formatCurrency(Number(p.value))}
-					</span>
+					<span className="font-bold text-slate-800 text-xs ml-auto">{Utils.formatCurrency(Number(p.value))}</span>
 				</div>
 			))}
 		</div>
 	);
 };
 
-// ─── KPI Card ────────────────────────────────────────────────────────────────
 interface KpiCardProps {
-	label: string;
-	value: string;
-	sub: string;
-	icon: React.ReactNode;
-	gradient: string;
-	trend?: number;
+	label: string; value: string; sub: string;
+	icon: React.ReactNode; gradient: string; trend?: number;
 }
-
 const KpiCard = ({ label, value, sub, icon, gradient, trend }: KpiCardProps) => (
 	<div className={`rounded-2xl p-5 text-white shadow-lg ${gradient} relative overflow-hidden`}>
-		<div className="absolute right-3 top-3 opacity-[0.15] scale-[2] origin-center">{icon}</div>
+		<div className="absolute right-3 top-3 opacity-[0.12] scale-[2.2] origin-center">{icon}</div>
 		<div className="relative z-10">
 			<p className="text-white/75 text-[10px] font-bold uppercase tracking-widest mb-1">{label}</p>
 			<p className="text-2xl font-bold leading-tight tracking-tight">{value}</p>
 			<div className="flex items-center gap-2 mt-1.5 flex-wrap">
 				<p className="text-white/65 text-xs">{sub}</p>
 				{trend !== undefined && (
-					<span className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-						trend >= 0 ? "bg-white/25" : "bg-black/20"
-					}`}>
+					<span className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${trend >= 0 ? "bg-white/25" : "bg-black/20"}`}>
 						{trend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
 						{Math.abs(trend).toFixed(1)}%
 					</span>
@@ -71,36 +69,49 @@ const KpiCard = ({ label, value, sub, icon, gradient, trend }: KpiCardProps) => 
 	</div>
 );
 
+// ─── Compute dates from period preset ────────────────────────────────────────
+const periodToDates = (preset: PeriodPreset | BottomPeriod) => {
+	const end = new Date();
+	const start = new Date();
+	if (preset === "7d") start.setDate(end.getDate() - 7);
+	else if (preset === "30d") start.setDate(end.getDate() - 30);
+	else if (preset === "3m") start.setMonth(end.getMonth() - 3);
+	else if (preset === "6m") start.setMonth(end.getMonth() - 6);
+	else if (preset === "12m") start.setFullYear(end.getFullYear() - 1);
+	return {
+		start: start.toISOString().split("T")[0],
+		end: end.toISOString().split("T")[0],
+	};
+};
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export const DashboardModule = ({
-	orders,
-	expenses,
-	stock = [],
+	orders, expenses, stock = [],
 }: {
-	orders: Order[];
-	expenses: Expense[];
-	stock?: StockItem[];
+	orders: Order[]; expenses: Expense[]; stock?: StockItem[];
 }) => {
 	const now = new Date();
-	const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-	const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
 
-	const [startDate, setStartDate] = useState(defaultStart);
-	const [endDate, setEndDate] = useState(defaultEnd);
+	// ── Filtros principais ───────────────────────────────────────────────────
+	const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("30d");
+	const [startDate, setStartDate] = useState(() => periodToDates("30d").start);
+	const [endDate, setEndDate] = useState(() => periodToDates("30d").end);
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 	const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string[]>([]);
 	const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("CONCLUIDA");
 
-	const allYears = useMemo(() => {
-		const years = new Set<string>();
-		orders.forEach((o) => { const d = o.data_conclusao || o.data; if (d) years.add(new Date(d).getFullYear().toString()); });
-		expenses.forEach((e) => { if (e.vencimento) years.add(new Date(e.vencimento).getFullYear().toString()); });
-		const cy = now.getFullYear().toString();
-		if (!years.has(cy)) years.add(cy);
-		return Array.from(years).sort();
-	}, [orders, expenses]);
+	// ── Filtro inferior (gráficos + tabela OS abertas) ───────────────────────
+	const [bottomPeriod, setBottomPeriod] = useState<BottomPeriod>("30d");
+	const bottomDates = useMemo(() => periodToDates(bottomPeriod), [bottomPeriod]);
 
-	const [selectedYears, setSelectedYears] = useState<string[]>([now.getFullYear().toString()]);
+	// Quando preset muda, atualiza as datas
+	useEffect(() => {
+		if (periodPreset !== "custom") {
+			const { start, end } = periodToDates(periodPreset);
+			setStartDate(start);
+			setEndDate(end);
+		}
+	}, [periodPreset]);
 
 	const allServices = useMemo(() => {
 		const s = new Set<string>();
@@ -108,7 +119,7 @@ export const DashboardModule = ({
 		return Array.from(s);
 	}, [orders]);
 
-	// ─── Helpers ─────────────────────────────────────────────────────────────
+	// ── Helpers ──────────────────────────────────────────────────────────────
 	const filterByDate = (dateStr: string, start: string, end: string) => {
 		const date = new Date(dateStr);
 		const s = start ? new Date(start) : null;
@@ -118,47 +129,42 @@ export const DashboardModule = ({
 	};
 
 	const calcOrderTotal = (order: Order) => {
-		if (selectedServices.length > 0) {
-			return order.items.reduce((acc, i) => (selectedServices.includes(i.servico) ? acc + i.total : acc), 0);
-		}
+		if (selectedServices.length > 0)
+			return order.items.reduce((acc, i) => selectedServices.includes(i.servico) ? acc + i.total : acc, 0);
 		return order.total;
 	};
 
-	// ─── Dados filtrados ─────────────────────────────────────────────────────
-	const currentOrders = useMemo(() => {
-		return orders.filter((o) => {
-			if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return false;
-			if (!filterByDate(o.data_conclusao || o.data, startDate, endDate)) return false;
-			if (selectedServices.length > 0 && !o.items.some((i) => selectedServices.includes(i.servico))) return false;
-			if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return false;
-			return true;
-		});
-	}, [orders, startDate, endDate, selectedServices, selectedPaymentStatus, orderStatusFilter]);
+	// ── Dados filtrados (filtro principal) ───────────────────────────────────
+	const currentOrders = useMemo(() => orders.filter((o) => {
+		if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return false;
+		if (!filterByDate(o.data_conclusao || o.data, startDate, endDate)) return false;
+		if (selectedServices.length > 0 && !o.items.some((i) => selectedServices.includes(i.servico))) return false;
+		if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return false;
+		return true;
+	}), [orders, startDate, endDate, selectedServices, selectedPaymentStatus, orderStatusFilter]);
 
-	const currentExpenses = useMemo(() => {
-		return expenses.filter((e) => e.status === "PAGO" && filterByDate(e.vencimento, startDate, endDate));
-	}, [expenses, startDate, endDate]);
+	const currentExpenses = useMemo(() =>
+		expenses.filter((e) => e.status === "PAGO" && filterByDate(e.vencimento, startDate, endDate)),
+		[expenses, startDate, endDate]);
 
-	// ─── Período anterior (comparação de tendência) ───────────────────────────
-	const prevPeriodRevenue = useMemo(() => {
-		const duration = new Date(endDate).getTime() - new Date(startDate).getTime() + 86400000;
-		const prevEnd = new Date(new Date(startDate).getTime() - 1);
-		const prevStart = new Date(prevEnd.getTime() - duration + 1);
-		const ps = prevStart.toISOString().split("T")[0];
-		const pe = prevEnd.toISOString().split("T")[0];
+	// ── Dados do período anterior (tendência) ────────────────────────────────
+	const prevRevenue = useMemo(() => {
+		const dur = new Date(endDate).getTime() - new Date(startDate).getTime() + 86400000;
+		const pe = new Date(new Date(startDate).getTime() - 1);
+		const ps = new Date(pe.getTime() - dur + 1);
 		return orders
-			.filter((o) => (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, ps, pe))
+			.filter((o) => (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, ps.toISOString().split("T")[0], pe.toISOString().split("T")[0]))
 			.reduce((acc, o) => acc + o.total, 0);
 	}, [orders, startDate, endDate, orderStatusFilter]);
 
-	// ─── Contadores de status ─────────────────────────────────────────────────
+	// ── Status counts ─────────────────────────────────────────────────────────
 	const statusCounts = useMemo(() => ({
 		concluded: orders.filter((o) => o.status === "CONCLUIDA").length,
 		open: orders.filter((o) => o.status === "ABERTA").length,
 		cancelled: orders.filter((o) => o.status === "CANCELADA").length,
 	}), [orders]);
 
-	// ─── KPIs ─────────────────────────────────────────────────────────────────
+	// ── KPIs ─────────────────────────────────────────────────────────────────
 	const kpis = useMemo(() => {
 		const revenue = currentOrders.reduce((acc, o) => acc + calcOrderTotal(o), 0);
 		const expense = currentExpenses.reduce((acc, e) => acc + e.valor, 0);
@@ -166,60 +172,83 @@ export const DashboardModule = ({
 		const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
 		const ticket = currentOrders.length > 0 ? revenue / currentOrders.length : 0;
 		const toReceive = orders
-			.filter((o) => {
-				if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return false;
-				if (!filterByDate(o.data_conclusao || o.data, startDate, endDate)) return false;
-				return (o.status_pagamento || "NAO_PAGO") !== "PAGO";
-			})
+			.filter((o) => (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, startDate, endDate) && (o.status_pagamento || "NAO_PAGO") !== "PAGO")
 			.reduce((acc, o) => acc + o.total, 0);
-		const revTrend = prevPeriodRevenue > 0 ? ((revenue - prevPeriodRevenue) / prevPeriodRevenue) * 100 : undefined;
+		const revTrend = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : undefined;
 		return { revenue, expense, profit, margin, ticket, toReceive, revTrend };
-	}, [currentOrders, currentExpenses, prevPeriodRevenue, orders, startDate, endDate, orderStatusFilter]);
+	}, [currentOrders, currentExpenses, prevRevenue, orders, startDate, endDate, orderStatusFilter]);
 
-	// ─── Gráfico Mensal ───────────────────────────────────────────────────────
+	// ── Gráfico Mensal (dinâmico baseado no período) ──────────────────────────
 	const monthlyData = useMemo(() => {
-		const data = Array(12).fill(0).map((_, i) => {
-			const d = new Date(); d.setMonth(i);
-			return { name: d.toLocaleString("pt-BR", { month: "short" }), receita: 0, despesa: 0, lucro: 0 };
-		});
+		const months = new Map<string, { name: string; receita: number; despesa: number; lucro: number }>();
+		let curr = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth(), 1);
+		const end = new Date(endDate);
+		while (curr <= end) {
+			const key = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}`;
+			const label = curr.toLocaleString("pt-BR", { month: "short", year: curr.getFullYear() !== now.getFullYear() ? "2-digit" : undefined });
+			months.set(key, { name: label, receita: 0, despesa: 0, lucro: 0 });
+			curr.setMonth(curr.getMonth() + 1);
+		}
 		orders.filter((o) => orderStatusFilter === "ALL" || o.status === orderStatusFilter).forEach((o) => {
 			const d = new Date(o.data_conclusao || o.data);
-			if (!selectedYears.includes(d.getFullYear().toString())) return;
+			const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+			const entry = months.get(key);
+			if (!entry) return;
 			if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return;
-			if (selectedServices.length === 0 || o.items.some((i) => selectedServices.includes(i.servico))) {
-				data[d.getMonth()].receita += calcOrderTotal(o);
-			}
+			if (selectedServices.length === 0 || o.items.some((i) => selectedServices.includes(i.servico)))
+				entry.receita += calcOrderTotal(o);
 		});
 		expenses.filter((e) => e.status === "PAGO").forEach((e) => {
 			const d = new Date(e.vencimento);
-			if (selectedYears.includes(d.getFullYear().toString())) data[d.getMonth()].despesa += e.valor;
+			const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+			const entry = months.get(key);
+			if (entry) entry.despesa += e.valor;
 		});
-		data.forEach((d) => (d.lucro = d.receita - d.despesa));
-		return data;
-	}, [orders, expenses, selectedServices, selectedYears, selectedPaymentStatus, orderStatusFilter]);
+		return Array.from(months.values()).map((d) => ({ ...d, lucro: d.receita - d.despesa }));
+	}, [orders, expenses, selectedServices, selectedPaymentStatus, orderStatusFilter, startDate, endDate]);
 
-	// ─── Gráfico Diário ───────────────────────────────────────────────────────
+	// ── Dados do filtro inferior ──────────────────────────────────────────────
+	const bottomOrders = useMemo(() => orders.filter((o) => {
+		if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return false;
+		return filterByDate(o.data_conclusao || o.data, bottomDates.start, bottomDates.end);
+	}), [orders, bottomDates, orderStatusFilter]);
+
+	// ── Gráfico Diário ────────────────────────────────────────────────────────
 	const dailyData = useMemo(() => {
 		const daysMap = new Map<string, { receita: number; volume: number }>();
-		currentOrders.forEach((o) => {
+		bottomOrders.forEach((o) => {
 			const key = new Date(o.data_conclusao || o.data).toISOString().split("T")[0];
 			const cur = daysMap.get(key) || { receita: 0, volume: 0 };
-			daysMap.set(key, { receita: cur.receita + calcOrderTotal(o), volume: cur.volume + 1 });
+			daysMap.set(key, { receita: cur.receita + o.total, volume: cur.volume + 1 });
 		});
-		const s = startDate ? new Date(startDate) : new Date(now.getFullYear(), now.getMonth(), 1);
-		const e = endDate ? new Date(endDate) : now;
+		const s = new Date(bottomDates.start);
+		const e = new Date(bottomDates.end);
 		const result = [];
-		let curr = new Date(s);
-		while (curr <= e) {
-			const key = curr.toISOString().split("T")[0];
+		let c = new Date(s);
+		while (c <= e) {
+			const key = c.toISOString().split("T")[0];
 			const val = daysMap.get(key) || { receita: 0, volume: 0 };
-			result.push({ date: curr.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), ...val });
-			curr.setDate(curr.getDate() + 1);
+			result.push({ date: c.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), ...val });
+			c.setDate(c.getDate() + 1);
 		}
 		return result.length > 31 ? result.filter((_, i) => i % Math.ceil(result.length / 30) === 0) : result;
-	}, [currentOrders, startDate, endDate]);
+	}, [bottomOrders, bottomDates]);
 
-	// ─── Top Serviços / Clientes ──────────────────────────────────────────────
+	// ── Dia da Semana ─────────────────────────────────────────────────────────
+	const dayOfWeekData = useMemo(() => {
+		const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+		const map = new Map<number, { revenue: number; count: number }>();
+		days.forEach((_, i) => map.set(i, { revenue: 0, count: 0 }));
+		bottomOrders.forEach((o) => {
+			const day = new Date(o.data_conclusao || o.data).getDay();
+			const cur = map.get(day)!;
+			map.set(day, { revenue: cur.revenue + o.total, count: cur.count + 1 });
+		});
+		return days.map((name, i) => ({ name, ...map.get(i)! }));
+	}, [bottomOrders]);
+	const maxDayRevenue = Math.max(...dayOfWeekData.map((d) => d.revenue), 1);
+
+	// ── Top Serviços / Clientes ───────────────────────────────────────────────
 	const topServices = useMemo(() => {
 		const map = new Map<string, { volume: number; revenue: number }>();
 		currentOrders.forEach((o) => o.items.forEach((i) => {
@@ -239,8 +268,9 @@ export const DashboardModule = ({
 		});
 		return Array.from(map.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue).slice(0, 7);
 	}, [currentOrders]);
+	const maxClientRevenue = topClients[0]?.revenue || 1;
 
-	// ─── Distribuição de Pagamento ────────────────────────────────────────────
+	// ── Distribuição de Pagamento ─────────────────────────────────────────────
 	const paymentDist = useMemo(() => {
 		const map = new Map([["PAGO", 0], ["PARCIAL", 0], ["NAO_PAGO", 0]]);
 		currentOrders.forEach((o) => {
@@ -250,45 +280,43 @@ export const DashboardModule = ({
 		return Array.from(map.entries()).map(([name, value]) => ({ name, value })).filter((d) => d.value > 0);
 	}, [currentOrders]);
 
-	// ─── Análise por dia da semana ────────────────────────────────────────────
-	const dayOfWeekData = useMemo(() => {
-		const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-		const map = new Map<number, { revenue: number; count: number }>();
-		days.forEach((_, i) => map.set(i, { revenue: 0, count: 0 }));
-		currentOrders.forEach((o) => {
-			const day = new Date(o.data_conclusao || o.data).getDay();
-			const cur = map.get(day)!;
-			map.set(day, { revenue: cur.revenue + calcOrderTotal(o), count: cur.count + 1 });
-		});
-		return days.map((name, i) => ({ name, ...map.get(i)! }));
-	}, [currentOrders]);
-
-	const maxDayRevenue = Math.max(...dayOfWeekData.map((d) => d.revenue), 1);
-
-	// ─── Alertas ─────────────────────────────────────────────────────────────
+	// ── Alertas ───────────────────────────────────────────────────────────────
 	const stockAlerts = useMemo(() => stock.filter((s) => (s.saldo || 0) <= (s.minimo || 0)), [stock]);
-
 	const upcomingExpenses = useMemo(() => {
 		const today = new Date();
 		const in7 = new Date(today.getTime() + 7 * 86400000);
-		return expenses
-			.filter((e) => { if (e.status !== "PENDENTE") return false; const d = new Date(e.vencimento); return d <= in7; })
-			.sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())
-			.slice(0, 5);
+		return expenses.filter((e) => e.status === "PENDENTE" && new Date(e.vencimento) <= in7)
+			.sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime()).slice(0, 5);
 	}, [expenses]);
 
-	// ─── UI helpers ──────────────────────────────────────────────────────────
+	// ── Ordens Abertas (tabela) ───────────────────────────────────────────────
+	const openOrders = useMemo(() =>
+		orders.filter((o) => o.status === "ABERTA")
+			.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+			.slice(0, 10),
+		[orders]);
+
+	// ── UI helpers ────────────────────────────────────────────────────────────
 	const fmt = Utils.formatCurrency;
-	const maxClientRevenue = topClients[0]?.revenue || 1;
-
-	const statusButtons = [
-		{ key: "CONCLUIDA" as const, label: "Concluídas", icon: <CheckCircle2 className="w-3.5 h-3.5" />, active: "bg-emerald-500 text-white border-emerald-500 shadow-emerald-100", inactive: "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50", count: statusCounts.concluded },
-		{ key: "ABERTA" as const, label: "Em Aberto", icon: <Clock className="w-3.5 h-3.5" />, active: "bg-blue-500 text-white border-blue-500 shadow-blue-100", inactive: "bg-white text-blue-600 border-blue-200 hover:bg-blue-50", count: statusCounts.open },
-		{ key: "CANCELADA" as const, label: "Canceladas", icon: <XCircle className="w-3.5 h-3.5" />, active: "bg-slate-600 text-white border-slate-600 shadow-slate-100", inactive: "bg-white text-slate-500 border-slate-200 hover:bg-slate-50", count: statusCounts.cancelled },
-		{ key: "ALL" as const, label: "Todas", icon: <BarChart2 className="w-3.5 h-3.5" />, active: "bg-indigo-500 text-white border-indigo-500 shadow-indigo-100", inactive: "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50", count: orders.length },
+	const periodPresets: { key: PeriodPreset; label: string }[] = [
+		{ key: "30d", label: "30 dias" },
+		{ key: "3m", label: "3 meses" },
+		{ key: "6m", label: "6 meses" },
+		{ key: "12m", label: "12 meses" },
+		{ key: "custom", label: "Personalizado" },
 	];
-
-	const paymentLabel: Record<string, string> = { PAGO: "Pago", PARCIAL: "Parcial", NAO_PAGO: "Não Pago" };
+	const bottomPresets: { key: BottomPeriod; label: string }[] = [
+		{ key: "7d", label: "7 dias" },
+		{ key: "30d", label: "30 dias" },
+		{ key: "3m", label: "3 meses" },
+		{ key: "6m", label: "6 meses" },
+	];
+	const statusButtons = [
+		{ key: "CONCLUIDA" as const, label: "Concluídas", icon: <CheckCircle2 className="w-3.5 h-3.5" />, active: "bg-emerald-500 text-white border-emerald-500", inactive: "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50", count: statusCounts.concluded },
+		{ key: "ABERTA" as const, label: "Em Aberto", icon: <Clock className="w-3.5 h-3.5" />, active: "bg-blue-500 text-white border-blue-500", inactive: "bg-white text-blue-600 border-blue-200 hover:bg-blue-50", count: statusCounts.open },
+		{ key: "CANCELADA" as const, label: "Canceladas", icon: <XCircle className="w-3.5 h-3.5" />, active: "bg-slate-600 text-white border-slate-600", inactive: "bg-white text-slate-500 border-slate-200 hover:bg-slate-50", count: statusCounts.cancelled },
+		{ key: "ALL" as const, label: "Todas", icon: <BarChart2 className="w-3.5 h-3.5" />, active: "bg-indigo-500 text-white border-indigo-500", inactive: "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50", count: orders.length },
+	];
 
 	return (
 		<div className="space-y-5 pb-20 md:pb-0">
@@ -307,58 +335,70 @@ export const DashboardModule = ({
 
 			{/* ── Barra de Filtros ── */}
 			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4">
-				<div className="flex flex-col md:flex-row gap-3 items-end flex-wrap">
-					<div className="flex items-center gap-1.5 text-slate-400 font-bold text-xs uppercase tracking-wide mr-2 mb-1 md:mb-0">
-						<Filter className="w-3.5 h-3.5 text-indigo-400" /> Filtros
+				<div className="flex flex-col gap-3">
+					{/* Período Presets */}
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="flex items-center gap-1.5 text-slate-400 font-bold text-xs uppercase tracking-wide mr-1">
+							<Filter className="w-3.5 h-3.5 text-indigo-400" /> Período
+						</span>
+						{periodPresets.map((p) => (
+							<button key={p.key} onClick={() => setPeriodPreset(p.key)}
+								className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${periodPreset === p.key ? "bg-indigo-600 text-white border-indigo-600 shadow-sm" : "bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600"}`}
+							>{p.label}</button>
+						))}
 					</div>
-					<div className="w-full md:w-36">
-						<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Início</label>
-						<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+					{/* Se custom, mostra date pickers */}
+					{periodPreset === "custom" && (
+						<div className="flex flex-wrap gap-3 items-end">
+							<div className="w-full md:w-36">
+								<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Início</label>
+								<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+							</div>
+							<div className="w-full md:w-36">
+								<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Fim</label>
+								<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+							</div>
+						</div>
+					)}
+					{/* Filtros adicionais */}
+					<div className="flex flex-wrap gap-3 items-end">
+						<div className="w-full md:w-44">
+							<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Pagamento</label>
+							<MultiSelect options={["PAGO", "PARCIAL", "NAO_PAGO"]} selected={selectedPaymentStatus} onChange={setSelectedPaymentStatus} placeholder="Todos" />
+						</div>
+						<div className="w-full md:w-52">
+							<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Serviços</label>
+							<MultiSelect options={allServices} selected={selectedServices} onChange={setSelectedServices} placeholder="Todos" />
+						</div>
+						<button
+							onClick={() => { setPeriodPreset("30d"); setSelectedServices([]); setSelectedPaymentStatus([]); setOrderStatusFilter("CONCLUIDA"); }}
+							className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-red-500 px-3 py-2 rounded-xl hover:bg-red-50 transition-all"
+						>
+							<RefreshCw className="w-3 h-3" /> Limpar
+						</button>
 					</div>
-					<div className="w-full md:w-36">
-						<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Fim</label>
-						<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-					</div>
-					<div className="w-full md:w-28">
-						<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Ano(s)</label>
-						<MultiSelect options={allYears} selected={selectedYears} onChange={setSelectedYears} placeholder="Ano" />
-					</div>
-					<div className="w-full md:w-44">
-						<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Pagamento</label>
-						<MultiSelect options={["PAGO", "PARCIAL", "NAO_PAGO"]} selected={selectedPaymentStatus} onChange={setSelectedPaymentStatus} placeholder="Todos" />
-					</div>
-					<div className="w-full md:w-52">
-						<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Serviços</label>
-						<MultiSelect options={allServices} selected={selectedServices} onChange={setSelectedServices} placeholder="Todos" />
-					</div>
-					<button
-						onClick={() => { setStartDate(defaultStart); setEndDate(defaultEnd); setSelectedServices([]); setSelectedYears([now.getFullYear().toString()]); setSelectedPaymentStatus([]); setOrderStatusFilter("CONCLUIDA"); }}
-						className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-red-500 px-3 py-2 rounded-xl hover:bg-red-50 transition-all"
-					>
-						<RefreshCw className="w-3 h-3" /> Limpar
-					</button>
 				</div>
 			</div>
 
 			{/* ── KPI Cards ── */}
 			<div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-				<KpiCard label="Receita" value={fmt(kpis.revenue)} sub={`${currentOrders.length} ordens no período`} icon={<TrendingUp />} gradient="bg-gradient-to-br from-emerald-400 to-emerald-600" trend={kpis.revTrend} />
-				<KpiCard label="Despesas" value={fmt(kpis.expense)} sub="contas pagas no período" icon={<ArrowDownRight />} gradient="bg-gradient-to-br from-rose-400 to-rose-600" />
+				<KpiCard label="Receita" value={fmt(kpis.revenue)} sub={`${currentOrders.length} ordens`} icon={<TrendingUp />} gradient="bg-gradient-to-br from-emerald-400 to-emerald-600" trend={kpis.revTrend} />
+				<KpiCard label="Despesas" value={fmt(kpis.expense)} sub="pagas no período" icon={<ArrowDownRight />} gradient="bg-gradient-to-br from-rose-400 to-rose-600" />
 				<KpiCard label="Lucro Líquido" value={fmt(kpis.profit)} sub={`Margem: ${kpis.margin.toFixed(1)}%`} icon={<Wallet />} gradient={kpis.profit >= 0 ? "bg-gradient-to-br from-indigo-500 to-violet-600" : "bg-gradient-to-br from-orange-500 to-red-600"} />
-				<KpiCard label="Ticket Médio" value={fmt(kpis.ticket)} sub="por ordem de serviço" icon={<Receipt />} gradient="bg-gradient-to-br from-sky-400 to-sky-600" />
-				<KpiCard label="Total de OS" value={String(currentOrders.length)} sub={`${statusCounts.open} em aberto agora`} icon={<Target />} gradient="bg-gradient-to-br from-violet-500 to-purple-600" />
+				<KpiCard label="Ticket Médio" value={fmt(kpis.ticket)} sub="por ordem" icon={<Receipt />} gradient="bg-gradient-to-br from-sky-400 to-sky-600" />
+				<KpiCard label="Total de OS" value={String(currentOrders.length)} sub={`${statusCounts.open} em aberto`} icon={<Target />} gradient="bg-gradient-to-br from-violet-500 to-purple-600" />
 				<KpiCard label="A Receber" value={fmt(kpis.toReceive)} sub="pendente + parcial" icon={<DollarSign />} gradient={kpis.toReceive > 0 ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-slate-400 to-slate-500"} />
 			</div>
 
-			{/* ── Fluxo Mensal + Distribuição de Pagamento ── */}
+			{/* ── Fluxo Mensal + Distribuição Pagamento ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-				{/* Fluxo Mensal */}
 				<div className="lg:col-span-2 bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
 					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-2">
 						<div>
 							<h4 className="text-base font-bold text-slate-800">Fluxo de Caixa Mensal</h4>
-							<p className="text-xs text-slate-400 mt-0.5">Receita × Despesa × Lucro — {selectedYears.join(", ")}</p>
+							<p className="text-xs text-slate-400 mt-0.5">
+								{Utils.formatDate(startDate)} → {Utils.formatDate(endDate)}
+							</p>
 						</div>
 						<div className="flex gap-3 text-[11px] font-semibold text-slate-500">
 							<span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-400 inline-block" />Receita</span>
@@ -379,24 +419,19 @@ export const DashboardModule = ({
 					</ResponsiveContainer>
 				</div>
 
-				{/* Distribuição de Pagamento */}
 				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 flex flex-col">
 					<h4 className="text-base font-bold text-slate-800">Status de Pagamento</h4>
-					<p className="text-xs text-slate-400 mt-0.5 mb-4">Distribuição do período selecionado</p>
+					<p className="text-xs text-slate-400 mt-0.5 mb-4">Distribuição do período</p>
 					{paymentDist.length > 0 ? (
 						<>
-							<div className="flex-1 min-h-[150px]">
-								<ResponsiveContainer width="100%" height={160}>
-									<PieChart>
-										<Pie data={paymentDist} cx="50%" cy="50%" innerRadius={50} outerRadius={72} dataKey="value" paddingAngle={4}>
-											{paymentDist.map((entry) => (
-												<Cell key={entry.name} fill={PIE_COLORS[entry.name] || "#94a3b8"} />
-											))}
-										</Pie>
-										<Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)", fontSize: "12px" }} />
-									</PieChart>
-								</ResponsiveContainer>
-							</div>
+							<ResponsiveContainer width="100%" height={155}>
+								<PieChart>
+									<Pie data={paymentDist} cx="50%" cy="50%" innerRadius={48} outerRadius={70} dataKey="value" paddingAngle={4}>
+										{paymentDist.map((e) => <Cell key={e.name} fill={PIE_COLORS[e.name] || "#94a3b8"} />)}
+									</Pie>
+									<Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)", fontSize: "12px" }} />
+								</PieChart>
+							</ResponsiveContainer>
 							<div className="space-y-2.5 mt-2">
 								{paymentDist.map((d) => {
 									const count = currentOrders.filter((o) => (o.status_pagamento || "NAO_PAGO") === d.name).length;
@@ -404,8 +439,8 @@ export const DashboardModule = ({
 									return (
 										<div key={d.name} className="flex items-center justify-between">
 											<div className="flex items-center gap-2">
-												<span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[d.name] }} />
-												<span className="text-xs text-slate-600 font-semibold">{paymentLabel[d.name]}</span>
+												<span className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[d.name] }} />
+												<span className="text-xs font-semibold text-slate-600">{paymentLabel[d.name]}</span>
 												<span className="text-[10px] text-slate-400">{count} OS</span>
 											</div>
 											<div className="flex items-center gap-2">
@@ -425,11 +460,9 @@ export const DashboardModule = ({
 
 			{/* ── Top Serviços + Top Clientes ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-				{/* Top Serviços */}
 				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
 					<h4 className="text-base font-bold text-slate-800">Top Serviços</h4>
-					<p className="text-xs text-slate-400 mt-0.5 mb-5">Receita gerada por tipo de serviço</p>
+					<p className="text-xs text-slate-400 mt-0.5 mb-5">Receita por tipo de serviço</p>
 					{topServices.length > 0 ? (
 						<ResponsiveContainer width="100%" height={220}>
 							<ComposedChart data={topServices} layout="vertical" margin={{ left: 0, right: 55 }}>
@@ -438,7 +471,7 @@ export const DashboardModule = ({
 								<YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={90} tick={{ fill: "#475569", fontSize: 11, fontWeight: 600 }} />
 								<Tooltip content={<CustomTooltip />} />
 								<Bar dataKey="revenue" name="Receita" fill="#6366f1" radius={[0, 6, 6, 0]} barSize={22}>
-									<LabelList dataKey="revenue" position="right" formatter={(v: number) => fmt(v)} style={{ fill: "#6366f1", fontSize: "10px", fontWeight: "bold" }} />
+									{/* LabelList removido pois CustomTooltip já mostra */}
 								</Bar>
 							</ComposedChart>
 						</ResponsiveContainer>
@@ -447,24 +480,21 @@ export const DashboardModule = ({
 					)}
 				</div>
 
-				{/* Top Clientes — Ranking */}
 				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
 					<h4 className="text-base font-bold text-slate-800">Top Clientes</h4>
-					<p className="text-xs text-slate-400 mt-0.5 mb-4">Ranking por receita no período</p>
+					<p className="text-xs text-slate-400 mt-0.5 mb-4">Ranking por receita</p>
 					{topClients.length > 0 ? (
 						<div className="space-y-3.5">
 							{topClients.map((c, i) => (
 								<div key={c.name} className="flex items-center gap-3">
-									<span className={`text-xs font-bold w-5 text-center flex-shrink-0 ${
-										i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700/70" : "text-slate-300"
-									}`}>{i + 1}</span>
+									<span className={`text-xs font-bold w-5 text-center flex-shrink-0 ${i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700/70" : "text-slate-300"}`}>{i + 1}</span>
 									<div className="flex-1 min-w-0">
 										<div className="flex items-center justify-between mb-1">
 											<span className="text-xs font-semibold text-slate-700 truncate pr-2">{c.name}</span>
 											<span className="text-xs font-bold text-slate-800 flex-shrink-0">{fmt(c.revenue)}</span>
 										</div>
 										<div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-											<div className="h-full bg-gradient-to-r from-indigo-400 to-violet-500 rounded-full transition-all duration-500" style={{ width: `${(c.revenue / maxClientRevenue) * 100}%` }} />
+											<div className="h-full bg-gradient-to-r from-indigo-400 to-violet-500 rounded-full" style={{ width: `${(c.revenue / maxClientRevenue) * 100}%` }} />
 										</div>
 										<p className="text-[10px] text-slate-400 mt-0.5">{c.volume} pedido{c.volume !== 1 ? "s" : ""}</p>
 									</div>
@@ -477,14 +507,29 @@ export const DashboardModule = ({
 				</div>
 			</div>
 
-			{/* ── Evolução Diária (Area Chart) ── */}
+			{/* ══ SEÇÃO INFERIOR — filtro próprio ══ */}
+			<div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
+				<div className="flex flex-wrap items-center gap-2">
+					<span className="text-xs font-bold text-indigo-600 uppercase tracking-wide mr-1">Visão Operacional —</span>
+					{bottomPresets.map((p) => (
+						<button key={p.key} onClick={() => setBottomPeriod(p.key)}
+							className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${bottomPeriod === p.key ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-indigo-500 border-indigo-200 hover:border-indigo-400"}`}
+						>{p.label}</button>
+					))}
+					<span className="text-xs text-indigo-400 ml-2">
+						{Utils.formatDate(bottomDates.start)} → {Utils.formatDate(bottomDates.end)}
+					</span>
+				</div>
+			</div>
+
+			{/* ── Evolução Diária ── */}
 			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
 				<h4 className="text-base font-bold text-slate-800">Evolução Diária de Receita</h4>
-				<p className="text-xs text-slate-400 mt-0.5 mb-5">Faturamento e volume de OS por dia no período selecionado</p>
+				<p className="text-xs text-slate-400 mt-0.5 mb-5">Faturamento dia a dia nos últimos {bottomPeriod === "7d" ? "7 dias" : bottomPeriod === "30d" ? "30 dias" : bottomPeriod === "3m" ? "3 meses" : "6 meses"}</p>
 				<ResponsiveContainer width="100%" height={210}>
 					<AreaChart data={dailyData} margin={{ left: -10, right: 10 }}>
 						<defs>
-							<linearGradient id="receitaGradient" x1="0" y1="0" x2="0" y2="1">
+							<linearGradient id="receitaGrad" x1="0" y1="0" x2="0" y2="1">
 								<stop offset="5%" stopColor="#6366f1" stopOpacity={0.18} />
 								<stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
 							</linearGradient>
@@ -493,23 +538,20 @@ export const DashboardModule = ({
 						<XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} interval="preserveStartEnd" />
 						<YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
 						<Tooltip content={<CustomTooltip />} />
-						<Area type="monotone" dataKey="receita" name="Receita" stroke="#6366f1" strokeWidth={2.5} fill="url(#receitaGradient)" dot={false} activeDot={{ r: 5, fill: "#6366f1", strokeWidth: 0 }} />
+						<Area type="monotone" dataKey="receita" name="Receita" stroke="#6366f1" strokeWidth={2.5} fill="url(#receitaGrad)" dot={false} activeDot={{ r: 5, fill: "#6366f1", strokeWidth: 0 }} />
 					</AreaChart>
 				</ResponsiveContainer>
 			</div>
 
-			{/* ── Análise por Dia da Semana + Alertas ── */}
+			{/* ── Dia da Semana + Alertas ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-				{/* Dia da Semana */}
 				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
 					<h4 className="text-base font-bold text-slate-800">Receita por Dia da Semana</h4>
-					<p className="text-xs text-slate-400 mt-0.5 mb-5">
-						Identifique os dias mais produtivos —{" "}
-						<span className="text-indigo-500 font-semibold">
+					<p className="text-xs text-slate-400 mt-0.5 mb-4">
+						Melhor dia:{" "}
+						<span className="text-indigo-600 font-bold">
 							{dayOfWeekData.reduce((best, d) => d.revenue > best.revenue ? d : best, dayOfWeekData[0])?.name || "—"}
-						</span>{" "}
-						é o melhor dia
+						</span>
 					</p>
 					<ResponsiveContainer width="100%" height={180}>
 						<BarChart data={dayOfWeekData} margin={{ left: -20, right: 5 }}>
@@ -519,14 +561,13 @@ export const DashboardModule = ({
 							<Tooltip content={<CustomTooltip />} />
 							<Bar dataKey="revenue" name="Receita" radius={[6, 6, 0, 0]} barSize={30}>
 								{dayOfWeekData.map((d, i) => (
-									<Cell key={i} fill={d.revenue === maxDayRevenue && maxDayRevenue > 0 ? "#6366f1" : "#cbd5e1"} />
+									<Cell key={i} fill={d.revenue === maxDayRevenue && maxDayRevenue > 0 ? "#6366f1" : "#e2e8f0"} />
 								))}
 							</Bar>
 						</BarChart>
 					</ResponsiveContainer>
 				</div>
 
-				{/* Alertas */}
 				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
 					<h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
 						<AlertTriangle className="w-4 h-4 text-amber-500" /> Alertas
@@ -534,46 +575,98 @@ export const DashboardModule = ({
 					<p className="text-xs text-slate-400 mt-0.5 mb-4">Contas e estoque que precisam de atenção</p>
 					<div className="space-y-2">
 						{upcomingExpenses.length === 0 && stockAlerts.length === 0 ? (
-							<div className="flex flex-col items-center justify-center py-8 text-slate-300">
-								<CheckCircle2 className="w-8 h-8 mb-2 text-emerald-300" />
+							<div className="flex flex-col items-center justify-center py-6 text-slate-300">
+								<CheckCircle2 className="w-7 h-7 mb-2 text-emerald-300" />
 								<p className="text-sm font-semibold text-emerald-400">Tudo em dia!</p>
-								<p className="text-xs mt-1">Nenhum alerta no momento</p>
 							</div>
 						) : (
 							<>
 								{upcomingExpenses.map((e) => {
-									const isOverdue = new Date(e.vencimento) < new Date();
+									const overdue = new Date(e.vencimento) < new Date();
 									return (
-										<div key={e.id} className={`flex items-center justify-between p-3 rounded-xl border ${isOverdue ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
+										<div key={e.id} className={`flex items-center justify-between p-2.5 rounded-xl border ${overdue ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
 											<div className="flex items-center gap-2 min-w-0">
-												<Receipt className={`w-3.5 h-3.5 flex-shrink-0 ${isOverdue ? "text-red-500" : "text-amber-500"}`} />
+												<Receipt className={`w-3.5 h-3.5 flex-shrink-0 ${overdue ? "text-red-500" : "text-amber-500"}`} />
 												<div className="min-w-0">
 													<p className="text-xs font-semibold text-slate-700 truncate">{e.produto}</p>
-													<p className={`text-[10px] ${isOverdue ? "text-red-500 font-bold" : "text-amber-600"}`}>
-														{isOverdue ? "⚠ Vencida" : "Vence"} em {Utils.formatDate(e.vencimento)}
-													</p>
+													<p className={`text-[10px] ${overdue ? "text-red-500 font-bold" : "text-amber-600"}`}>{overdue ? "⚠ Vencida" : "Vence"} {Utils.formatDate(e.vencimento)}</p>
 												</div>
 											</div>
-											<span className={`text-xs font-bold flex-shrink-0 ml-3 ${isOverdue ? "text-red-600" : "text-amber-700"}`}>{fmt(e.valor)}</span>
+											<span className={`text-xs font-bold ml-2 flex-shrink-0 ${overdue ? "text-red-600" : "text-amber-700"}`}>{fmt(e.valor)}</span>
 										</div>
 									);
 								})}
 								{stockAlerts.slice(0, 3).map((s) => (
-									<div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-rose-50 border border-rose-100">
+									<div key={s.id} className="flex items-center justify-between p-2.5 rounded-xl bg-rose-50 border border-rose-100">
 										<div className="flex items-center gap-2 min-w-0">
 											<Package className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
-											<div className="min-w-0">
+											<div>
 												<p className="text-xs font-semibold text-slate-700 truncate">{s.nome}</p>
 												<p className="text-[10px] text-rose-500">Saldo: {s.saldo} {s.unidade} (mín: {s.minimo})</p>
 											</div>
 										</div>
-										<span className="text-[10px] font-bold text-rose-500 bg-rose-100 px-2 py-0.5 rounded-full flex-shrink-0 ml-3">Crítico</span>
+										<span className="text-[10px] font-bold text-rose-500 bg-rose-100 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">Crítico</span>
 									</div>
 								))}
 							</>
 						)}
 					</div>
 				</div>
+			</div>
+
+			{/* ── Tabela: Últimas Ordens Abertas ── */}
+			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
+				<div className="flex items-center justify-between mb-4">
+					<div>
+						<h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+							<Clock className="w-4 h-4 text-blue-500" /> Ordens em Aberto
+						</h4>
+						<p className="text-xs text-slate-400 mt-0.5">{openOrders.length} OS pendentes de conclusão</p>
+					</div>
+				</div>
+				{openOrders.length === 0 ? (
+					<div className="flex flex-col items-center justify-center py-8 text-slate-300">
+						<CheckCircle2 className="w-7 h-7 mb-2 text-emerald-300" />
+						<p className="text-sm font-semibold text-emerald-400">Nenhuma ordem em aberto!</p>
+					</div>
+				) : (
+					<div className="overflow-x-auto">
+						<table className="w-full text-sm">
+							<thead>
+								<tr className="border-b border-slate-100">
+									<th className="text-left text-[10px] font-bold text-slate-400 uppercase pb-2 pr-4">#OS</th>
+									<th className="text-left text-[10px] font-bold text-slate-400 uppercase pb-2 pr-4">Cliente</th>
+									<th className="text-left text-[10px] font-bold text-slate-400 uppercase pb-2 pr-4 hidden md:table-cell">Data</th>
+									<th className="text-left text-[10px] font-bold text-slate-400 uppercase pb-2 pr-4 hidden lg:table-cell">Serviços</th>
+									<th className="text-left text-[10px] font-bold text-slate-400 uppercase pb-2 pr-4">Pagamento</th>
+									<th className="text-right text-[10px] font-bold text-slate-400 uppercase pb-2">Valor</th>
+								</tr>
+							</thead>
+							<tbody className="divide-y divide-slate-50">
+								{openOrders.map((o) => (
+									<tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
+										<td className="py-2.5 pr-4 font-bold text-indigo-600 text-xs">#{o.id}</td>
+										<td className="py-2.5 pr-4">
+											<span className="font-semibold text-slate-700 text-xs truncate max-w-[150px] block">{o.cliente_nome}</span>
+										</td>
+										<td className="py-2.5 pr-4 text-xs text-slate-400 hidden md:table-cell">{Utils.formatDate(o.data)}</td>
+										<td className="py-2.5 pr-4 hidden lg:table-cell">
+											<span className="text-xs text-slate-500 truncate max-w-[180px] block">
+												{o.items.map((i) => i.servico).filter((v, i, a) => a.indexOf(v) === i).join(", ") || "—"}
+											</span>
+										</td>
+										<td className="py-2.5 pr-4">
+											<span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${paymentBadge[o.status_pagamento || "NAO_PAGO"]}`}>
+												{paymentLabel[o.status_pagamento || "NAO_PAGO"]}
+											</span>
+										</td>
+										<td className="py-2.5 text-right font-bold text-slate-800 text-xs">{fmt(o.total)}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 			</div>
 
 		</div>

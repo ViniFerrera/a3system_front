@@ -1,5 +1,5 @@
 import React from "react";
-import { Printer } from "lucide-react";
+import { Printer, AlertTriangle } from "lucide-react";
 
 // URL base do backend (sem /api)
 const BACKEND =
@@ -8,7 +8,17 @@ const BACKEND =
 		""
 	);
 
+const errorMessages: Record<string, string> = {
+	nao_autorizado: "Acesso negado. Seu e-mail não está autorizado a usar o sistema.",
+	server_error: "Erro interno no servidor. Tente novamente.",
+	auth_failed: "Falha na autenticação com o Google. Tente novamente.",
+};
+
 export const LoginPage = () => {
+	const params = new URLSearchParams(window.location.search);
+	const errorKey = params.get("error") || "";
+	const errorMsg = errorMessages[errorKey] || null;
+
 	return (
 		<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-4">
 			{/* Glow decorativo */}
@@ -55,6 +65,13 @@ export const LoginPage = () => {
 					</svg>
 					Entrar com Google
 				</a>
+
+				{errorMsg && (
+					<div className="flex items-start gap-2 mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-left">
+						<AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+						<p className="text-xs text-red-700 font-medium">{errorMsg}</p>
+					</div>
+				)}
 
 				<p className="text-xs text-slate-400 mt-6">
 					Acesso restrito a usuários autorizados
