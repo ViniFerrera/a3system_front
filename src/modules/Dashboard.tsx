@@ -103,6 +103,7 @@ export const DashboardModule = ({
 
 	// ── Filtro inferior (gráficos + tabela OS abertas) ───────────────────────
 	const [bottomPeriod, setBottomPeriod] = useState<BottomPeriod>("30d");
+	const [expandedDashOrder, setExpandedDashOrder] = useState<number | null>(null);
 	const bottomDates = useMemo(() => periodToDates(bottomPeriod), [bottomPeriod]);
 
 	// Quando preset muda, atualiza as datas
@@ -184,7 +185,8 @@ export const DashboardModule = ({
 		const end = new Date(endDate);
 		while (curr <= end) {
 			const key = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}`;
-			const label = curr.toLocaleString("pt-BR", { month: "short", year: curr.getFullYear() !== now.getFullYear() ? "2-digit" : undefined });
+			const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+			const label = `${monthNames[curr.getMonth()]}/${String(curr.getFullYear()).slice(2)}`;
 			months.set(key, { name: label, receita_concluida: 0, receita_aberta: 0, despesa: 0, lucro: 0 });
 			curr.setMonth(curr.getMonth() + 1);
 		}
@@ -651,26 +653,64 @@ export const DashboardModule = ({
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-slate-50">
-								{openOrders.map((o) => (
-									<tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
-										<td className="py-2.5 pr-4 font-bold text-indigo-600 text-xs">#{o.id}</td>
-										<td className="py-2.5 pr-4">
-											<span className="font-semibold text-slate-700 text-xs truncate max-w-[150px] block">{o.cliente_nome}</span>
-										</td>
-										<td className="py-2.5 pr-4 text-xs text-slate-400 hidden md:table-cell">{Utils.formatDate(o.data)}</td>
-										<td className="py-2.5 pr-4 hidden lg:table-cell">
-											<span className="text-xs text-slate-500 truncate max-w-[180px] block">
-												{o.items.map((i) => i.servico).filter((v, i, a) => a.indexOf(v) === i).join(", ") || "—"}
-											</span>
-										</td>
-										<td className="py-2.5 pr-4">
-											<span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${paymentBadge[o.status_pagamento || "NAO_PAGO"]}`}>
-												{paymentLabel[o.status_pagamento || "NAO_PAGO"]}
-											</span>
-										</td>
-										<td className="py-2.5 text-right font-bold text-slate-800 text-xs">{fmt(o.total)}</td>
-									</tr>
-								))}
+								{openOrders.map((o) => {
+									const isExp = expandedDashOrder === o.id;
+									const safeClient = o.cliente_nome.replace(/[<>:"/\\|?*]/g, "").trim().replace(/\s+/g, "_");
+									const dateStr = o.data ? o.data.split("T")[0] : "";
+									const fmtDate = (() => { const d = new Date(o.data); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")} - ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; })();
+									return (
+										<React.Fragment key={o.id}>
+											<tr className={`hover:bg-slate-50/50 transition-colors cursor-pointer ${isExp ? "bg-indigo-50/40" : ""}`} onClick={() => setExpandedDashOrder(isExp ? null : o.id!)}>
+												<td className="py-2.5 pr-4 font-bold text-indigo-600 text-xs">#{o.id}</td>
+												<td className="py-2.5 pr-4">
+													<span className="font-semibold text-slate-700 text-xs truncate max-w-[150px] block">{o.cliente_nome}</span>
+												</td>
+												<td className="py-2.5 pr-4 text-xs text-slate-400 hidden md:table-cell">{fmtDate}</td>
+												<td className="py-2.5 pr-4 hidden lg:table-cell">
+													<span className="text-xs text-slate-500 truncate max-w-[180px] block">
+														{o.items.map((i) => i.servico).filter((v, i, a) => a.indexOf(v) === i).join(", ") || "—"}
+													</span>
+												</td>
+												<td className="py-2.5 pr-4">
+													<span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${paymentBadge[o.status_pagamento || "NAO_PAGO"]}`}>
+														{paymentLabel[o.status_pagamento || "NAO_PAGO"]}
+													</span>
+												</td>
+												<td className="py-2.5 text-right font-bold text-slate-800 text-xs">{fmt(o.total)}</td>
+											</tr>
+											{isExp && (
+												<tr className="bg-slate-50/70">
+													<td colSpan={6} className="px-4 py-3">
+														<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
+															<div className="space-y-1.5">
+																<p className="font-bold text-slate-600 text-[10px] uppercase tracking-wide mb-1">Itens do Pedido</p>
+																{o.items.map((item, idx) => (
+																	<div key={idx} className="flex justify-between bg-white p-2 rounded-lg border border-slate-100">
+																		<span className="text-slate-600"><strong className="text-indigo-600">{item.quantidade}x</strong> {item.servico} - {item.material}</span>
+																		<span className="font-bold text-slate-700">{fmt(item.total)}</span>
+																	</div>
+																))}
+																{o.descricao && <p className="text-slate-500 italic mt-2">{o.descricao}</p>}
+															</div>
+															<div className="space-y-2">
+																<div className="bg-white p-3 rounded-lg border border-slate-100 space-y-1.5">
+																	<p className="font-bold text-slate-600 text-[10px] uppercase tracking-wide">Financeiro</p>
+																	<div className="flex justify-between"><span className="text-slate-500">Forma:</span><span className="font-bold">{o.forma_pagamento || "N/D"}</span></div>
+																	<div className="flex justify-between"><span className="text-slate-500">Total:</span><span className="font-bold text-indigo-600">{fmt(o.total)}</span></div>
+																	<div className="flex justify-between"><span className="text-slate-500">Pagamento:</span><span className={`font-bold ${paymentBadge[o.status_pagamento || "NAO_PAGO"]} px-2 py-0.5 rounded-full text-[10px]`}>{paymentLabel[o.status_pagamento || "NAO_PAGO"]}</span></div>
+																</div>
+																<div className="bg-white p-3 rounded-lg border border-slate-100">
+																	<p className="font-bold text-slate-600 text-[10px] uppercase tracking-wide mb-1">Pasta OneDrive</p>
+																	<p className="text-slate-500 font-mono text-[10px] break-all bg-slate-50 p-2 rounded border border-slate-200">A3_Ordens/{dateStr}/OS{o.id}_{safeClient}</p>
+																</div>
+															</div>
+														</div>
+													</td>
+												</tr>
+											)}
+										</React.Fragment>
+									);
+								})}
 							</tbody>
 						</table>
 					</div>

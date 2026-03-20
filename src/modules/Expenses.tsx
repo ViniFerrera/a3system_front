@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Utils } from "@/utils";
 import { Expense } from "@/types";
 import * as XLSX from "xlsx";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import {
 	Plus,
 	Search,
@@ -20,6 +21,7 @@ import {
 	ArrowDown,
 	Save,
 	AlertTriangle,
+	BarChart2,
 } from "lucide-react";
 import { api } from "@/services/api";
 
@@ -62,6 +64,8 @@ export const ExpensesModule = ({
 		direction: "asc" | "desc";
 	} | null>(null);
 	const [hasChanges, setHasChanges] = useState(false);
+	const [recurrence, setRecurrence] = useState<{ enabled: boolean; months: number }>({ enabled: false, months: 1 });
+	const [showDashboard, setShowDashboard] = useState(false);
 
 	const safeExpenses = Array.isArray(expenses) ? expenses : [];
 
@@ -74,6 +78,56 @@ export const ExpensesModule = ({
 			.filter((e) => e.status === "PENDENTE")
 			.reduce((acc, e) => acc + e.valor, 0);
 		return { total, paid, pending };
+	}, [safeExpenses]);
+
+	const yearMetrics = useMemo(() => {
+		const currentYear = new Date().getFullYear();
+		const yearExpenses = safeExpenses.filter((e) => {
+			const d = new Date(e.vencimento);
+			return d.getFullYear() === currentYear;
+		});
+		const total = yearExpenses.reduce((acc, e) => acc + e.valor, 0);
+		const paid = yearExpenses.filter((e) => e.status === "PAGO").reduce((acc, e) => acc + e.valor, 0);
+		const pending = yearExpenses.filter((e) => e.status === "PENDENTE").reduce((acc, e) => acc + e.valor, 0);
+		const count = yearExpenses.length;
+		return { total, paid, pending, count };
+	}, [safeExpenses]);
+
+	const dashboardData = useMemo(() => {
+		const monthlyMap = new Map<string, { paid: number; pending: number }>();
+		const currentYear = new Date().getFullYear();
+		for (let m = 0; m < 12; m++) {
+			const key = `${currentYear}-${String(m + 1).padStart(2, "0")}`;
+			monthlyMap.set(key, { paid: 0, pending: 0 });
+		}
+		safeExpenses.forEach((e) => {
+			const d = new Date(e.vencimento);
+			if (d.getFullYear() !== currentYear) return;
+			const key = `${currentYear}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+			const entry = monthlyMap.get(key);
+			if (!entry) return;
+			if (e.status === "PAGO") entry.paid += e.valor;
+			else entry.pending += e.valor;
+		});
+		const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+		return Array.from(monthlyMap.entries()).map(([key, val], i) => ({
+			name: monthNames[i],
+			pago: val.paid,
+			pendente: val.pending,
+			total: val.paid + val.pending,
+		}));
+	}, [safeExpenses]);
+
+	const topExpenses = useMemo(() => {
+		const map = new Map<string, number>();
+		safeExpenses.forEach((e) => {
+			const current = map.get(e.produto) || 0;
+			map.set(e.produto, current + e.valor);
+		});
+		return Array.from(map.entries())
+			.map(([name, value]) => ({ name, value }))
+			.sort((a, b) => b.value - a.value)
+			.slice(0, 5);
 	}, [safeExpenses]);
 
 	const handleSort = (key: keyof Expense) => {
@@ -263,8 +317,20 @@ export const ExpensesModule = ({
 					prev.map((e) => (e.id === editingExpense.id ? res.data : e))
 				);
 			} else {
-				const res = await api.post("/expenses", formData);
-				setExpenses((prev: Expense[]) => [res.data, ...prev]);
+				if (recurrence.enabled && recurrence.months > 1) {
+					const newExpenses: Expense[] = [];
+					for (let i = 0; i < recurrence.months; i++) {
+						const baseDate = new Date(formData.vencimento || new Date().toISOString().split("T")[0]);
+						baseDate.setMonth(baseDate.getMonth() + i);
+						const vencimento = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, "0")}-${String(baseDate.getDate()).padStart(2, "0")}`;
+						const res = await api.post("/expenses", { ...formData, produto: `${formData.produto} (${i + 1}/${recurrence.months})`, vencimento });
+						newExpenses.push(res.data);
+					}
+					setExpenses((prev: Expense[]) => [...newExpenses, ...prev]);
+				} else {
+					const res = await api.post("/expenses", formData);
+					setExpenses((prev: Expense[]) => [res.data, ...prev]);
+				}
 			}
 			setIsModalOpen(false);
 			setEditingExpense(null);
@@ -316,6 +382,7 @@ export const ExpensesModule = ({
 			});
 		}
 		setIsModalOpen(true);
+		setRecurrence({ enabled: false, months: 1 });
 	};
 
 	const isOverdue = (date: string) => {
@@ -397,43 +464,103 @@ export const ExpensesModule = ({
 					>
 						<Plus className='w-4 h-4' /> Nova Conta
 					</button>
+					<button
+						onClick={() => setShowDashboard(!showDashboard)}
+						className={`flex items-center gap-2 px-4 py-2 rounded-[10px] border transition shadow-sm text-sm font-medium ${showDashboard ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"}`}
+					>
+						<BarChart2 className='w-4 h-4' /> {showDashboard ? "Ocultar" : "Dashboard"}
+					</button>
 				</div>
 			</div>
 
+			{/* Dashboard Lateral */}
+			{showDashboard && (
+				<div className="animate-in slide-in-from-left-5 duration-300 bg-white border border-slate-100 rounded-2xl shadow-lg p-6 space-y-6">
+					<div className="flex items-center justify-between">
+						<h3 className="text-base font-bold text-slate-800">Dashboard Financeiro — {new Date().getFullYear()}</h3>
+						<button onClick={() => setShowDashboard(false)} className="text-slate-400 hover:text-slate-600 text-sm">Fechar</button>
+					</div>
+					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+						<div>
+							<h4 className="text-sm font-bold text-slate-700 mb-3">Despesas Mensais</h4>
+							<ResponsiveContainer width="100%" height={220}>
+								<BarChart data={dashboardData} margin={{ left: -10, right: 10 }}>
+									<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+									<XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
+									<YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+									<Tooltip formatter={(v: number) => Utils.formatCurrency(v)} contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)", fontSize: "12px" }} />
+									<Bar dataKey="pago" name="Pago" fill="#10b981" stackId="a" radius={[0, 0, 0, 0]} />
+									<Bar dataKey="pendente" name="Pendente" fill="#f59e0b" stackId="a" radius={[4, 4, 0, 0]} />
+								</BarChart>
+							</ResponsiveContainer>
+						</div>
+						<div>
+							<h4 className="text-sm font-bold text-slate-700 mb-3">Top Despesas por Descrição</h4>
+							<div className="space-y-2.5">
+								{topExpenses.map((item, i) => {
+									const maxVal = topExpenses[0]?.value || 1;
+									return (
+										<div key={item.name}>
+											<div className="flex justify-between text-xs mb-1">
+												<span className="font-semibold text-slate-700 truncate max-w-[200px]">{item.name}</span>
+												<span className="font-bold text-slate-800">{Utils.formatCurrency(item.value)}</span>
+											</div>
+											<div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+												<div className="h-full bg-gradient-to-r from-indigo-400 to-violet-500 rounded-full transition-all" style={{ width: `${(item.value / maxVal) * 100}%` }} />
+											</div>
+										</div>
+									);
+								})}
+								{topExpenses.length === 0 && <p className="text-sm text-slate-400 text-center py-4">Sem dados</p>}
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* Cards Ano Atual */}
+			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+				<div className="rounded-2xl p-4 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg">
+					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Total {new Date().getFullYear()}</p>
+					<p className="text-xl font-bold mt-1">{Utils.formatCurrency(yearMetrics.total)}</p>
+					<p className="text-white/60 text-[10px] mt-1">{yearMetrics.count} despesas</p>
+				</div>
+				<div className="rounded-2xl p-4 bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg">
+					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Pago {new Date().getFullYear()}</p>
+					<p className="text-xl font-bold mt-1">{Utils.formatCurrency(yearMetrics.paid)}</p>
+				</div>
+				<div className="rounded-2xl p-4 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg">
+					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Pendente {new Date().getFullYear()}</p>
+					<p className="text-xl font-bold mt-1">{Utils.formatCurrency(yearMetrics.pending)}</p>
+				</div>
+				<div className="rounded-2xl p-4 bg-gradient-to-br from-rose-400 to-rose-600 text-white shadow-lg">
+					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Quitação</p>
+					<p className="text-xl font-bold mt-1">{yearMetrics.total > 0 ? `${((yearMetrics.paid / yearMetrics.total) * 100).toFixed(0)}%` : "—"}</p>
+					<p className="text-white/60 text-[10px] mt-1">do total anual</p>
+				</div>
+			</div>
+
+			{/* Cards Período Filtrado */}
 			<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
 				<Card className='p-5 border-l-[4px] border-indigo-600 bg-indigo-50/50'>
-					<p className='text-xs font-bold text-slate-500 uppercase tracking-wider mb-1'>
-						Total Filtrado
-					</p>
+					<p className='text-xs font-bold text-slate-500 uppercase tracking-wider mb-1'>Total Filtrado</p>
 					<div className='flex items-center gap-2'>
 						<DollarSign className='w-5 h-5 text-indigo-600' />
-						<span className='text-2xl font-bold text-slate-800'>
-							{Utils.formatCurrency(
-								sortedAndFilteredExpenses.reduce((acc, e) => acc + e.valor, 0)
-							)}
-						</span>
+						<span className='text-2xl font-bold text-slate-800'>{Utils.formatCurrency(sortedAndFilteredExpenses.reduce((acc, e) => acc + e.valor, 0))}</span>
 					</div>
 				</Card>
 				<Card className='p-5 border-l-[4px] border-emerald-500 bg-emerald-50/50'>
-					<p className='text-xs font-bold text-slate-500 uppercase tracking-wider mb-1'>
-						Total Pago
-					</p>
+					<p className='text-xs font-bold text-slate-500 uppercase tracking-wider mb-1'>Total Pago</p>
 					<div className='flex items-center gap-2'>
 						<CheckCircle className='w-5 h-5 text-emerald-600' />
-						<span className='text-2xl font-bold text-slate-800'>
-							{Utils.formatCurrency(metrics.paid)}
-						</span>
+						<span className='text-2xl font-bold text-slate-800'>{Utils.formatCurrency(metrics.paid)}</span>
 					</div>
 				</Card>
 				<Card className='p-5 border-l-[4px] border-orange-500 bg-orange-50/50'>
-					<p className='text-xs font-bold text-slate-500 uppercase tracking-wider mb-1'>
-						Pendente
-					</p>
+					<p className='text-xs font-bold text-slate-500 uppercase tracking-wider mb-1'>Pendente</p>
 					<div className='flex items-center gap-2'>
 						<Circle className='w-5 h-5 text-orange-600' />
-						<span className='text-2xl font-bold text-slate-800'>
-							{Utils.formatCurrency(metrics.pending)}
-						</span>
+						<span className='text-2xl font-bold text-slate-800'>{Utils.formatCurrency(metrics.pending)}</span>
 					</div>
 				</Card>
 			</div>
@@ -655,6 +782,32 @@ export const ExpensesModule = ({
 							</button>
 						</div>
 					</div>
+					{!editingExpense && (
+						<div>
+							<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>Recorrência</label>
+							<div className='flex items-center gap-3'>
+								<button
+									onClick={() => setRecurrence(prev => ({ ...prev, enabled: !prev.enabled }))}
+									className={`px-4 py-2 rounded-[10px] border text-sm font-bold transition-all ${recurrence.enabled ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}
+								>
+									{recurrence.enabled ? "Recorrente" : "Única"}
+								</button>
+								{recurrence.enabled && (
+									<div className='flex items-center gap-2'>
+										<select
+											value={recurrence.months}
+											onChange={(e) => setRecurrence(prev => ({ ...prev, months: Number(e.target.value) }))}
+											className='border border-slate-200 rounded-[10px] p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500'
+										>
+											{[2,3,4,5,6,7,8,9,10,11,12].map(n => (
+												<option key={n} value={n}>{n} meses</option>
+											))}
+										</select>
+									</div>
+								)}
+							</div>
+						</div>
+					)}
 					<div className='flex justify-end pt-4 border-t border-slate-100 gap-2'>
 						<button
 							onClick={() => setIsModalOpen(false)}
@@ -666,7 +819,7 @@ export const ExpensesModule = ({
 							onClick={handleSave}
 							className='bg-indigo-600 text-white px-6 py-2.5 rounded-[10px] hover:bg-indigo-700 font-bold shadow-md transition-all text-sm'
 						>
-							Salvar Despesa
+							{!editingExpense && recurrence.enabled ? `Salvar ${recurrence.months} Despesas` : "Salvar Despesa"}
 						</button>
 					</div>
 				</div>

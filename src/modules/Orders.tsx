@@ -387,123 +387,6 @@ export const OrderModule = ({
 		}
 	};
 
-	// --- CÁLCULO DE KPIS ---
-	const summary = useMemo(() => {
-		const now = new Date();
-		const currentMonth = now.getMonth();
-		const currentYear = now.getFullYear();
-
-		const getMonthData = (dateStr: string) => {
-			const d = new Date(dateStr);
-			const isThisMonth =
-				d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-			const isLastMonth =
-				currentMonth === 0
-					? d.getMonth() === 11 && d.getFullYear() === currentYear - 1
-					: d.getMonth() === currentMonth - 1 &&
-					  d.getFullYear() === currentYear;
-			return { isThisMonth, isLastMonth };
-		};
-
-		const thisMonthOrders = orders.filter(
-			(o) => getMonthData(o.data).isThisMonth
-		).length;
-		const lastMonthOrders = orders.filter(
-			(o) => getMonthData(o.data).isLastMonth
-		).length;
-		const variationTotal =
-			lastMonthOrders === 0
-				? thisMonthOrders > 0
-					? 100
-					: 0
-				: ((thisMonthOrders - lastMonthOrders) / lastMonthOrders) * 100;
-
-		const thisMonthOpen = orders.filter(
-			(o) => o.status === "ABERTA" && getMonthData(o.data).isThisMonth
-		).length;
-		const lastMonthOpen = orders.filter(
-			(o) => o.status === "ABERTA" && getMonthData(o.data).isLastMonth
-		).length;
-		const variationOpen =
-			lastMonthOpen === 0
-				? thisMonthOpen > 0
-					? 100
-					: 0
-				: ((thisMonthOpen - lastMonthOpen) / lastMonthOpen) * 100;
-
-		const thisMonthCompleted = orders.filter(
-			(o) =>
-				o.status === "CONCLUIDA" &&
-				o.data_conclusao &&
-				getMonthData(o.data_conclusao).isThisMonth
-		).length;
-		const lastMonthCompleted = orders.filter(
-			(o) =>
-				o.status === "CONCLUIDA" &&
-				o.data_conclusao &&
-				getMonthData(o.data_conclusao).isLastMonth
-		).length;
-		const variationCompleted =
-			lastMonthCompleted === 0
-				? thisMonthCompleted > 0
-					? 100
-					: 0
-				: ((thisMonthCompleted - lastMonthCompleted) / lastMonthCompleted) *
-				  100;
-
-		const totalDurationMs = orders.reduce((acc, o) => {
-			if (o.status === "CONCLUIDA" && o.data_conclusao) {
-				const diff =
-					new Date(o.data_conclusao).getTime() - new Date(o.data).getTime();
-				return diff > 0 ? acc + diff : acc;
-			}
-			return acc;
-		}, 0);
-		const countDuration = orders.filter(
-			(o) => o.status === "CONCLUIDA" && o.data_conclusao
-		).length;
-		const avgTimeHours =
-			countDuration > 0
-				? totalDurationMs / countDuration / (1000 * 60 * 60)
-				: 0;
-		const avgTimeDisplay =
-			avgTimeHours > 24
-				? `${(avgTimeHours / 24).toFixed(1)} dias`
-				: `${avgTimeHours.toFixed(1)} horas`;
-
-		const totalOrders = orders.length;
-		const openOrdersSnapshot = orders.filter(
-			(o) => o.status === "ABERTA"
-		).length;
-		const completedOrdersSnapshot = orders.filter(
-			(o) => o.status === "CONCLUIDA"
-		).length;
-
-		const sparklineData = Array(7)
-			.fill(0)
-			.map((_, i) => {
-				const d = new Date();
-				d.setDate(d.getDate() - (6 - i));
-				d.setHours(0, 0, 0, 0);
-				return orders.filter((o) => {
-					const od = new Date(o.data);
-					od.setHours(0, 0, 0, 0);
-					return od.getTime() === d.getTime();
-				}).length;
-			});
-
-		return {
-			totalOrders,
-			openOrdersSnapshot,
-			completedOrdersSnapshot,
-			avgTimeDisplay,
-			variationTotal,
-			variationOpen,
-			variationCompleted,
-			sparklineData,
-		};
-	}, [orders]);
-
 	const filteredOrders = useMemo(() => {
 		return orders.filter((o) => {
 			const orderDateString = new Date(o.data).toISOString().split("T")[0];
@@ -534,6 +417,123 @@ export const OrderModule = ({
 		filterPaymentStatus,
 		filterOrderStatus,
 	]);
+
+	// --- CÁLCULO DE KPIS ---
+	const summary = useMemo(() => {
+		const now = new Date();
+		const currentMonth = now.getMonth();
+		const currentYear = now.getFullYear();
+
+		const getMonthData = (dateStr: string) => {
+			const d = new Date(dateStr);
+			const isThisMonth =
+				d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+			const isLastMonth =
+				currentMonth === 0
+					? d.getMonth() === 11 && d.getFullYear() === currentYear - 1
+					: d.getMonth() === currentMonth - 1 &&
+					  d.getFullYear() === currentYear;
+			return { isThisMonth, isLastMonth };
+		};
+
+		const thisMonthOrders = filteredOrders.filter(
+			(o) => getMonthData(o.data).isThisMonth
+		).length;
+		const lastMonthOrders = filteredOrders.filter(
+			(o) => getMonthData(o.data).isLastMonth
+		).length;
+		const variationTotal =
+			lastMonthOrders === 0
+				? thisMonthOrders > 0
+					? 100
+					: 0
+				: ((thisMonthOrders - lastMonthOrders) / lastMonthOrders) * 100;
+
+		const thisMonthOpen = filteredOrders.filter(
+			(o) => o.status === "ABERTA" && getMonthData(o.data).isThisMonth
+		).length;
+		const lastMonthOpen = filteredOrders.filter(
+			(o) => o.status === "ABERTA" && getMonthData(o.data).isLastMonth
+		).length;
+		const variationOpen =
+			lastMonthOpen === 0
+				? thisMonthOpen > 0
+					? 100
+					: 0
+				: ((thisMonthOpen - lastMonthOpen) / lastMonthOpen) * 100;
+
+		const thisMonthCompleted = filteredOrders.filter(
+			(o) =>
+				o.status === "CONCLUIDA" &&
+				o.data_conclusao &&
+				getMonthData(o.data_conclusao).isThisMonth
+		).length;
+		const lastMonthCompleted = filteredOrders.filter(
+			(o) =>
+				o.status === "CONCLUIDA" &&
+				o.data_conclusao &&
+				getMonthData(o.data_conclusao).isLastMonth
+		).length;
+		const variationCompleted =
+			lastMonthCompleted === 0
+				? thisMonthCompleted > 0
+					? 100
+					: 0
+				: ((thisMonthCompleted - lastMonthCompleted) / lastMonthCompleted) *
+				  100;
+
+		const totalDurationMs = filteredOrders.reduce((acc, o) => {
+			if (o.status === "CONCLUIDA" && o.data_conclusao) {
+				const diff =
+					new Date(o.data_conclusao).getTime() - new Date(o.data).getTime();
+				return diff > 0 ? acc + diff : acc;
+			}
+			return acc;
+		}, 0);
+		const countDuration = filteredOrders.filter(
+			(o) => o.status === "CONCLUIDA" && o.data_conclusao
+		).length;
+		const avgTimeHours =
+			countDuration > 0
+				? totalDurationMs / countDuration / (1000 * 60 * 60)
+				: 0;
+		const avgTimeDisplay =
+			avgTimeHours > 24
+				? `${(avgTimeHours / 24).toFixed(1)} dias`
+				: `${avgTimeHours.toFixed(1)} horas`;
+
+		const totalOrders = filteredOrders.length;
+		const openOrdersSnapshot = filteredOrders.filter(
+			(o) => o.status === "ABERTA"
+		).length;
+		const completedOrdersSnapshot = filteredOrders.filter(
+			(o) => o.status === "CONCLUIDA"
+		).length;
+
+		const sparklineData = Array(7)
+			.fill(0)
+			.map((_, i) => {
+				const d = new Date();
+				d.setDate(d.getDate() - (6 - i));
+				d.setHours(0, 0, 0, 0);
+				return filteredOrders.filter((o) => {
+					const od = new Date(o.data);
+					od.setHours(0, 0, 0, 0);
+					return od.getTime() === d.getTime();
+				}).length;
+			});
+
+		return {
+			totalOrders,
+			openOrdersSnapshot,
+			completedOrdersSnapshot,
+			avgTimeDisplay,
+			variationTotal,
+			variationOpen,
+			variationCompleted,
+			sparklineData,
+		};
+	}, [filteredOrders]);
 
 	const uniqueServices = useMemo(
 		() => [...new Set(priceTable.map((p) => p.Servico))].sort(),
@@ -1129,36 +1129,54 @@ export const OrderModule = ({
 														{order.status}
 													</span>
 												</td>
-												<td
-													className='p-4 text-right flex justify-end gap-2'
-													onClick={(e) => e.stopPropagation()}
-												>
-													<button
-														onClick={() => openModal(order)}
-														className='p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[6px] transition'
-													>
-														<Edit2 className='w-4 h-4' />
-													</button>
-													<button
-														onClick={() => handleDelete(order.id!)}
-														className='p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-[6px] transition'
-													>
-														<Trash2 className='w-4 h-4' />
-													</button>
-													<button
-														onClick={() =>
-															setExpandedOrderId(
-																isExpanded ? null : Number(order.id)
-															)
-														}
-														className='p-1.5 text-slate-400 hover:text-indigo-600'
-													>
-														{isExpanded ? (
-															<ChevronUp className='w-4 h-4' />
-														) : (
-															<ChevronDown className='w-4 h-4' />
+												<td className='p-4 text-right' onClick={(e) => e.stopPropagation()}>
+													<div className='flex justify-end gap-1.5'>
+														{order.status === "ABERTA" && (
+															<button
+																onClick={() => updateStatus(order, { status: "CONCLUIDA" })}
+																className='p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-[6px] transition'
+																title='Concluir Ordem'
+															>
+																<CheckCircle2 className='w-4 h-4' />
+															</button>
 														)}
-													</button>
+														{order.status === "ABERTA" && (
+															<button
+																onClick={() => updateStatus(order, { status: "CANCELADA" })}
+																className='p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-[6px] transition'
+																title='Cancelar Ordem'
+															>
+																<XCircle className='w-4 h-4' />
+															</button>
+														)}
+														{order.status === "CONCLUIDA" && (
+															<button
+																onClick={() => updateStatus(order, { status: "ABERTA" })}
+																className='p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-[6px] transition'
+																title='Reabrir Ordem'
+															>
+																<Clock className='w-4 h-4' />
+															</button>
+														)}
+														<button
+															onClick={() => openModal(order)}
+															className='p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[6px] transition'
+														>
+															<Edit2 className='w-4 h-4' />
+														</button>
+														<button
+															onClick={() => handleDelete(order.id!)}
+															className='p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-[6px] transition'
+														>
+															<Trash2 className='w-4 h-4' />
+														</button>
+														<button
+															onClick={() => setExpandedOrderId(isExpanded ? null : Number(order.id))}
+															className='p-1.5 text-slate-400 hover:text-indigo-600'
+														>
+															{isExpanded ? <ChevronUp className='w-4 h-4' /> : <ChevronDown className='w-4 h-4' />}
+														</button>
+													</div>
 												</td>
 											</tr>
 											{isExpanded && (
