@@ -701,7 +701,7 @@ export const DashboardModule = ({
 																</div>
 																<div className="bg-white p-3 rounded-lg border border-slate-100">
 																	<p className="font-bold text-slate-600 text-[10px] uppercase tracking-wide mb-1">Pasta OneDrive</p>
-																	<p className="text-slate-500 font-mono text-[10px] break-all bg-slate-50 p-2 rounded border border-slate-200">A3_Ordens/{dateStr}/OS{o.id}_{safeClient}</p>
+																	<p className="text-slate-500 font-mono text-[10px] break-all bg-slate-50 p-2 rounded border border-slate-200">01_A3_Art_Copy/Ordens/{dateStr}/OS{o.id}_{safeClient}</p>
 																</div>
 															</div>
 														</div>

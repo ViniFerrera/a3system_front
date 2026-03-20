@@ -1291,7 +1291,7 @@ export const OrderModule = ({
 																		Arquivos
 																	</h5>
 																	<div className='mb-3 bg-slate-50 p-2 rounded border border-slate-200 text-[10px] text-slate-500 font-mono break-all'>
-																		Ordens/{order.data.split("T")[0]}/OS{order.id}_{order.cliente_nome.replace(/\s+/g, "_")}
+																		01_A3_Art_Copy/Ordens/{order.data.split("T")[0]}/OS{order.id}_{order.cliente_nome.replace(/\s+/g, "_")}
 																	</div>
 																</div>
 															</div>
