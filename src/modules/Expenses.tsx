@@ -24,6 +24,7 @@ import {
 	BarChart2,
 } from "lucide-react";
 import { api } from "@/services/api";
+import { useLoading } from "@/components/ui/LoadingOverlay";
 
 export const ExpensesModule = ({
 	expenses = [],
@@ -33,6 +34,7 @@ export const ExpensesModule = ({
 	setExpenses: Function;
 }) => {
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const loading = useLoading();
 	const [searchTerm, setSearchTerm] = useState("");
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -310,6 +312,7 @@ export const ExpensesModule = ({
 			alert("Descrição e Valor são obrigatórios.");
 			return;
 		}
+		loading.show(editingExpense ? "Salvando despesa..." : "Criando despesa...");
 		try {
 			if (editingExpense && editingExpense.id) {
 				const res = await api.put(`/expenses/${editingExpense.id}`, formData);
@@ -337,6 +340,8 @@ export const ExpensesModule = ({
 			setFormData({});
 		} catch (err) {
 			alert("Erro ao salvar");
+		} finally {
+			loading.hide();
 		}
 	};
 

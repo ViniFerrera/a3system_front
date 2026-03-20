@@ -28,6 +28,7 @@ import { UsersModule } from "@/modules/Users";
 import { DatabaseSecurityModule } from "@/modules/DatabaseSecurity";
 import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
 import { api } from "@/services/api";
+import { LoadingProvider, useLoading } from "@/components/ui/LoadingOverlay";
 
 // ─── Helpers de Auth ─────────────────────────────────────────────────────────
 interface JwtUser {
@@ -62,7 +63,8 @@ interface NavItem {
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
-const App = () => {
+const AppInner = () => {
+	const loading = useLoading();
 	const [user, setUser] = useState<JwtUser | null>(null);
 	const [authReady, setAuthReady] = useState(false);
 
@@ -111,6 +113,7 @@ const App = () => {
 			}
 		};
 
+		loading.show("Carregando dados do sistema...");
 		Promise.all([
 			fetchSafe("/clients", setClients),
 			fetchSafe("/stock", setStock),
@@ -118,7 +121,7 @@ const App = () => {
 			fetchSafe("/expenses", setExpenses),
 			fetchSafe("/pricing", setPriceTable),
 			fetchSafe("/machinery", setMachinery),
-		]);
+		]).finally(() => loading.hide());
 	}, [user]);
 
 	const handleStockUpdate = () => {
@@ -361,5 +364,11 @@ const App = () => {
 		</div>
 	);
 };
+
+const App = () => (
+	<LoadingProvider>
+		<AppInner />
+	</LoadingProvider>
+);
 
 export default App;

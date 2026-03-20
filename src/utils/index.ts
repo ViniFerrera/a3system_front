@@ -78,6 +78,12 @@ export const Utils = {
         return { unit: 0, total: 0, rule: 'Não encontrado' };
     },
     formatCurrency: (value: number) => { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value); },
-    formatDateTime: (dateString?: string) => { if (!dateString) return '-'; const date = new Date(dateString); return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date); },
-    formatDate: (dateString?: string) => { if (!dateString) return '-'; if (dateString.includes('-')) { const [year, month, day] = dateString.split('-'); return `${day}/${month}/${year}`; } return new Date(dateString).toLocaleDateString('pt-BR'); }
+    formatDateTime: (dateString?: string) => { if (!dateString) return '-'; const date = new Date(dateString); if (isNaN(date.getTime())) return '-'; return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(date); },
+    formatDate: (dateString?: string) => { if (!dateString) return '-'; if (dateString.includes('-')) { const [year, month, day] = dateString.split('-'); return `${day}/${month}/${year}`; } return new Date(dateString).toLocaleDateString('pt-BR'); },
+    /** Retorna datetime local (BRT) sem sufixo Z — para armazenar como hora local */
+    localIsoNow: () => {
+        const d = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
 };

@@ -36,6 +36,7 @@ import {
 	BarChart2,
 } from "lucide-react";
 import { api } from "@/services/api";
+import { useLoading } from "@/components/ui/LoadingOverlay";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 
 interface Machine {
@@ -240,6 +241,7 @@ export const OrderModule = ({
 	const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
 	const [machinesList, setMachinesList] = useState<Machine[]>(machinery);
 	const [isRefreshing, setIsRefreshing] = useState(false);
+	const loading = useLoading();
 
 	// Configuração Taxa Débito
 	const [debitTaxPercent, setDebitTaxPercent] = useState(0);
@@ -338,9 +340,9 @@ export const OrderModule = ({
 	// --- FUNÇÃO DE REFRESH MANUAL (PONTO 3) ---
 	const handleRefreshOrders = async () => {
 		setIsRefreshing(true);
+		loading.show("Atualizando ordens...");
 		try {
 			const res = await api.get("/orders");
-			// Processamento de dados se necessário (ex: parse de anexos/items)
 			const processed = res.data.map((o: any) => ({
 				...o,
 				items: typeof o.items === "string" ? JSON.parse(o.items) : o.items,
@@ -351,7 +353,8 @@ export const OrderModule = ({
 			console.error("Erro ao atualizar ordens:", err);
 			alert("Não foi possível atualizar a lista.");
 		} finally {
-			setTimeout(() => setIsRefreshing(false), 500); // Visual delay
+			setIsRefreshing(false);
+			loading.hide();
 		}
 	};
 
@@ -679,9 +682,13 @@ export const OrderModule = ({
 		dataPayload.append("forma_pagamento", formData.forma_pagamento || "");
 		dataPayload.append("taxa_extra", String(formData.taxa_extra || 0));
 
-		const dateValue = formData.data
-			? formData.data.split("T")[0]
-			: new Date().toISOString().split("T")[0];
+		// Envia datetime completo com hora local (BRT) para evitar +3h no servidor UTC
+		const dateValue = editingOrder
+			? (formData.data || Utils.localIsoNow())
+			: (() => {
+				const datePart = formData.data ? formData.data.split("T")[0] : Utils.localIsoNow().split("T")[0];
+				return `${datePart}T${Utils.localIsoNow().split("T")[1]}`;
+			})();
 		dataPayload.append("data", dateValue);
 
 		dataPayload.append("items", JSON.stringify(items));
@@ -691,6 +698,7 @@ export const OrderModule = ({
 		);
 		filesToUpload.forEach((file) => dataPayload.append("files", file));
 
+		loading.show(editingOrder ? "Salvando ordem..." : "Criando ordem...");
 		try {
 			let savedOrder: Order;
 			if (editingOrder && editingOrder.id) {
@@ -728,6 +736,8 @@ export const OrderModule = ({
 		} catch (err) {
 			console.error(err);
 			alert("Erro ao salvar ordem");
+		} finally {
+			loading.hide();
 		}
 	};
 
@@ -748,12 +758,19 @@ export const OrderModule = ({
 		} else if (updates.status === "CANCELADA") {
 			if (!confirm("Confirmar cancelamento da ordem?")) return;
 		}
+		const statusLabel = updates.status === "CONCLUIDA" ? "Concluindo" : updates.status === "CANCELADA" ? "Cancelando" : "Atualizando";
+		loading.show(`${statusLabel} ordem #${order.id}...`);
 		try {
+			// Envia data_conclusao com hora local quando conclui
+			const finalUpdates = { ...updates };
+			if (updates.status === "CONCLUIDA" && order.status !== "CONCLUIDA") {
+				finalUpdates.data_conclusao = Utils.localIsoNow();
+			}
 			const res = await api.put(`/orders/${order.id}`, {
 				...order,
-				...updates,
+				...finalUpdates,
 			});
-			const mergedOrder = { ...order, ...updates, ...res.data };
+			const mergedOrder = { ...order, ...finalUpdates, ...res.data };
 			const updatedOrder = sanitizeOrderResponse(mergedOrder);
 			setOrders((prev: Order[]) =>
 				prev.map((o) => (o.id === order.id ? updatedOrder : o))
@@ -761,6 +778,8 @@ export const OrderModule = ({
 			if (updates.status === "CONCLUIDA") onStockUpdate(order.items);
 		} catch (err) {
 			alert("Erro ao atualizar status");
+		} finally {
+			loading.hide();
 		}
 	};
 
@@ -1130,32 +1149,37 @@ export const OrderModule = ({
 													</span>
 												</td>
 												<td className='p-4 text-right' onClick={(e) => e.stopPropagation()}>
-													<div className='flex justify-end gap-1.5'>
+													<div className='flex justify-end gap-1.5 flex-wrap'>
 														{order.status === "ABERTA" && (
 															<button
 																onClick={() => updateStatus(order, { status: "CONCLUIDA" })}
-																className='p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-[6px] transition'
-																title='Concluir Ordem'
+																className='flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 shadow-sm shadow-emerald-200 transition-all'
 															>
-																<CheckCircle2 className='w-4 h-4' />
+																<CheckCircle2 className='w-3.5 h-3.5' /> Concluir
 															</button>
 														)}
 														{order.status === "ABERTA" && (
 															<button
 																onClick={() => updateStatus(order, { status: "CANCELADA" })}
-																className='p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-[6px] transition'
-																title='Cancelar Ordem'
+																className='flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 text-[10px] font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all'
 															>
-																<XCircle className='w-4 h-4' />
+																<XCircle className='w-3.5 h-3.5' /> Cancelar
 															</button>
 														)}
 														{order.status === "CONCLUIDA" && (
 															<button
 																onClick={() => updateStatus(order, { status: "ABERTA" })}
-																className='p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-[6px] transition'
-																title='Reabrir Ordem'
+																className='flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
 															>
-																<Clock className='w-4 h-4' />
+																<Clock className='w-3.5 h-3.5' /> Reabrir
+															</button>
+														)}
+														{order.status === "CANCELADA" && (
+															<button
+																onClick={() => updateStatus(order, { status: "ABERTA" })}
+																className='flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
+															>
+																<Clock className='w-3.5 h-3.5' /> Reabrir
 															</button>
 														)}
 														<button
