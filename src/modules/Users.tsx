@@ -119,7 +119,7 @@ export const UsersModule = () => {
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
 				{/* ── Emails Autorizados ── */}
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
+				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
 					<div className="flex items-center gap-2 mb-1">
 						<Lock className="w-4 h-4 text-indigo-500" />
 						<h3 className="text-base font-bold text-slate-800">Emails Autorizados</h3>
@@ -190,7 +190,7 @@ export const UsersModule = () => {
 				</div>
 
 				{/* ── Histórico de Logins ── */}
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
+				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
 					<div className="flex items-center gap-2 mb-1">
 						<User className="w-4 h-4 text-slate-400" />
 						<h3 className="text-base font-bold text-slate-800">Histórico de Logins</h3>

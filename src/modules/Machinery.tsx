@@ -222,7 +222,7 @@ export const MachineryModule = ({
 				</div>
 				<button
 					onClick={() => openModal()}
-					className='flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition shadow-sm font-medium w-full md:w-auto justify-center'
+					className='flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium w-full md:w-auto justify-center'
 				>
 					<Plus className='w-4 h-4' /> Novo Maquinário
 				</button>
@@ -230,7 +230,7 @@ export const MachineryModule = ({
 
 			{/* Grid de Maquinas - AJUSTADO PARA MAX 3 COLUNAS */}
 			{safeMachinery.length === 0 ? (
-				<div className='text-center py-20 bg-slate-50 rounded-[10px] border border-slate-200 border-dashed'>
+				<div className='text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed'>
 					<Settings className='w-12 h-12 text-slate-300 mx-auto mb-3' />
 					<p className='text-slate-500 font-medium'>
 						Nenhum maquinário cadastrado ainda.
@@ -260,7 +260,7 @@ export const MachineryModule = ({
 								className='group hover:-translate-y-1 transition-all duration-300 overflow-hidden border-slate-200 flex flex-col'
 							>
 								{/* Imagem / Placeholder */}
-								<div className='h-48 bg-slate-100 relative border-b border-slate-100 flex items-center justify-center overflow-hidden'>
+								<div className='h-48 bg-slate-100 relative border-b border-slate-200/60 flex items-center justify-center overflow-hidden'>
 									{machine.imagem_url ? (
 										<img
 											src={machine.imagem_url}
@@ -283,13 +283,13 @@ export const MachineryModule = ({
 									<div className='absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200'>
 										<button
 											onClick={() => openModal(machine)}
-											className='p-2 bg-white/90 text-slate-600 hover:text-indigo-600 rounded-[8px] shadow-sm hover:shadow-md transition-all backdrop-blur-sm'
+											className='p-2 bg-white/90 text-slate-600 hover:text-indigo-600 rounded-[8px] shadow-sm hover:shadow-card-hover transition-all backdrop-blur-sm'
 										>
 											<Edit2 className='w-3.5 h-3.5' />
 										</button>
 										<button
 											onClick={() => handleDelete(machine.id!)}
-											className='p-2 bg-white/90 text-slate-600 hover:text-red-600 rounded-[8px] shadow-sm hover:shadow-md transition-all backdrop-blur-sm'
+											className='p-2 bg-white/90 text-slate-600 hover:text-red-600 rounded-[8px] shadow-sm hover:shadow-card-hover transition-all backdrop-blur-sm'
 										>
 											<Trash2 className='w-3.5 h-3.5' />
 										</button>
@@ -384,7 +384,7 @@ export const MachineryModule = ({
 							</label>
 							<input
 								type='text'
-								className='w-full border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none'
+								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 								placeholder='Ex: Impressora Offset Heidelberg'
 								value={formData.nome || ""}
 								onChange={(e) =>
@@ -399,7 +399,7 @@ export const MachineryModule = ({
 							</label>
 							<input
 								type='text'
-								className='w-full border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none'
+								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 								placeholder='Ex: Impressão Digital'
 								value={formData.tipo || ""}
 								onChange={(e) =>
@@ -414,7 +414,7 @@ export const MachineryModule = ({
 							</label>
 							<input
 								type='text'
-								className='w-full border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none'
+								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 								placeholder='Ex: Setor A - Térreo'
 								value={formData.subtitulo || ""}
 								onChange={(e) =>
@@ -439,7 +439,7 @@ export const MachineryModule = ({
 										onClick={() =>
 											setFormData({ ...formData, status: status as any })
 										}
-										className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[10px] border transition-all text-xs font-bold uppercase ${
+										className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border transition-all text-xs font-bold uppercase ${
 											isSelected
 												? `${info.color} ring-2 ring-offset-1 ring-indigo-200 shadow-sm`
 												: "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
@@ -462,7 +462,7 @@ export const MachineryModule = ({
 								<ImageIcon className='absolute left-3 top-3 w-4 h-4 text-slate-400' />
 								<input
 									type='text'
-									className='w-full pl-9 border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none'
+									className='w-full pl-9 border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 									placeholder='https://...'
 									value={formData.imagem_url || ""}
 									onChange={(e) =>
@@ -495,7 +495,7 @@ export const MachineryModule = ({
 							</label>
 							<input
 								type='date'
-								className='w-full border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none'
+								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 								value={formData.ultima_manutencao || ""}
 								onChange={(e) =>
 									setFormData({
@@ -511,7 +511,7 @@ export const MachineryModule = ({
 							</label>
 							<input
 								type='date'
-								className='w-full border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none'
+								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 								value={formData.proxima_manutencao || ""}
 								onChange={(e) =>
 									setFormData({
@@ -529,7 +529,7 @@ export const MachineryModule = ({
 						</label>
 						<textarea
 							rows={3}
-							className='w-full border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none resize-none bg-slate-50 focus:bg-white'
+							className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none bg-slate-50 focus:bg-white'
 							placeholder='Especificações técnicas, número de série, observações...'
 							value={formData.descricao || ""}
 							onChange={(e) =>
@@ -547,7 +547,7 @@ export const MachineryModule = ({
 						</button>
 						<button
 							onClick={handleSave}
-							className='bg-indigo-600 text-white px-6 py-2.5 rounded-[10px] hover:bg-indigo-700 font-bold shadow-md text-sm flex items-center gap-2'
+							className='bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 font-bold shadow-md text-sm flex items-center gap-2'
 						>
 							<Settings className='w-4 h-4' /> Salvar Máquina
 						</button>

@@ -146,7 +146,7 @@ export const DatabaseSecurityModule = () => {
 
 			{/* Actions */}
 			<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
+				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
 					<h3 className="text-base font-bold text-slate-800 flex items-center gap-2 mb-2">
 						<Download className="w-5 h-5 text-emerald-500" /> Fazer Backup
 					</h3>
@@ -160,7 +160,7 @@ export const DatabaseSecurityModule = () => {
 					</button>
 				</div>
 
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
+				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
 					<h3 className="text-base font-bold text-slate-800 flex items-center gap-2 mb-2">
 						<Upload className="w-5 h-5 text-amber-500" /> Restaurar Backup
 					</h3>
@@ -176,8 +176,8 @@ export const DatabaseSecurityModule = () => {
 			</div>
 
 			{/* Table Stats */}
-			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
-				<div className="p-6 border-b border-slate-100">
+			<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card overflow-hidden">
+				<div className="p-6 border-b border-slate-200/60">
 					<h3 className="text-base font-bold text-slate-800">Detalhamento por Tabela</h3>
 					<p className="text-xs text-slate-400 mt-1">Registros em cada tabela do sistema</p>
 				</div>

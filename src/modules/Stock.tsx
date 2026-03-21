@@ -311,7 +311,7 @@ export const StockModule = ({
 
 	return (
 		<div className='space-y-6 pb-20'>
-			<div className='flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-[10px] border border-slate-200 shadow-sm'>
+			<div className='flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200/60 shadow-card'>
 				<div>
 					<h2 className='text-xl font-bold text-slate-800 flex items-center gap-2'>
 						<Box className='w-5 h-5 text-indigo-600' /> Controle de Estoque
@@ -440,7 +440,7 @@ export const StockModule = ({
 											</div>
 										</div>
 
-										<div className='flex items-end justify-between mt-2 pt-2 border-t border-slate-100 border-dashed'>
+										<div className='flex items-end justify-between mt-2 pt-2 border-t border-slate-200/60 border-dashed'>
 											<div className='flex flex-col'>
 												<span className='text-[10px] text-slate-400 uppercase font-bold'>
 													Saldo
@@ -679,7 +679,7 @@ export const StockModule = ({
 						</div>
 					)}
 
-					<div className='flex justify-end pt-4 border-t border-slate-100 gap-2'>
+					<div className='flex justify-end pt-4 border-t border-slate-200/60 gap-2'>
 						<button
 							onClick={() => setIsModalOpen(false)}
 							className='px-4 py-2 text-slate-500 hover:text-slate-700 font-medium text-sm'

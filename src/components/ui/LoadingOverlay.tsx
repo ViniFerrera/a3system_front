@@ -29,8 +29,8 @@ export const LoadingProvider = ({ children }: { children: React.ReactNode }) => 
 		<LoadingContext.Provider value={{ show, hide }}>
 			{children}
 			{visible && (
-				<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-150">
-					<div className="bg-white rounded-2xl shadow-2xl px-8 py-6 flex flex-col items-center gap-4 min-w-[220px] animate-in zoom-in-95 duration-200">
+				<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+					<div className="bg-white rounded-2xl shadow-elevated px-8 py-6 flex flex-col items-center gap-4 min-w-[220px] animate-scale-in">
 						<div className="relative">
 							<div className="w-10 h-10 rounded-full border-[3px] border-indigo-100 border-t-indigo-600 animate-spin" />
 							<div className="absolute inset-0 w-10 h-10 rounded-full border-[3px] border-transparent border-b-violet-400 animate-spin" style={{ animationDirection: "reverse", animationDuration: "0.8s" }} />

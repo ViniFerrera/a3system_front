@@ -148,7 +148,7 @@ const AppInner = () => {
 	if (!authReady) {
 		return (
 			<div className="min-h-screen flex items-center justify-center bg-slate-900">
-				<div className="w-8 h-8 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin" />
+				<div className="w-10 h-10 rounded-full border-[3px] border-indigo-500/30 border-t-indigo-500 animate-spin" />
 			</div>
 		);
 	}
@@ -179,7 +179,7 @@ const AppInner = () => {
 		else if (id === "expenses") { count = counts.expenses; color = "bg-red-500"; }
 		if (count > 0)
 			return (
-				<span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${color} text-white shadow`}>
+				<span className={`ml-auto text-[10px] font-bold min-w-[20px] text-center px-1.5 py-0.5 rounded-full ${color} text-white shadow-sm`}>
 					{count}
 				</span>
 			);
@@ -189,48 +189,49 @@ const AppInner = () => {
 	const activeLabel = navItems.find((n) => n.id === activeTab)?.label ?? "";
 
 	return (
-		<div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
+		<div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
 
 			{/* ── Mobile Header ── */}
-			<div className="md:hidden fixed top-0 w-full z-50 flex items-center justify-between px-4 py-3 bg-slate-900 shadow-lg">
-				<div className="flex items-center gap-2">
-					<div className="bg-indigo-500 p-1.5 rounded-lg">
+			<div className="md:hidden fixed top-0 w-full z-50 flex items-center justify-between px-4 py-3 bg-slate-900/95 backdrop-blur-md shadow-lg border-b border-slate-800/50">
+				<div className="flex items-center gap-2.5">
+					<div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-lg shadow-glow-indigo">
 						<Printer className="w-4 h-4 text-white" />
 					</div>
 					<span className="font-bold text-white text-lg tracking-tight">A3 System</span>
 				</div>
 				<button
 					onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-					className="text-slate-300 hover:text-white transition p-1"
+					className="text-slate-300 hover:text-white transition-colors p-2 -mr-2 rounded-lg hover:bg-slate-800/50"
+					aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
 				>
-					{isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+					{isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
 				</button>
 			</div>
 
 			{/* ── Sidebar ── */}
 			<aside
-				className={`fixed inset-y-0 left-0 w-64 bg-slate-900 flex flex-col z-40 transform transition-transform duration-300 ease-in-out md:translate-x-0 shadow-2xl ${
+				className={`fixed inset-y-0 left-0 w-[260px] bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col z-40 transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:translate-x-0 shadow-2xl ${
 					isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
 				} md:sticky md:top-0 md:h-screen pt-16 md:pt-0`}
 			>
 				{/* Logo */}
-				<div className="hidden md:flex items-center gap-3 px-5 py-6 border-b border-slate-800">
-					<div className="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-900/50">
+				<div className="hidden md:flex items-center gap-3 px-5 py-6 border-b border-slate-800/60">
+					<div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-2.5 rounded-xl shadow-lg shadow-indigo-900/40">
 						<Printer className="w-5 h-5 text-white" />
 					</div>
 					<div>
 						<span className="font-bold text-lg text-white tracking-tight block">A3 System</span>
-						<span className="text-xs text-slate-500">Gestão Gráfica</span>
+						<span className="text-[11px] text-slate-500 font-medium">Gestão Gráfica</span>
 					</div>
 				</div>
 
 				{/* Nav */}
-				<nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
+				<nav className="flex-1 px-3 py-4 overflow-y-auto custom-scrollbar space-y-5">
 					{groups.map((group) => {
 						const items = navItems.filter((n) => n.group === group);
 						return (
 							<div key={group}>
-								<p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 mb-2">
+								<p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 px-3 mb-2">
 									{group}
 								</p>
 								<div className="space-y-0.5">
@@ -245,14 +246,14 @@ const AppInner = () => {
 												}}
 												className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group ${
 													isActive
-														? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/40"
-														: "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+														? "bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-900/30"
+														: "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
 												}`}
 											>
-												<item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"}`} />
+												<item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"}`} />
 												<span className="flex-1 text-left">{item.label}</span>
 												{getBadge(item.id)}
-												{isActive && <ChevronRight className="w-3 h-3 opacity-50" />}
+												{isActive && <ChevronRight className="w-3 h-3 opacity-40" />}
 											</button>
 										);
 									})}
@@ -263,23 +264,23 @@ const AppInner = () => {
 				</nav>
 
 				{/* Rodapé — usuário + logout */}
-				<div className="px-4 py-4 border-t border-slate-800">
+				<div className="px-4 py-4 border-t border-slate-800/60">
 					<div className="flex items-center gap-3 mb-3">
 						{user.picture ? (
-							<img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border-2 border-slate-700 object-cover" />
+							<img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full border-2 border-slate-700/80 object-cover ring-2 ring-slate-800" />
 						) : (
-							<div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+							<div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
 								{user.name?.charAt(0)}
 							</div>
 						)}
 						<div className="flex-1 min-w-0">
-							<p className="text-xs font-semibold text-slate-300 truncate">{user.name}</p>
+							<p className="text-[13px] font-semibold text-slate-300 truncate">{user.name}</p>
 							<p className="text-[10px] text-slate-500 truncate">{user.email}</p>
 						</div>
 					</div>
 					<button
 						onClick={handleLogout}
-						className="w-full flex items-center gap-2 text-xs text-slate-500 hover:text-red-400 transition-colors px-2 py-1.5 rounded-lg hover:bg-slate-800"
+						className="w-full flex items-center gap-2 text-xs text-slate-500 hover:text-red-400 transition-colors px-3 py-2 rounded-lg hover:bg-red-500/10"
 					>
 						<LogOut className="w-3.5 h-3.5" /> Sair
 					</button>
@@ -289,7 +290,7 @@ const AppInner = () => {
 			{/* ── Overlay mobile ── */}
 			{isMobileMenuOpen && (
 				<div
-					className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm"
+					className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm animate-fade-in"
 					onClick={() => setIsMobileMenuOpen(false)}
 				/>
 			)}
@@ -297,35 +298,35 @@ const AppInner = () => {
 			{/* ── Conteúdo principal ── */}
 			<div className="flex-1 flex flex-col min-h-screen overflow-hidden">
 				{/* Topbar desktop */}
-				<header className="hidden md:flex items-center justify-between px-8 py-4 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
+				<header className="hidden md:flex items-center justify-between px-8 py-4 bg-white/80 backdrop-blur-md border-b border-slate-200/80 flex-shrink-0 sticky top-0 z-10">
 					<div>
 						<h1 className="text-lg font-bold text-slate-800">{activeLabel}</h1>
-						<p className="text-xs text-slate-400">
+						<p className="text-xs text-slate-400 mt-0.5">
 							{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
 						</p>
 					</div>
 					<div className="flex items-center gap-3">
 						{counts.orders > 0 && (
-							<span className="text-xs bg-blue-50 text-blue-600 font-semibold px-3 py-1.5 rounded-full border border-blue-100">
+							<span className="text-xs bg-blue-50 text-blue-600 font-semibold px-3 py-1.5 rounded-full border border-blue-100 shadow-sm">
 								{counts.orders} OS abertas
 							</span>
 						)}
 						{counts.expenses > 0 && (
-							<span className="text-xs bg-red-50 text-red-600 font-semibold px-3 py-1.5 rounded-full border border-red-100">
+							<span className="text-xs bg-red-50 text-red-600 font-semibold px-3 py-1.5 rounded-full border border-red-100 shadow-sm">
 								{counts.expenses} contas vencem em breve
 							</span>
 						)}
-						<div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+						<div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
 							{user.picture && (
-								<img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border border-slate-200 object-cover" />
+								<img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border-2 border-slate-100 object-cover shadow-sm" />
 							)}
 							<span className="text-sm font-medium text-slate-700 hidden lg:block">{user.name}</span>
 						</div>
 					</div>
 				</header>
 
-				<main className="flex-1 overflow-y-auto p-4 md:p-7 mt-14 md:mt-0">
-					<div className="max-w-7xl mx-auto">
+				<main className="flex-1 overflow-y-auto p-4 md:p-8 mt-14 md:mt-0">
+					<div className="max-w-7xl mx-auto animate-fade-in-up">
 						{activeTab === "dashboard" && (
 							<DashboardModule orders={orders} expenses={expenses} stock={stock} />
 						)}

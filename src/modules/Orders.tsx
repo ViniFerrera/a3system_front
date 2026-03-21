@@ -114,7 +114,7 @@ const SearchableSelect = ({
 			</div>
 			{isOpen && (
 				<div className='absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-[10px] shadow-xl max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100'>
-					<div className='p-2 border-b border-slate-100 bg-slate-50 sticky top-0'>
+					<div className='p-2 border-b border-slate-200/60 bg-slate-50 sticky top-0'>
 						<div className='flex items-center gap-2 bg-white border border-slate-200 rounded-[6px] px-2 py-1.5'>
 							<Search className='w-3.5 h-3.5 text-slate-400' />
 							<input
@@ -1070,14 +1070,14 @@ export const OrderModule = ({
 								<th className='p-2 sm:p-4 text-right'>Ações</th>
 							</tr>
 						</thead>
-						<tbody className='divide-y divide-slate-100'>
+						<tbody className='divide-y divide-slate-100/60'>
 							{filteredOrders.length > 0 ? (
 								filteredOrders.map((order) => {
 									const isExpanded = expandedOrderId === order.id;
 									return (
 										<React.Fragment key={order.id}>
 											<tr
-												className={`hover:bg-slate-50 transition-colors cursor-pointer ${
+												className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
 													isExpanded ? "bg-indigo-50/30" : ""
 												}`}
 												onClick={() =>

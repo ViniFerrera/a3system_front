@@ -213,7 +213,7 @@ export const PricingModule = ({
 					{/* Botão de Exportar Tabela */}
 					<button
 						onClick={handleExportTable}
-						className='flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2 rounded-[10px] hover:bg-slate-50 transition shadow-sm text-sm font-medium w-full md:w-auto'
+						className='flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-50 transition shadow-sm text-sm font-medium w-full md:w-auto'
 					>
 						<FileSpreadsheet className='w-4 h-4 text-emerald-600' /> Exportar
 						tabela
@@ -229,7 +229,7 @@ export const PricingModule = ({
 
 					<button
 						onClick={() => fileInputRef.current?.click()}
-						className='flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-[10px] hover:bg-slate-900 transition shadow-sm text-sm font-medium w-full md:w-auto'
+						className='flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-xl hover:bg-slate-900 transition shadow-sm text-sm font-medium w-full md:w-auto'
 					>
 						<Upload className='w-4 h-4' /> Importar Excel
 					</button>
@@ -237,7 +237,7 @@ export const PricingModule = ({
 					{hasChanges && (
 						<button
 							onClick={handleSaveChanges}
-							className='flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-[10px] hover:bg-green-700 transition shadow-sm text-sm font-bold animate-in fade-in zoom-in w-full md:w-auto'
+							className='flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 transition shadow-sm text-sm font-bold animate-in fade-in zoom-in w-full md:w-auto'
 						>
 							<Save className='w-4 h-4' /> Salvar
 						</button>
@@ -256,7 +256,7 @@ export const PricingModule = ({
 								{key}
 							</label>
 							<select
-								className='border border-slate-200 p-2.5 rounded-[10px] text-sm w-full bg-slate-50 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-colors'
+								className='border border-slate-200 p-2.5 rounded-xl text-sm w-full bg-slate-50 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-colors'
 								value={(filters as any)[key]}
 								onChange={(e) =>
 									setFilters((prev) => ({ ...prev, [key]: e.target.value }))

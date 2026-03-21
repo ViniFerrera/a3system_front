@@ -398,7 +398,7 @@ export const ExpensesModule = ({
 		<div className='space-y-4 sm:space-y-6'>
 			<div className='flex flex-col gap-3 sm:gap-4'>
 				<div className='flex flex-col sm:flex-row gap-2 w-full items-stretch sm:items-end'>
-					<div className='flex items-center gap-2 bg-white border border-slate-200 rounded-[10px] p-2 w-full md:w-auto shadow-sm'>
+					<div className='flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-2 w-full md:w-auto shadow-sm'>
 						<Filter className='w-4 h-4 text-indigo-500' />
 						<input
 							type='date'
@@ -419,13 +419,13 @@ export const ExpensesModule = ({
 						<input
 							type='text'
 							placeholder='Buscar descrição...'
-							className='w-full md:w-48 pl-7 pr-2 py-2 border border-slate-200 rounded-[10px] text-xs outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm'
+							className='w-full md:w-48 pl-7 pr-2 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm'
 							value={filterDesc}
 							onChange={(e) => setFilterDesc(e.target.value)}
 						/>
 					</div>
 					<select
-						className='text-xs border border-slate-200 rounded-[10px] p-2 bg-white outline-none w-full md:w-auto h-[34px] shadow-sm'
+						className='text-xs border border-slate-200 rounded-xl p-2 bg-white outline-none w-full md:w-auto h-[34px] shadow-sm'
 						value={statusFilter}
 						onChange={(e) => setStatusFilter(e.target.value as any)}
 					>
@@ -437,7 +437,7 @@ export const ExpensesModule = ({
 				<div className='flex gap-2 w-full sm:w-auto justify-end overflow-x-auto pb-1 sm:pb-0'>
 					<button
 						onClick={handleDownloadTemplate}
-						className='flex items-center gap-1.5 sm:gap-2 bg-white text-slate-700 border border-slate-200 px-3 sm:px-4 py-2 rounded-[10px] hover:bg-slate-50 transition shadow-sm text-xs sm:text-sm font-medium whitespace-nowrap'
+						className='flex items-center gap-1.5 sm:gap-2 bg-white text-slate-700 border border-slate-200 px-3 sm:px-4 py-2 rounded-xl hover:bg-slate-50 transition shadow-sm text-xs sm:text-sm font-medium whitespace-nowrap'
 					>
 						<Download className='w-4 h-4' /> <span className='hidden sm:inline'>{safeExpenses.length > 0 ? "Exportar .xlsx" : "Modelo .xlsx"}</span><span className='sm:hidden'>Exportar</span>
 					</button>
@@ -451,27 +451,27 @@ export const ExpensesModule = ({
 					/>
 					<button
 						onClick={() => fileInputRef.current?.click()}
-						className='flex items-center gap-1.5 sm:gap-2 bg-slate-800 text-white px-3 sm:px-4 py-2 rounded-[10px] hover:bg-slate-900 transition shadow-sm text-xs sm:text-sm font-medium whitespace-nowrap'
+						className='flex items-center gap-1.5 sm:gap-2 bg-slate-800 text-white px-3 sm:px-4 py-2 rounded-xl hover:bg-slate-900 transition shadow-sm text-xs sm:text-sm font-medium whitespace-nowrap'
 					>
 						<Upload className='w-4 h-4' /> Importar
 					</button>
 					{hasChanges && (
 						<button
 							onClick={handleSaveChanges}
-							className='flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-[10px] hover:bg-green-700 transition shadow-sm text-sm font-bold animate-in fade-in zoom-in'
+							className='flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 transition shadow-sm text-sm font-bold animate-in fade-in zoom-in'
 						>
 							<Save className='w-4 h-4' /> Salvar
 						</button>
 					)}
 					<button
 						onClick={() => openModal()}
-						className='flex items-center gap-2 bg-indigo-600 text-white px-5 py-2 rounded-[10px] hover:bg-indigo-700 transition shadow-sm font-medium'
+						className='flex items-center gap-2 bg-indigo-600 text-white px-5 py-2 rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium'
 					>
 						<Plus className='w-4 h-4' /> Nova Conta
 					</button>
 					<button
 						onClick={() => setShowDashboard(!showDashboard)}
-						className={`flex items-center gap-2 px-4 py-2 rounded-[10px] border transition shadow-sm text-sm font-medium ${showDashboard ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"}`}
+						className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition shadow-sm text-sm font-medium ${showDashboard ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"}`}
 					>
 						<BarChart2 className='w-4 h-4' /> {showDashboard ? "Ocultar" : "Dashboard"}
 					</button>
@@ -671,20 +671,20 @@ export const ExpensesModule = ({
 										<div className='flex justify-end gap-1 sm:gap-2'>
 											<button
 												onClick={() => toggleStatus(expense)}
-												className='p-1.5 sm:p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-[10px] transition-colors sm:hidden'
+												className='p-1.5 sm:p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors sm:hidden'
 												title={expense.status === "PAGO" ? "Marcar Pendente" : "Marcar Pago"}
 											>
 												<CheckCircle className='w-4 h-4' />
 											</button>
 											<button
 												onClick={() => openModal(expense)}
-												className='p-1.5 sm:p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[10px] transition-colors'
+												className='p-1.5 sm:p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors'
 											>
 												<Edit2 className='w-4 h-4' />
 											</button>
 											<button
 												onClick={() => handleDelete(expense.id!)}
-												className='p-1.5 sm:p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-[10px] transition-colors'
+												className='p-1.5 sm:p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors'
 											>
 												<Trash2 className='w-4 h-4' />
 											</button>
@@ -719,7 +719,7 @@ export const ExpensesModule = ({
 						</label>
 						<input
 							type='text'
-							className='w-full border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow'
+							className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow'
 							value={formData.produto || ""}
 							onChange={(e) =>
 								setFormData({ ...formData, produto: e.target.value })
@@ -734,7 +734,7 @@ export const ExpensesModule = ({
 							</label>
 							<input
 								type='date'
-								className='w-full border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow'
+								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow'
 								value={formData.vencimento || ""}
 								onChange={(e) =>
 									setFormData({ ...formData, vencimento: e.target.value })
@@ -747,7 +747,7 @@ export const ExpensesModule = ({
 							</label>
 							<input
 								type='number'
-								className='w-full border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow'
+								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow'
 								value={formData.valor || ""}
 								onChange={(e) =>
 									setFormData({ ...formData, valor: Number(e.target.value) })
@@ -761,7 +761,7 @@ export const ExpensesModule = ({
 						</label>
 						<textarea
 							rows={3}
-							className='w-full border border-slate-200 p-2.5 rounded-[10px] focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-shadow bg-slate-50 focus:bg-white'
+							className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-shadow bg-slate-50 focus:bg-white'
 							value={formData.obs || ""}
 							onChange={(e) =>
 								setFormData({ ...formData, obs: e.target.value })
@@ -776,7 +776,7 @@ export const ExpensesModule = ({
 						<div className='flex gap-2'>
 							<button
 								onClick={() => setFormData({ ...formData, status: "PENDENTE" })}
-								className={`flex-1 py-2 rounded-[10px] border text-sm font-bold transition-all ${
+								className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
 									formData.status === "PENDENTE"
 										? "bg-orange-50 text-orange-700 border-orange-200 shadow-sm"
 										: "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
@@ -786,7 +786,7 @@ export const ExpensesModule = ({
 							</button>
 							<button
 								onClick={() => setFormData({ ...formData, status: "PAGO" })}
-								className={`flex-1 py-2 rounded-[10px] border text-sm font-bold transition-all ${
+								className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
 									formData.status === "PAGO"
 										? "bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm"
 										: "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
@@ -802,7 +802,7 @@ export const ExpensesModule = ({
 							<div className='flex items-center gap-3'>
 								<button
 									onClick={() => setRecurrence(prev => ({ ...prev, enabled: !prev.enabled }))}
-									className={`px-4 py-2 rounded-[10px] border text-sm font-bold transition-all ${recurrence.enabled ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}
+									className={`px-4 py-2 rounded-xl border text-sm font-bold transition-all ${recurrence.enabled ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}
 								>
 									{recurrence.enabled ? "Recorrente" : "Única"}
 								</button>
@@ -811,7 +811,7 @@ export const ExpensesModule = ({
 										<select
 											value={recurrence.months}
 											onChange={(e) => setRecurrence(prev => ({ ...prev, months: Number(e.target.value) }))}
-											className='border border-slate-200 rounded-[10px] p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500'
+											className='border border-slate-200 rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500'
 										>
 											{[2,3,4,5,6,7,8,9,10,11,12].map(n => (
 												<option key={n} value={n}>{n} meses</option>
@@ -831,7 +831,7 @@ export const ExpensesModule = ({
 						</button>
 						<button
 							onClick={handleSave}
-							className='bg-indigo-600 text-white px-6 py-2.5 rounded-[10px] hover:bg-indigo-700 font-bold shadow-md transition-all text-sm'
+							className='bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 font-bold shadow-md transition-all text-sm'
 						>
 							{!editingExpense && recurrence.enabled ? `Salvar ${recurrence.months} Despesas` : "Salvar Despesa"}
 						</button>

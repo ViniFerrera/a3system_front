@@ -152,7 +152,7 @@ export const AiInsightsModule = () => {
 							<p className='text-sm'>Analisando dados da empresa e mercado...</p>
 						</div>
 					) : chatResponse ? (
-						<div className='prose prose-sm prose-indigo max-w-none text-slate-600 bg-white/50 p-4 rounded-xl border border-slate-100 shadow-sm overflow-y-auto max-h-[60vh]'>
+						<div className='prose prose-sm prose-indigo max-w-none text-slate-600 bg-white/50 p-4 rounded-xl border border-slate-200/60 shadow-card overflow-y-auto max-h-[60vh]'>
 							<Markdown
 								components={{
 									h1: ({ children }) => <h1 className="text-xl font-bold text-slate-800 mt-4 mb-2">{children}</h1>,
@@ -203,7 +203,7 @@ export const AiInsightsModule = () => {
 					<button
 						onClick={handleRefreshInsights}
 						disabled={isInsightsLoading}
-						className='bg-emerald-600 text-white px-5 py-2.5 rounded-[10px] hover:bg-emerald-700 transition font-bold text-sm flex items-center gap-2 shadow-md shadow-emerald-200 disabled:opacity-50'
+						className='bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition font-bold text-sm flex items-center gap-2 shadow-md shadow-emerald-200 disabled:opacity-50'
 					>
 						{isInsightsLoading ? (
 							<RefreshCcw className='w-4 h-4 animate-spin' />

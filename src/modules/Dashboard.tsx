@@ -33,13 +33,13 @@ const paymentBadge: Record<string, string> = {
 const CustomTooltip = ({ active, payload, label }: any) => {
 	if (!active || !payload?.length) return null;
 	return (
-		<div className="bg-white border border-slate-100 rounded-2xl shadow-xl p-3 min-w-[140px]">
+		<div className="bg-white/95 backdrop-blur-sm border border-slate-200/60 rounded-xl shadow-elevated p-3.5 min-w-[150px]">
 			<p className="font-bold text-slate-700 text-xs mb-2">{label}</p>
 			{payload.map((p: any, i: number) => (
-				<div key={i} className="flex items-center gap-2 mt-1">
+				<div key={i} className="flex items-center gap-2 mt-1.5">
 					<span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color || p.fill }} />
 					<span className="text-slate-500 text-xs">{p.name}:</span>
-					<span className="font-bold text-slate-800 text-xs ml-auto">{Utils.formatCurrency(Number(p.value))}</span>
+					<span className="font-bold text-slate-800 text-xs ml-auto tabular-nums">{Utils.formatCurrency(Number(p.value))}</span>
 				</div>
 			))}
 		</div>
@@ -51,15 +51,15 @@ interface KpiCardProps {
 	icon: React.ReactNode; gradient: string; trend?: number;
 }
 const KpiCard = ({ label, value, sub, icon, gradient, trend }: KpiCardProps) => (
-	<div className={`rounded-2xl p-3 sm:p-5 text-white shadow-lg ${gradient} relative overflow-hidden`}>
-		<div className="absolute right-3 top-3 opacity-[0.12] scale-[2.2] origin-center">{icon}</div>
+	<div className={`rounded-2xl p-3.5 sm:p-5 text-white shadow-lg ${gradient} relative overflow-hidden group hover:shadow-xl transition-shadow duration-200`}>
+		<div className="absolute right-3 top-3 opacity-[0.10] scale-[2.2] origin-center group-hover:scale-[2.4] transition-transform duration-300">{icon}</div>
 		<div className="relative z-10">
-			<p className="text-white/75 text-[10px] font-bold uppercase tracking-widest mb-1">{label}</p>
-			<p className="text-lg sm:text-2xl font-bold leading-tight tracking-tight">{value}</p>
-			<div className="flex items-center gap-2 mt-1.5 flex-wrap">
-				<p className="text-white/65 text-xs">{sub}</p>
+			<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1.5">{label}</p>
+			<p className="text-lg sm:text-2xl font-bold leading-tight tracking-tight tabular-nums">{value}</p>
+			<div className="flex items-center gap-2 mt-2 flex-wrap">
+				<p className="text-white/60 text-xs">{sub}</p>
 				{trend !== undefined && (
-					<span className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${trend >= 0 ? "bg-white/25" : "bg-black/20"}`}>
+					<span className={`flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${trend >= 0 ? "bg-white/20" : "bg-black/15"}`}>
 						{trend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
 						{Math.abs(trend).toFixed(1)}%
 					</span>
@@ -327,7 +327,7 @@ export const DashboardModule = ({
 	];
 
 	return (
-		<div className="space-y-5 pb-20 md:pb-0">
+		<div className="space-y-5 pb-20 md:pb-0 animate-fade-in-up">
 
 			{/* ── Status Tabs ── */}
 			<div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
@@ -342,7 +342,7 @@ export const DashboardModule = ({
 			</div>
 
 			{/* ── Barra de Filtros ── */}
-			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-3 sm:p-4">
+			<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-3 sm:p-4">
 				<div className="flex flex-col gap-3">
 					{/* Período Presets */}
 					<div className="flex flex-wrap items-center gap-2">
@@ -400,7 +400,7 @@ export const DashboardModule = ({
 
 			{/* ── Fluxo Mensal + Distribuição Pagamento ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-				<div className="lg:col-span-2 bg-white border border-slate-100 rounded-2xl shadow-sm p-4 sm:p-6">
+				<div className="lg:col-span-2 bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-5 gap-2">
 						<div>
 							<h4 className="text-sm sm:text-base font-bold text-slate-800">Fluxo de Caixa Mensal</h4>
@@ -429,7 +429,7 @@ export const DashboardModule = ({
 					</ResponsiveContainer>
 				</div>
 
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 flex flex-col">
+				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6 flex flex-col">
 					<h4 className="text-base font-bold text-slate-800">Status de Pagamento</h4>
 					<p className="text-xs text-slate-400 mt-0.5 mb-4">Distribuição do período</p>
 					{paymentDist.length > 0 ? (
@@ -470,7 +470,7 @@ export const DashboardModule = ({
 
 			{/* ── Top Serviços + Top Clientes ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
+				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
 					<h4 className="text-base font-bold text-slate-800">Top Serviços</h4>
 					<p className="text-xs text-slate-400 mt-0.5 mb-5">Receita por tipo de serviço</p>
 					{topServices.length > 0 ? (
@@ -490,7 +490,7 @@ export const DashboardModule = ({
 					)}
 				</div>
 
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
+				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
 					<h4 className="text-base font-bold text-slate-800">Top Clientes</h4>
 					<p className="text-xs text-slate-400 mt-0.5 mb-4">Ranking por receita</p>
 					{topClients.length > 0 ? (
@@ -533,7 +533,7 @@ export const DashboardModule = ({
 			</div>
 
 			{/* ── Evolução Diária ── */}
-			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 sm:p-6">
+			<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 				<h4 className="text-sm sm:text-base font-bold text-slate-800">Evolução Diária de Receita</h4>
 				<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-4 sm:mb-5">Faturamento dia a dia nos últimos {bottomPeriod === "7d" ? "7 dias" : bottomPeriod === "30d" ? "30 dias" : bottomPeriod === "3m" ? "3 meses" : "6 meses"}</p>
 				<ResponsiveContainer width="100%" height={180}>
@@ -555,7 +555,7 @@ export const DashboardModule = ({
 
 			{/* ── Dia da Semana + Alertas ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 sm:p-6">
+				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 					<h4 className="text-sm sm:text-base font-bold text-slate-800">Receita por Dia da Semana</h4>
 					<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">
 						Melhor dia:{" "}
@@ -578,7 +578,7 @@ export const DashboardModule = ({
 					</ResponsiveContainer>
 				</div>
 
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 sm:p-6">
+				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 					<h4 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
 						<AlertTriangle className="w-4 h-4 text-amber-500" /> Alertas
 					</h4>
@@ -625,7 +625,7 @@ export const DashboardModule = ({
 			</div>
 
 			{/* ── Tabela: Últimas Ordens Abertas ── */}
-			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 sm:p-6">
+			<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 				<div className="flex items-center justify-between mb-3 sm:mb-4">
 					<div>
 						<h4 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
@@ -643,13 +643,13 @@ export const DashboardModule = ({
 					<div className="overflow-x-auto">
 						<table className="w-full text-sm">
 							<thead>
-								<tr className="border-b border-slate-100">
-									<th className="text-left text-[10px] font-bold text-slate-400 uppercase pb-2 pr-4">#OS</th>
-									<th className="text-left text-[10px] font-bold text-slate-400 uppercase pb-2 pr-4">Cliente</th>
-									<th className="text-left text-[10px] font-bold text-slate-400 uppercase pb-2 pr-4 hidden md:table-cell">Data</th>
-									<th className="text-left text-[10px] font-bold text-slate-400 uppercase pb-2 pr-4 hidden lg:table-cell">Serviços</th>
-									<th className="text-left text-[10px] font-bold text-slate-400 uppercase pb-2 pr-4">Pagamento</th>
-									<th className="text-right text-[10px] font-bold text-slate-400 uppercase pb-2">Valor</th>
+								<tr className="border-b border-slate-200/60">
+									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">#OS</th>
+									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Cliente</th>
+									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden md:table-cell">Data</th>
+									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden lg:table-cell">Serviços</th>
+									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Pagamento</th>
+									<th className="text-right text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5">Valor</th>
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-slate-50">
