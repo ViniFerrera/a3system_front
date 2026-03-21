@@ -860,30 +860,30 @@ export const OrderModule = ({
 	);
 
 	return (
-		<div className='flex flex-col space-y-6 pb-12'>
+		<div className='flex flex-col space-y-4 sm:space-y-6 pb-12'>
 			{/* 1. CARDS RESUMO */}
-			<div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
-				<Card className='p-4 flex justify-between items-center bg-slate-50 border border-slate-100 shadow-sm relative overflow-hidden group'>
+			<div className='grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4'>
+				<Card className='p-3 sm:p-4 flex justify-between items-center bg-slate-50 border border-slate-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-indigo-500'></div>
 					<div>
-						<p className='text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
 							Total de ordens
 						</p>
-						<h3 className='text-2xl font-bold text-slate-800 mt-1'>
+						<h3 className='text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
 							{summary.totalOrders}
 						</h3>
 						<VariationIndicator val={summary.variationTotal} />
 					</div>
-					<MiniSparkline data={summary.sparklineData} color='#6366f1' />
+					<div className='hidden sm:block'><MiniSparkline data={summary.sparklineData} color='#6366f1' /></div>
 				</Card>
 
-				<Card className='p-4 flex justify-between items-center bg-amber-50/30 border border-amber-100 shadow-sm relative overflow-hidden group'>
+				<Card className='p-3 sm:p-4 flex justify-between items-center bg-amber-50/30 border border-amber-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-amber-500'></div>
 					<div>
-						<p className='text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
 							Ordens abertas
 						</p>
-						<h3 className='text-2xl font-bold text-slate-800 mt-1'>
+						<h3 className='text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
 							{summary.openOrdersSnapshot}
 						</h3>
 						<VariationIndicator val={summary.variationOpen} />
@@ -896,13 +896,13 @@ export const OrderModule = ({
 					</div>
 				</Card>
 
-				<Card className='p-4 flex justify-between items-center bg-emerald-50/30 border border-emerald-100 shadow-sm relative overflow-hidden group'>
+				<Card className='p-3 sm:p-4 flex justify-between items-center bg-emerald-50/30 border border-emerald-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-emerald-500'></div>
 					<div>
-						<p className='text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
 							Ordens concluídas
 						</p>
-						<h3 className='text-2xl font-bold text-slate-800 mt-1'>
+						<h3 className='text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
 							{summary.completedOrdersSnapshot}
 						</h3>
 						<VariationIndicator val={summary.variationCompleted} />
@@ -911,13 +911,13 @@ export const OrderModule = ({
 						<MiniSparkline data={[1, 2, 3, 4, 3, 5, 6]} color='#10b981' />
 					</div>
 				</Card>
-				<Card className='p-4 flex justify-between items-center bg-blue-50/30 border border-blue-100 shadow-sm relative overflow-hidden group'>
+				<Card className='p-3 sm:p-4 flex justify-between items-center bg-blue-50/30 border border-blue-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-500'></div>
 					<div>
-						<p className='text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
 							Tempo médio
 						</p>
-						<h3 className='text-xl font-bold text-slate-800 mt-1'>
+						<h3 className='text-lg sm:text-xl font-bold text-slate-800 mt-1'>
 							{summary.avgTimeDisplay}
 						</h3>
 						<div className='flex items-center gap-1 mt-2 text-[10px] text-blue-500'>
@@ -931,74 +931,75 @@ export const OrderModule = ({
 			</div>
 
 			{/* 2. FILTROS */}
-			<div className='bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-end'>
-				<div className='flex items-center gap-2 border border-slate-200 rounded-[10px] p-2 bg-slate-50 w-full md:w-auto hover:border-indigo-200 transition-colors'>
-					<Calendar className='w-4 h-4 text-slate-400' />
-					<input
-						type='date'
-						className='bg-transparent text-sm outline-none text-slate-600'
-						value={filterStart}
-						onChange={(e) => setFilterStart(e.target.value)}
-					/>
-					<span className='text-slate-300'>|</span>
-					<input
-						type='date'
-						className='bg-transparent text-sm outline-none text-slate-600'
-						value={filterEnd}
-						onChange={(e) => setFilterEnd(e.target.value)}
-					/>
+			<div className='bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3 sm:gap-4'>
+				<div className='flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end'>
+					<div className='flex items-center gap-2 border border-slate-200 rounded-[10px] p-2 bg-slate-50 w-full sm:w-auto hover:border-indigo-200 transition-colors'>
+						<Calendar className='w-4 h-4 text-slate-400 flex-shrink-0' />
+						<input
+							type='date'
+							className='bg-transparent text-xs sm:text-sm outline-none text-slate-600 min-w-0 flex-1'
+							value={filterStart}
+							onChange={(e) => setFilterStart(e.target.value)}
+						/>
+						<span className='text-slate-300'>|</span>
+						<input
+							type='date'
+							className='bg-transparent text-xs sm:text-sm outline-none text-slate-600 min-w-0 flex-1'
+							value={filterEnd}
+							onChange={(e) => setFilterEnd(e.target.value)}
+						/>
+					</div>
+					<div className='w-full sm:w-64'>
+						<MultiSelect
+							options={uniqueServices}
+							selected={filterServices}
+							onChange={setFilterServices}
+							placeholder='Filtrar Serviços'
+						/>
+					</div>
+					<div className='w-full sm:w-64'>
+						<SearchableSelect
+							options={clientOptions}
+							value={filterClient}
+							onChange={setFilterClient}
+							placeholder='Filtrar por Cliente'
+							fullClients={clients}
+						/>
+					</div>
 				</div>
-				<div className='w-full md:w-64'>
-					<MultiSelect
-						options={uniqueServices}
-						selected={filterServices}
-						onChange={setFilterServices}
-						placeholder='Filtrar Serviços'
-					/>
+				<div className='flex items-center gap-2 justify-end'>
+					<button
+						onClick={handleRefreshOrders}
+						disabled={isRefreshing}
+						className={`p-2.5 rounded-[10px] transition border border-slate-200 ${
+							isRefreshing
+								? "bg-slate-50 text-slate-300 cursor-not-allowed"
+								: "bg-white text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
+						}`}
+						title='Atualizar Lista'
+					>
+						<RefreshCcw
+							className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+						/>
+					</button>
+					<button
+						onClick={() => setIsConfigModalOpen(true)}
+						className='bg-slate-100 text-slate-600 hover:bg-slate-200 p-2.5 rounded-[10px] transition'
+						title='Configurações (Taxas)'
+					>
+						<Settings className='w-4 h-4' />
+					</button>
+					<button
+						onClick={() => openModal()}
+						className='bg-indigo-600 text-white px-4 sm:px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition font-bold text-sm flex items-center gap-2 shadow-md shadow-indigo-200'
+					>
+						<Plus className='w-4 h-4' /> <span className='hidden sm:inline'>Nova</span> Ordem
+					</button>
 				</div>
-				<div className='w-full md:w-64'>
-					<SearchableSelect
-						options={clientOptions}
-						value={filterClient}
-						onChange={setFilterClient}
-						placeholder='Filtrar por Cliente'
-						fullClients={clients}
-					/>
-				</div>
-
-				{/* PONTO 3: Botão Refresh Adicionado */}
-				<button
-					onClick={handleRefreshOrders}
-					disabled={isRefreshing}
-					className={`ml-auto p-2.5 rounded-[10px] transition border border-slate-200 ${
-						isRefreshing
-							? "bg-slate-50 text-slate-300 cursor-not-allowed"
-							: "bg-white text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
-					}`}
-					title='Atualizar Lista'
-				>
-					<RefreshCcw
-						className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-					/>
-				</button>
-
-				<button
-					onClick={() => setIsConfigModalOpen(true)}
-					className='bg-slate-100 text-slate-600 hover:bg-slate-200 p-2.5 rounded-[10px] transition'
-					title='Configurações (Taxas)'
-				>
-					<Settings className='w-4 h-4' />
-				</button>
-				<button
-					onClick={() => openModal()}
-					className='bg-indigo-600 text-white px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition font-bold text-sm flex items-center gap-2 shadow-md shadow-indigo-200'
-				>
-					<Plus className='w-4 h-4' /> Nova Ordem
-				</button>
 			</div>
 
 			{/* 3. STATUS ORDEM + TABS PAGAMENTO */}
-			<div className='flex flex-wrap gap-2 mb-2'>
+			<div className='flex gap-2 mb-2 overflow-x-auto pb-1 -mx-1 px-1'>
 				{([
 					{ key: "TODOS", label: "Todas", icon: <BarChart2 className="w-3.5 h-3.5" />, active: "bg-indigo-500 text-white border-indigo-500", inactive: "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50" },
 					{ key: "ABERTA", label: "Abertas", icon: <Clock className="w-3.5 h-3.5" />, active: "bg-blue-500 text-white border-blue-500", inactive: "bg-white text-blue-600 border-blue-200 hover:bg-blue-50" },
@@ -1016,8 +1017,8 @@ export const OrderModule = ({
 					);
 				})}
 			</div>
-			<div className='flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-200 pb-1'>
-				<div className='flex gap-1'>
+			<div className='flex flex-col sm:flex-row justify-between items-center gap-2 border-b border-slate-200 pb-1'>
+				<div className='flex gap-1 overflow-x-auto w-full sm:w-auto pb-1'>
 					{[
 						{ key: "TODOS", label: "Todas" },
 						{
@@ -1057,15 +1058,15 @@ export const OrderModule = ({
 					<table className='w-full text-left text-sm text-slate-600'>
 						<thead className='bg-slate-50 text-slate-500 font-bold uppercase text-[11px] border-b border-slate-200'>
 							<tr>
-								<th className='p-4 w-20'>ID</th>
-								<th className='p-4'>Cliente</th>
-								<th className='p-4'>Criação</th>
-								<th className='p-4'>Conclusão</th>
-								<th className='p-4'>Serviços</th>
-								<th className='p-4'>Total</th>
-								<th className='p-4'>Pagamento</th>
-								<th className='p-4'>Status</th>
-								<th className='p-4 text-right'>Ações</th>
+								<th className='p-2 sm:p-4 w-14 sm:w-20'>ID</th>
+								<th className='p-2 sm:p-4'>Cliente</th>
+								<th className='p-2 sm:p-4 hidden lg:table-cell'>Criação</th>
+								<th className='p-2 sm:p-4 hidden xl:table-cell'>Conclusão</th>
+								<th className='p-2 sm:p-4 hidden md:table-cell'>Serviços</th>
+								<th className='p-2 sm:p-4'>Total</th>
+								<th className='p-2 sm:p-4 hidden sm:table-cell'>Pagamento</th>
+								<th className='p-2 sm:p-4 hidden sm:table-cell'>Status</th>
+								<th className='p-2 sm:p-4 text-right'>Ações</th>
 							</tr>
 						</thead>
 						<tbody className='divide-y divide-slate-100'>
@@ -1084,16 +1085,17 @@ export const OrderModule = ({
 													)
 												}
 											>
-												<td className='p-4 font-mono text-xs text-slate-400'>
+												<td className='p-2 sm:p-4 font-mono text-xs text-slate-400'>
 													#{order.id}
 												</td>
-												<td className='p-4 font-bold text-slate-700'>
-													{order.cliente_nome}
+												<td className='p-2 sm:p-4'>
+													<span className='font-bold text-slate-700 text-xs sm:text-sm block truncate max-w-[100px] sm:max-w-none'>{order.cliente_nome}</span>
+													<span className='text-[10px] text-slate-400 sm:hidden block mt-0.5'>{Utils.formatDateTime(order.data)}</span>
 												</td>
-												<td className='p-4 text-xs'>
+												<td className='p-2 sm:p-4 text-xs hidden lg:table-cell'>
 													{Utils.formatDateTime(order.data)}
 												</td>
-												<td className='p-4 text-xs'>
+												<td className='p-2 sm:p-4 text-xs hidden xl:table-cell'>
 													{order.data_conclusao ? (
 														<span className='text-emerald-600 font-medium'>
 															{Utils.formatDateTime(order.data_conclusao)}
@@ -1103,7 +1105,7 @@ export const OrderModule = ({
 													)}
 												</td>
 												<td
-													className='p-4 text-xs max-w-[200px] truncate'
+													className='p-2 sm:p-4 text-xs max-w-[200px] truncate hidden md:table-cell'
 													title={order.items.map((i) => i.servico).join(", ")}
 												>
 													{order.items.length > 0 ? (
@@ -1121,7 +1123,7 @@ export const OrderModule = ({
 														"Sem itens"
 													)}
 												</td>
-												<td className='p-4 font-bold text-slate-800'>
+												<td className='p-2 sm:p-4 font-bold text-slate-800 text-xs sm:text-sm'>
 													{Utils.formatCurrency(order.total)}
 													{(order.taxa_extra || 0) > 0 && (
 														<span className='text-[9px] text-slate-400 block'>
@@ -1129,12 +1131,12 @@ export const OrderModule = ({
 														</span>
 													)}
 												</td>
-												<td className='p-4'>
+												<td className='p-2 sm:p-4 hidden sm:table-cell'>
 													<Badge
 														status={order.status_pagamento || "NAO_PAGO"}
 													/>
 												</td>
-												<td className='p-4'>
+												<td className='p-2 sm:p-4 hidden sm:table-cell'>
 													<span
 														className={`px-2 py-1 rounded-[6px] text-[10px] font-bold border uppercase tracking-wide
 													${
@@ -1148,38 +1150,38 @@ export const OrderModule = ({
 														{order.status}
 													</span>
 												</td>
-												<td className='p-4 text-right' onClick={(e) => e.stopPropagation()}>
-													<div className='flex justify-end gap-1.5 flex-wrap'>
+												<td className='p-2 sm:p-4 text-right' onClick={(e) => e.stopPropagation()}>
+													<div className='flex justify-end gap-1 sm:gap-1.5 flex-wrap'>
 														{order.status === "ABERTA" && (
 															<button
 																onClick={() => updateStatus(order, { status: "CONCLUIDA" })}
-																className='flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 shadow-sm shadow-emerald-200 transition-all'
+																className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 shadow-sm shadow-emerald-200 transition-all'
 															>
-																<CheckCircle2 className='w-3.5 h-3.5' /> Concluir
+																<CheckCircle2 className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Concluir</span>
 															</button>
 														)}
 														{order.status === "ABERTA" && (
 															<button
 																onClick={() => updateStatus(order, { status: "CANCELADA" })}
-																className='flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 text-[10px] font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all'
+																className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-red-50 text-red-600 text-[10px] font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all'
 															>
-																<XCircle className='w-3.5 h-3.5' /> Cancelar
+																<XCircle className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Cancelar</span>
 															</button>
 														)}
 														{order.status === "CONCLUIDA" && (
 															<button
 																onClick={() => updateStatus(order, { status: "ABERTA" })}
-																className='flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
+																className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
 															>
-																<Clock className='w-3.5 h-3.5' /> Reabrir
+																<Clock className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Reabrir</span>
 															</button>
 														)}
 														{order.status === "CANCELADA" && (
 															<button
 																onClick={() => updateStatus(order, { status: "ABERTA" })}
-																className='flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
+																className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
 															>
-																<Clock className='w-3.5 h-3.5' /> Reabrir
+																<Clock className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Reabrir</span>
 															</button>
 														)}
 														<button
@@ -1328,7 +1330,7 @@ export const OrderModule = ({
 								})
 							) : (
 								<tr>
-									<td colSpan={9} className='p-12 text-center text-slate-400'>
+									<td colSpan={9} className='p-8 sm:p-12 text-center text-slate-400 text-sm'>
 										Nenhuma ordem encontrada.
 									</td>
 								</tr>
@@ -1466,7 +1468,7 @@ export const OrderModule = ({
 
 					{/* ÁREA DE INSERÇÃO DE ITENS */}
 					<div className='bg-slate-50 p-5 rounded-[10px] border border-slate-200 shadow-inner'>
-						<div className='grid grid-cols-2 md:grid-cols-12 gap-3 items-end'>
+						<div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 items-end'>
 							{/* 1. Serviço */}
 							<div className='md:col-span-4'>
 								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>

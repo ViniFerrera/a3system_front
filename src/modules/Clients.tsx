@@ -173,15 +173,15 @@ export const ClientsModule = ({
 	};
 
 	return (
-		<div className='space-y-6'>
-			<div className='flex justify-between items-center'>
-				<h2 className='text-2xl font-bold text-slate-800'>
+		<div className='space-y-4 sm:space-y-6'>
+			<div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3'>
+				<h2 className='text-xl sm:text-2xl font-bold text-slate-800'>
 					Gestão de Clientes
 				</h2>
-				<div className='flex gap-2'>
+				<div className='flex gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0'>
 					<button
 						onClick={handleExportExcel}
-						className='flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-[10px] hover:bg-slate-50 transition shadow-sm text-sm font-medium'
+						className='flex items-center gap-1.5 sm:gap-2 bg-white text-slate-700 border border-slate-200 px-3 sm:px-4 py-2.5 rounded-[10px] hover:bg-slate-50 transition shadow-sm text-xs sm:text-sm font-medium whitespace-nowrap'
 					>
 						<Download className='w-4 h-4' /> Exportar
 					</button>
@@ -194,13 +194,13 @@ export const ClientsModule = ({
 					/>
 					<button
 						onClick={() => fileInputRef.current?.click()}
-						className='flex items-center gap-2 bg-slate-800 text-white px-4 py-2.5 rounded-[10px] hover:bg-slate-900 transition shadow-sm text-sm font-medium'
+						className='flex items-center gap-1.5 sm:gap-2 bg-slate-800 text-white px-3 sm:px-4 py-2.5 rounded-[10px] hover:bg-slate-900 transition shadow-sm text-xs sm:text-sm font-medium whitespace-nowrap'
 					>
 						<Upload className='w-4 h-4' /> Importar
 					</button>
 					<button
 						onClick={() => openModal()}
-						className='flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition shadow-sm font-medium'
+						className='flex items-center gap-1.5 sm:gap-2 bg-indigo-600 text-white px-3 sm:px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition shadow-sm text-xs sm:text-sm font-medium whitespace-nowrap'
 					>
 						<Plus className='w-4 h-4' /> Novo Cliente
 					</button>
@@ -216,11 +216,11 @@ export const ClientsModule = ({
 					onChange={(e) => setSearchTerm(e.target.value)}
 				/>
 			</div>
-			<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+			<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6'>
 				{filteredClients.map((client) => (
 					<Card
 						key={client.id}
-						className='p-6 hover:shadow-lg hover:-translate-y-1 relative group'
+						className='p-4 sm:p-6 hover:shadow-lg sm:hover:-translate-y-1 relative group'
 					>
 						<div className='flex justify-between items-start mb-4'>
 							<div className='flex items-center gap-3'>
@@ -257,7 +257,7 @@ export const ClientsModule = ({
 									</div>
 								</div>
 							</div>
-							<div className='flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-x-2 group-hover:translate-x-0'>
+							<div className='flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200 sm:translate-x-2 sm:group-hover:translate-x-0'>
 								<button
 									onClick={() => openModal(client)}
 									className='p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-[10px] transition-colors'

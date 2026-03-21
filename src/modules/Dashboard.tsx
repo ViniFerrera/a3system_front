@@ -51,11 +51,11 @@ interface KpiCardProps {
 	icon: React.ReactNode; gradient: string; trend?: number;
 }
 const KpiCard = ({ label, value, sub, icon, gradient, trend }: KpiCardProps) => (
-	<div className={`rounded-2xl p-5 text-white shadow-lg ${gradient} relative overflow-hidden`}>
+	<div className={`rounded-2xl p-3 sm:p-5 text-white shadow-lg ${gradient} relative overflow-hidden`}>
 		<div className="absolute right-3 top-3 opacity-[0.12] scale-[2.2] origin-center">{icon}</div>
 		<div className="relative z-10">
 			<p className="text-white/75 text-[10px] font-bold uppercase tracking-widest mb-1">{label}</p>
-			<p className="text-2xl font-bold leading-tight tracking-tight">{value}</p>
+			<p className="text-lg sm:text-2xl font-bold leading-tight tracking-tight">{value}</p>
 			<div className="flex items-center gap-2 mt-1.5 flex-wrap">
 				<p className="text-white/65 text-xs">{sub}</p>
 				{trend !== undefined && (
@@ -330,7 +330,7 @@ export const DashboardModule = ({
 		<div className="space-y-5 pb-20 md:pb-0">
 
 			{/* ── Status Tabs ── */}
-			<div className="flex flex-wrap gap-2">
+			<div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
 				{statusButtons.map((btn) => (
 					<button key={btn.key} onClick={() => setOrderStatusFilter(btn.key)}
 						className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-semibold text-xs transition-all duration-150 shadow-sm ${orderStatusFilter === btn.key ? btn.active + " shadow-md" : btn.inactive}`}
@@ -342,7 +342,7 @@ export const DashboardModule = ({
 			</div>
 
 			{/* ── Barra de Filtros ── */}
-			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4">
+			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-3 sm:p-4">
 				<div className="flex flex-col gap-3">
 					{/* Período Presets */}
 					<div className="flex flex-wrap items-center gap-2">
@@ -400,22 +400,22 @@ export const DashboardModule = ({
 
 			{/* ── Fluxo Mensal + Distribuição Pagamento ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-				<div className="lg:col-span-2 bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
-					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-2">
+				<div className="lg:col-span-2 bg-white border border-slate-100 rounded-2xl shadow-sm p-4 sm:p-6">
+					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-5 gap-2">
 						<div>
-							<h4 className="text-base font-bold text-slate-800">Fluxo de Caixa Mensal</h4>
-							<p className="text-xs text-slate-400 mt-0.5">
+							<h4 className="text-sm sm:text-base font-bold text-slate-800">Fluxo de Caixa Mensal</h4>
+							<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">
 								{Utils.formatDate(startDate)} → {Utils.formatDate(endDate)}
 							</p>
 						</div>
-						<div className="flex gap-3 text-[11px] font-semibold text-slate-500">
-							<span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-400 inline-block" />Concluídas</span>
-							<span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-300 inline-block" />Abertas</span>
-							<span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-rose-400 inline-block" />Despesa</span>
-							<span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" />Lucro</span>
+						<div className="flex flex-wrap gap-2 sm:gap-3 text-[10px] sm:text-[11px] font-semibold text-slate-500">
+							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-emerald-400 inline-block" />Concluídas</span>
+							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-amber-300 inline-block" />Abertas</span>
+							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-rose-400 inline-block" />Despesa</span>
+							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-indigo-500 inline-block" />Lucro</span>
 						</div>
 					</div>
-					<ResponsiveContainer width="100%" height={260}>
+					<ResponsiveContainer width="100%" height={200}>
 						<ComposedChart data={monthlyData} margin={{ left: -5, right: 10 }}>
 							<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
 							<XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
@@ -533,10 +533,10 @@ export const DashboardModule = ({
 			</div>
 
 			{/* ── Evolução Diária ── */}
-			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
-				<h4 className="text-base font-bold text-slate-800">Evolução Diária de Receita</h4>
-				<p className="text-xs text-slate-400 mt-0.5 mb-5">Faturamento dia a dia nos últimos {bottomPeriod === "7d" ? "7 dias" : bottomPeriod === "30d" ? "30 dias" : bottomPeriod === "3m" ? "3 meses" : "6 meses"}</p>
-				<ResponsiveContainer width="100%" height={210}>
+			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 sm:p-6">
+				<h4 className="text-sm sm:text-base font-bold text-slate-800">Evolução Diária de Receita</h4>
+				<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-4 sm:mb-5">Faturamento dia a dia nos últimos {bottomPeriod === "7d" ? "7 dias" : bottomPeriod === "30d" ? "30 dias" : bottomPeriod === "3m" ? "3 meses" : "6 meses"}</p>
+				<ResponsiveContainer width="100%" height={180}>
 					<AreaChart data={dailyData} margin={{ left: -10, right: 10 }}>
 						<defs>
 							<linearGradient id="receitaGrad" x1="0" y1="0" x2="0" y2="1">
@@ -554,16 +554,16 @@ export const DashboardModule = ({
 			</div>
 
 			{/* ── Dia da Semana + Alertas ── */}
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
-					<h4 className="text-base font-bold text-slate-800">Receita por Dia da Semana</h4>
-					<p className="text-xs text-slate-400 mt-0.5 mb-4">
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 sm:p-6">
+					<h4 className="text-sm sm:text-base font-bold text-slate-800">Receita por Dia da Semana</h4>
+					<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">
 						Melhor dia:{" "}
 						<span className="text-indigo-600 font-bold">
 							{dayOfWeekData.reduce((best, d) => d.revenue > best.revenue ? d : best, dayOfWeekData[0])?.name || "—"}
 						</span>
 					</p>
-					<ResponsiveContainer width="100%" height={180}>
+					<ResponsiveContainer width="100%" height={160}>
 						<BarChart data={dayOfWeekData} margin={{ left: -20, right: 5 }}>
 							<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
 							<XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
@@ -578,11 +578,11 @@ export const DashboardModule = ({
 					</ResponsiveContainer>
 				</div>
 
-				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
-					<h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+				<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 sm:p-6">
+					<h4 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
 						<AlertTriangle className="w-4 h-4 text-amber-500" /> Alertas
 					</h4>
-					<p className="text-xs text-slate-400 mt-0.5 mb-4">Contas e estoque que precisam de atenção</p>
+					<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">Contas e estoque que precisam de atenção</p>
 					<div className="space-y-2">
 						{upcomingExpenses.length === 0 && stockAlerts.length === 0 ? (
 							<div className="flex flex-col items-center justify-center py-6 text-slate-300">
@@ -625,13 +625,13 @@ export const DashboardModule = ({
 			</div>
 
 			{/* ── Tabela: Últimas Ordens Abertas ── */}
-			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
-				<div className="flex items-center justify-between mb-4">
+			<div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 sm:p-6">
+				<div className="flex items-center justify-between mb-3 sm:mb-4">
 					<div>
-						<h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+						<h4 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
 							<Clock className="w-4 h-4 text-blue-500" /> Ordens em Aberto
 						</h4>
-						<p className="text-xs text-slate-400 mt-0.5">{openOrders.length} OS pendentes de conclusão</p>
+						<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{openOrders.length} OS pendentes de conclusão</p>
 					</div>
 				</div>
 				{openOrders.length === 0 ? (
