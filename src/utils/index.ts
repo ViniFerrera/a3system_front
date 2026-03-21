@@ -78,7 +78,19 @@ export const Utils = {
         return { unit: 0, total: 0, rule: 'Não encontrado' };
     },
     formatCurrency: (value: number) => { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value); },
-    formatDateTime: (dateString?: string) => { if (!dateString) return '-'; const date = new Date(dateString); if (isNaN(date.getTime())) return '-'; return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(date); },
+    formatDateTime: (dateString?: string) => {
+        if (!dateString) return '-';
+        // Se a string contém "T" e NÃO contém "Z" ou offset, é hora local — parseia manualmente
+        if (dateString.includes('T') && !dateString.includes('Z') && !dateString.match(/[+-]\d{2}:\d{2}$/)) {
+            const [datePart, timePart] = dateString.split('T');
+            const [y, m, d] = datePart.split('-');
+            const [hh, mm] = (timePart || '00:00').split(':');
+            return `${d}/${m} - ${hh}:${mm}`;
+        }
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '-';
+        return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(date);
+    },
     formatDate: (dateString?: string) => { if (!dateString) return '-'; if (dateString.includes('-')) { const [year, month, day] = dateString.split('-'); return `${day}/${month}/${year}`; } return new Date(dateString).toLocaleDateString('pt-BR'); },
     /** Retorna datetime local (BRT) sem sufixo Z — para armazenar como hora local */
     localIsoNow: () => {

@@ -392,7 +392,8 @@ export const OrderModule = ({
 
 	const filteredOrders = useMemo(() => {
 		return orders.filter((o) => {
-			const orderDateString = new Date(o.data).toISOString().split("T")[0];
+			// Extrai YYYY-MM-DD direto da string armazenada (hora local, sem converter para UTC)
+			const orderDateString = o.data ? o.data.split("T")[0] : "";
 			if (filterStart && orderDateString < filterStart) return false;
 			if (filterEnd && orderDateString > filterEnd) return false;
 			if (filterClient !== 0 && o.cliente_id !== filterClient) return false;
