@@ -241,6 +241,12 @@ export const OrderModule = ({
 	const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
 	const [machinesList, setMachinesList] = useState<Machine[]>(machinery);
 	const [isRefreshing, setIsRefreshing] = useState(false);
+
+	// OneDrive web config para montar link direto
+	const [onedriveConfig, setOnedriveConfig] = useState<{ cid: string; folderPath: string } | null>(null);
+	useEffect(() => {
+		api.get("/onedrive-web-config").then((res) => setOnedriveConfig(res.data)).catch(() => {});
+	}, []);
 	const loading = useLoading();
 
 	// Configuração Taxa Débito
@@ -1334,16 +1340,24 @@ export const OrderModule = ({
 																	<div className='mb-2 bg-slate-50 p-2 rounded border border-slate-200 text-[10px] text-slate-500 font-mono break-all'>
 																		01_A3_Art_Copy/Ordens/{order.data.split("T")[0]}/OS{order.id}_{order.cliente_nome.replace(/\s+/g, "_")}
 																	</div>
-																	<a
-																		href={`https://onedrive.live.com/?id=root&cid=onedrive&search=OS${order.id}_${encodeURIComponent(order.cliente_nome.replace(/\s+/g, "_"))}`}
-																		target="_blank"
-																		rel="noopener noreferrer"
-																		className='inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors'
-																		onClick={(e) => e.stopPropagation()}
-																	>
-																		<FolderOpen className='w-3.5 h-3.5' />
-																		Abrir no OneDrive
-																	</a>
+																	{onedriveConfig?.cid && (() => {
+																		const folderName = `OS${order.id}_${order.cliente_nome.replace(/\s+/g, "_")}`;
+																		const date = order.data?.split("T")[0] || "";
+																		const fullPath = `/personal/${onedriveConfig.cid}/Documents/${onedriveConfig.folderPath}/${date}/${folderName}`;
+																		const url = `https://onedrive.live.com/?id=${encodeURIComponent(fullPath)}&search=${encodeURIComponent(folderName)}&view=0`;
+																		return (
+																			<a
+																				href={url}
+																				target="_blank"
+																				rel="noopener noreferrer"
+																				className='inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors'
+																				onClick={(e) => e.stopPropagation()}
+																			>
+																				<FolderOpen className='w-3.5 h-3.5' />
+																				Abrir no OneDrive
+																			</a>
+																		);
+																	})()}
 																</div>
 															</div>
 														</div>

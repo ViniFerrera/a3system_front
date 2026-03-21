@@ -11,6 +11,7 @@ import {
 	RefreshCcw,
 	Lightbulb,
 	ArrowRight,
+	Clock,
 } from "lucide-react";
 import { api } from "@/services/api";
 import {
@@ -31,11 +32,22 @@ interface InsightData {
 	calendar_events: { date: string; event: string }[];
 }
 
+const PERIOD_OPTIONS = [
+	{ label: "7 dias", value: 7 },
+	{ label: "15 dias", value: 15 },
+	{ label: "1 mês", value: 30 },
+	{ label: "3 meses", value: 90 },
+	{ label: "6 meses", value: 180 },
+	{ label: "1 ano", value: 365 },
+	{ label: "Tudo", value: 0 },
+];
+
 export const AiInsightsModule = () => {
 	// --- ESTADOS DO CHAT ---
 	const [chatInput, setChatInput] = useState("");
 	const [chatResponse, setChatResponse] = useState("");
 	const [isChatLoading, setIsChatLoading] = useState(false);
+	const [selectedPeriod, setSelectedPeriod] = useState(90); // padrão: 3 meses
 
 	// --- ESTADOS DO DASHBOARD ---
 	const [insightData, setInsightData] = useState<InsightData | null>(null);
@@ -54,9 +66,12 @@ export const AiInsightsModule = () => {
 	const handleSendChat = async (message: string) => {
 		if (!message.trim()) return;
 		setIsChatLoading(true);
-		setChatInput(message); // Preenche se clicou na sugestão
+		setChatInput(message);
 		try {
-			const res = await api.post("/ai/chat", { message });
+			const res = await api.post("/ai/chat", {
+				message,
+				periodDays: selectedPeriod || undefined,
+			});
 			setChatResponse(res.data.text);
 		} catch (error) {
 			setChatResponse("Desculpe, tive um erro ao conectar com a IA.");
@@ -98,6 +113,26 @@ export const AiInsightsModule = () => {
 			<div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
 				{/* Coluna Esquerda: Input e Histórico */}
 				<Card className='lg:col-span-1 p-6 flex flex-col h-full border-indigo-100 bg-slate-50/50'>
+					{/* Seletor de período */}
+					<label className='text-xs font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1.5'>
+						<Clock className='w-3 h-3' /> Período de análise
+					</label>
+					<div className='flex flex-wrap gap-1.5 mb-4'>
+						{PERIOD_OPTIONS.map((opt) => (
+							<button
+								key={opt.value}
+								onClick={() => setSelectedPeriod(opt.value)}
+								className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+									selectedPeriod === opt.value
+										? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
+										: "bg-white text-slate-500 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600"
+								}`}
+							>
+								{opt.label}
+							</button>
+						))}
+					</div>
+
 					<label className='text-xs font-bold text-indigo-600 uppercase mb-2 flex items-center gap-2'>
 						<Sparkles className='w-3 h-3' /> Faça uma pergunta
 					</label>
