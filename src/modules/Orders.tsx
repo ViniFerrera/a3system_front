@@ -275,6 +275,10 @@ export const OrderModule = ({
 		"TODOS" | "ABERTA" | "CONCLUIDA" | "CANCELADA"
 	>("TODOS");
 
+	// Paginação
+	const [currentPage, setCurrentPage] = useState(1);
+	const [pageSize, setPageSize] = useState(25);
+
 	useEffect(() => {
 		api
 			.get("/machinery")
@@ -421,6 +425,16 @@ export const OrderModule = ({
 		filterPaymentStatus,
 		filterOrderStatus,
 	]);
+
+	// Reset page when filters change
+	useEffect(() => { setCurrentPage(1); }, [filterStart, filterEnd, filterClient, filterServices, filterPaymentStatus, filterOrderStatus]);
+
+	// Paginated orders
+	const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+	const paginatedOrders = useMemo(() => {
+		const start = (currentPage - 1) * pageSize;
+		return filteredOrders.slice(start, start + pageSize);
+	}, [filteredOrders, currentPage, pageSize]);
 
 	// --- CÁLCULO DE KPIS ---
 	const summary = useMemo(() => {
@@ -1071,8 +1085,8 @@ export const OrderModule = ({
 							</tr>
 						</thead>
 						<tbody className='divide-y divide-slate-100/60'>
-							{filteredOrders.length > 0 ? (
-								filteredOrders.map((order) => {
+							{paginatedOrders.length > 0 ? (
+								paginatedOrders.map((order) => {
 									const isExpanded = expandedOrderId === order.id;
 									return (
 										<React.Fragment key={order.id}>
@@ -1089,8 +1103,8 @@ export const OrderModule = ({
 												<td className='p-2 sm:p-4 font-mono text-xs text-slate-400'>
 													#{order.id}
 												</td>
-												<td className='p-2 sm:p-4'>
-													<span className='font-bold text-slate-700 text-xs sm:text-sm block truncate max-w-[100px] sm:max-w-none'>{order.cliente_nome}</span>
+												<td className='p-2 sm:p-4 max-w-[140px] sm:max-w-[200px]'>
+													<span className='font-bold text-slate-700 text-xs sm:text-sm block break-words leading-snug'>{order.cliente_nome}</span>
 													<span className='text-[10px] text-slate-400 sm:hidden block mt-0.5'>{Utils.formatDateTime(order.data)}</span>
 												</td>
 												<td className='p-2 sm:p-4 text-xs hidden lg:table-cell'>
@@ -1317,9 +1331,19 @@ export const OrderModule = ({
 																		<FolderOpen className='w-4 h-4 text-blue-500' />{" "}
 																		Arquivos
 																	</h5>
-																	<div className='mb-3 bg-slate-50 p-2 rounded border border-slate-200 text-[10px] text-slate-500 font-mono break-all'>
+																	<div className='mb-2 bg-slate-50 p-2 rounded border border-slate-200 text-[10px] text-slate-500 font-mono break-all'>
 																		01_A3_Art_Copy/Ordens/{order.data.split("T")[0]}/OS{order.id}_{order.cliente_nome.replace(/\s+/g, "_")}
 																	</div>
+																	<a
+																		href={`https://onedrive.live.com/?id=root&cid=onedrive&search=OS${order.id}_${encodeURIComponent(order.cliente_nome.replace(/\s+/g, "_"))}`}
+																		target="_blank"
+																		rel="noopener noreferrer"
+																		className='inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors'
+																		onClick={(e) => e.stopPropagation()}
+																	>
+																		<FolderOpen className='w-3.5 h-3.5' />
+																		Abrir no OneDrive
+																	</a>
 																</div>
 															</div>
 														</div>
@@ -1338,6 +1362,69 @@ export const OrderModule = ({
 							)}
 						</tbody>
 					</table>
+				</div>
+				{/* Paginação + contagem de linhas */}
+				<div className='flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-200/60 bg-slate-50/50'>
+					<div className='flex items-center gap-3 text-xs text-slate-500'>
+						<span className='font-semibold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg border border-indigo-100'>
+							{filteredOrders.length} {filteredOrders.length === 1 ? 'ordem' : 'ordens'}
+						</span>
+						<span>|</span>
+						<label className='flex items-center gap-1.5'>
+							Exibir
+							<select
+								value={pageSize}
+								onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+								className='border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white'
+							>
+								{[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+							</select>
+							por página
+						</label>
+					</div>
+					{totalPages > 1 && (
+						<div className='flex items-center gap-1'>
+							<button
+								onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+								disabled={currentPage === 1}
+								className='px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+							>
+								Anterior
+							</button>
+							{Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+								let page: number;
+								if (totalPages <= 7) {
+									page = i + 1;
+								} else if (currentPage <= 4) {
+									page = i + 1;
+								} else if (currentPage >= totalPages - 3) {
+									page = totalPages - 6 + i;
+								} else {
+									page = currentPage - 3 + i;
+								}
+								return (
+									<button
+										key={page}
+										onClick={() => setCurrentPage(page)}
+										className={`w-8 h-8 text-xs font-semibold rounded-lg transition-colors ${
+											currentPage === page
+												? 'bg-indigo-600 text-white shadow-sm'
+												: 'border border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+										}`}
+									>
+										{page}
+									</button>
+								);
+							})}
+							<button
+								onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+								disabled={currentPage === totalPages}
+								className='px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+							>
+								Próxima
+							</button>
+						</div>
+					)}
 				</div>
 			</div>
 

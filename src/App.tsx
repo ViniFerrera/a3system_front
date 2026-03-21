@@ -215,7 +215,7 @@ const AppInner = () => {
 				} md:sticky md:top-0 md:h-screen pt-16 md:pt-0`}
 			>
 				{/* Logo */}
-				<div className="hidden md:flex items-center gap-3 px-5 py-6 border-b border-slate-800/60">
+				<div className="hidden md:flex items-center gap-3 px-5 py-4 border-b border-slate-800/60">
 					<div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-2.5 rounded-xl shadow-lg shadow-indigo-900/40">
 						<Printer className="w-5 h-5 text-white" />
 					</div>
@@ -226,12 +226,12 @@ const AppInner = () => {
 				</div>
 
 				{/* Nav */}
-				<nav className="flex-1 px-3 py-4 overflow-y-auto custom-scrollbar space-y-5">
+				<nav className="flex-1 px-3 py-2 overflow-hidden space-y-2">
 					{groups.map((group) => {
 						const items = navItems.filter((n) => n.group === group);
 						return (
 							<div key={group}>
-								<p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 px-3 mb-2">
+								<p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 px-3 mb-1">
 									{group}
 								</p>
 								<div className="space-y-0.5">
@@ -244,7 +244,7 @@ const AppInner = () => {
 													setActiveTab(item.id);
 													setIsMobileMenuOpen(false);
 												}}
-												className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group ${
+												className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group ${
 													isActive
 														? "bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-900/30"
 														: "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
@@ -264,8 +264,8 @@ const AppInner = () => {
 				</nav>
 
 				{/* Rodapé — usuário + logout */}
-				<div className="px-4 py-4 border-t border-slate-800/60">
-					<div className="flex items-center gap-3 mb-3">
+				<div className="px-4 py-3 border-t border-slate-800/60">
+					<div className="flex items-center gap-3 mb-2">
 						{user.picture ? (
 							<img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full border-2 border-slate-700/80 object-cover ring-2 ring-slate-800" />
 						) : (
@@ -326,12 +326,14 @@ const AppInner = () => {
 				</header>
 
 				<main className="flex-1 overflow-y-auto p-4 md:p-8 mt-14 md:mt-0">
-					<div className="max-w-7xl mx-auto animate-fade-in-up">
-						{activeTab === "dashboard" && (
+					<div className="max-w-7xl mx-auto">
+						<div style={{ display: activeTab === "dashboard" ? "block" : "none" }}>
 							<DashboardModule orders={orders} expenses={expenses} stock={stock} />
-						)}
-						{activeTab === "ai" && <AiInsightsModule />}
-						{activeTab === "orders" && (
+						</div>
+						<div style={{ display: activeTab === "ai" ? "block" : "none" }}>
+							<AiInsightsModule />
+						</div>
+						<div style={{ display: activeTab === "orders" ? "block" : "none" }}>
 							<OrderModule
 								clients={clients}
 								priceTable={priceTable}
@@ -341,24 +343,28 @@ const AppInner = () => {
 								machinery={machinery}
 								setClients={setClients}
 							/>
-						)}
-						{activeTab === "stock" && (
+						</div>
+						<div style={{ display: activeTab === "stock" ? "block" : "none" }}>
 							<StockModule stock={stock} setStock={setStock} priceTable={priceTable} />
-						)}
-						{activeTab === "machinery" && (
+						</div>
+						<div style={{ display: activeTab === "machinery" ? "block" : "none" }}>
 							<MachineryModule machinery={machinery} setMachinery={setMachinery} stock={stock} />
-						)}
-						{activeTab === "pricing" && (
+						</div>
+						<div style={{ display: activeTab === "pricing" ? "block" : "none" }}>
 							<PricingModule data={priceTable} setData={setPriceTable} />
-						)}
-						{activeTab === "clients" && (
+						</div>
+						<div style={{ display: activeTab === "clients" ? "block" : "none" }}>
 							<ClientsModule clients={clients} setClients={setClients} />
-						)}
-						{activeTab === "expenses" && (
+						</div>
+						<div style={{ display: activeTab === "expenses" ? "block" : "none" }}>
 							<ExpensesModule expenses={expenses} setExpenses={setExpenses} />
-						)}
-						{activeTab === "users" && <UsersModule />}
-						{activeTab === "db-security" && <DatabaseSecurityModule />}
+						</div>
+						<div style={{ display: activeTab === "users" ? "block" : "none" }}>
+							<UsersModule />
+						</div>
+						<div style={{ display: activeTab === "db-security" ? "block" : "none" }}>
+							<DatabaseSecurityModule />
+						</div>
 					</div>
 				</main>
 			</div>

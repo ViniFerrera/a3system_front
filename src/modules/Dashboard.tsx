@@ -135,7 +135,9 @@ export const DashboardModule = ({
 	};
 
 	// ── Dados filtrados (filtro principal) ───────────────────────────────────
+	// Canceladas nunca contribuem valores — apenas contam no statusCounts
 	const currentOrders = useMemo(() => orders.filter((o) => {
+		if (o.status === "CANCELADA") return false;
 		if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return false;
 		if (!filterByDate(o.data_conclusao || o.data, startDate, endDate)) return false;
 		if (selectedServices.length > 0 && !o.items.some((i) => selectedServices.includes(i.servico))) return false;
@@ -153,7 +155,7 @@ export const DashboardModule = ({
 		const pe = new Date(new Date(startDate).getTime() - 1);
 		const ps = new Date(pe.getTime() - dur + 1);
 		return orders
-			.filter((o) => (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, ps.toISOString().split("T")[0], pe.toISOString().split("T")[0]))
+			.filter((o) => o.status !== "CANCELADA" && (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, ps.toISOString().split("T")[0], pe.toISOString().split("T")[0]))
 			.reduce((acc, o) => acc + o.total, 0);
 	}, [orders, startDate, endDate, orderStatusFilter]);
 
@@ -172,7 +174,7 @@ export const DashboardModule = ({
 		const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
 		const ticket = currentOrders.length > 0 ? revenue / currentOrders.length : 0;
 		const toReceive = orders
-			.filter((o) => (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, startDate, endDate) && (o.status_pagamento || "NAO_PAGO") !== "PAGO")
+			.filter((o) => o.status !== "CANCELADA" && (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, startDate, endDate) && (o.status_pagamento || "NAO_PAGO") !== "PAGO")
 			.reduce((acc, o) => acc + o.total, 0);
 		const revTrend = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : undefined;
 		return { revenue, expense, profit, margin, ticket, toReceive, revTrend };
@@ -191,6 +193,7 @@ export const DashboardModule = ({
 			curr.setMonth(curr.getMonth() + 1);
 		}
 		orders.forEach((o) => {
+			if (o.status === "CANCELADA") return;
 			if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return;
 			const d = new Date(o.data_conclusao || o.data);
 			const key = toLocalDate(d).slice(0, 7);
@@ -217,6 +220,7 @@ export const DashboardModule = ({
 
 	// ── Dados do filtro inferior ──────────────────────────────────────────────
 	const bottomOrders = useMemo(() => orders.filter((o) => {
+		if (o.status === "CANCELADA") return false;
 		if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return false;
 		return filterByDate(o.data_conclusao || o.data, bottomDates.start, bottomDates.end);
 	}), [orders, bottomDates, orderStatusFilter]);
