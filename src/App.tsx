@@ -14,6 +14,7 @@ import {
 	LogOut,
 	Shield,
 	HardDrive,
+	Receipt,
 } from "lucide-react";
 import { LoginPage } from "@/pages/Login";
 import { DashboardModule } from "@/modules/Dashboard";
@@ -26,6 +27,7 @@ import { MachineryModule } from "@/modules/Machinery";
 import { AiInsightsModule } from "@/modules/AiInsights";
 import { UsersModule } from "@/modules/Users";
 import { DatabaseSecurityModule } from "@/modules/DatabaseSecurity";
+import { NotaFiscalModule } from "@/modules/NotaFiscal";
 import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
 import { api } from "@/services/api";
 import { LoadingProvider, useLoading } from "@/components/ui/LoadingOverlay";
@@ -165,6 +167,7 @@ const AppInner = () => {
 		{ id: "machinery", icon: Printer, label: "Maquinário", group: "Operacional" },
 		{ id: "pricing", icon: Settings, label: "Preços", group: "Configuração" },
 		{ id: "expenses", icon: DollarSign, label: "Financeiro", group: "Configuração" },
+		{ id: "nota-fiscal", icon: Receipt, label: "Nota Fiscal", group: "Configuração" },
 		{ id: "users", icon: Shield, label: "Usuários", group: "Configuração" },
 		{ id: "db-security", icon: HardDrive, label: "Banco de Dados", group: "Configuração" },
 	];
@@ -358,6 +361,9 @@ const AppInner = () => {
 						</div>
 						<div style={{ display: activeTab === "expenses" ? "block" : "none" }}>
 							<ExpensesModule expenses={expenses} setExpenses={setExpenses} />
+						</div>
+						<div style={{ display: activeTab === "nota-fiscal" ? "block" : "none" }}>
+							<NotaFiscalModule orders={orders} />
 						</div>
 						<div style={{ display: activeTab === "users" ? "block" : "none" }}>
 							<UsersModule />

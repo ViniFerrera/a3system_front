@@ -280,6 +280,7 @@ export const OrderModule = ({
 	const [filterOrderStatus, setFilterOrderStatus] = useState<
 		"TODOS" | "ABERTA" | "CONCLUIDA" | "CANCELADA"
 	>("TODOS");
+	const [filterNF, setFilterNF] = useState<"TODOS" | "COM_NF" | "SEM_NF">("TODOS");
 
 	// Paginação
 	const [currentPage, setCurrentPage] = useState(1);
@@ -312,6 +313,7 @@ export const OrderModule = ({
 		taxa_extra: 0,
 		desconto_pontual: 0,
 		data: new Date().toISOString(),
+		nota_fiscal: false,
 	});
 
 	const [tempItem, setTempItem] = useState({
@@ -420,6 +422,10 @@ export const OrderModule = ({
 			if (filterOrderStatus !== "TODOS") {
 				if (o.status !== filterOrderStatus) return false;
 			}
+			if (filterNF !== "TODOS") {
+				if (filterNF === "COM_NF" && !o.nota_fiscal) return false;
+				if (filterNF === "SEM_NF" && o.nota_fiscal) return false;
+			}
 			return true;
 		});
 	}, [
@@ -430,10 +436,11 @@ export const OrderModule = ({
 		filterServices,
 		filterPaymentStatus,
 		filterOrderStatus,
+		filterNF,
 	]);
 
 	// Reset page when filters change
-	useEffect(() => { setCurrentPage(1); }, [filterStart, filterEnd, filterClient, filterServices, filterPaymentStatus, filterOrderStatus]);
+	useEffect(() => { setCurrentPage(1); }, [filterStart, filterEnd, filterClient, filterServices, filterPaymentStatus, filterOrderStatus, filterNF]);
 
 	// Paginated orders
 	const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
@@ -702,6 +709,7 @@ export const OrderModule = ({
 		);
 		dataPayload.append("forma_pagamento", formData.forma_pagamento || "");
 		dataPayload.append("taxa_extra", String(formData.taxa_extra || 0));
+		dataPayload.append("nota_fiscal", String(formData.nota_fiscal || false));
 
 		// Envia datetime completo com hora local (BRT) para evitar +3h no servidor UTC
 		const dateValue = editingOrder
@@ -863,6 +871,7 @@ export const OrderModule = ({
 				taxa_extra: 0,
 				desconto_pontual: 0,
 				data: new Date().toISOString(),
+				nota_fiscal: false,
 			});
 		}
 		setIsModalOpen(true);
@@ -1070,6 +1079,26 @@ export const OrderModule = ({
 							{tab.label}
 						</button>
 					))}
+					{/* Filtro NF */}
+					<div className="ml-auto flex items-center gap-1.5">
+						{[
+							{ key: "TODOS", label: "NF: Todas" },
+							{ key: "COM_NF", label: "Com NF" },
+							{ key: "SEM_NF", label: "Sem NF" },
+						].map((tab) => (
+							<button
+								key={tab.key}
+								onClick={() => setFilterNF(tab.key as any)}
+								className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+									filterNF === tab.key
+										? "bg-indigo-600 text-white shadow-sm"
+										: "text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200"
+								}`}
+							>
+								{tab.label}
+							</button>
+						))}
+					</div>
 				</div>
 			</div>
 
@@ -1107,7 +1136,8 @@ export const OrderModule = ({
 												}
 											>
 												<td className='p-2 sm:p-4 font-mono text-xs text-slate-400'>
-													#{order.id}
+													<span>#{order.id}</span>
+													{order.nota_fiscal && <span className='ml-1 px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px] font-bold'>NF</span>}
 												</td>
 												<td className='p-2 sm:p-4 max-w-[140px] sm:max-w-[200px]'>
 													<span className='font-bold text-slate-700 text-xs sm:text-sm block break-words leading-snug'>{order.cliente_nome}</span>
@@ -1549,6 +1579,37 @@ export const OrderModule = ({
 										})
 									}
 								/>
+							</div>
+						</div>
+
+						{/* Nota Fiscal */}
+						<div className='mt-3'>
+							<label className='block text-xs font-bold text-slate-500 mb-1.5'>
+								Nota Fiscal
+							</label>
+							<div className='flex gap-2'>
+								<button
+									type='button'
+									onClick={() => setFormData({ ...formData, nota_fiscal: false })}
+									className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
+										!formData.nota_fiscal
+											? "bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
+											: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
+									}`}
+								>
+									Sem NF
+								</button>
+								<button
+									type='button'
+									onClick={() => setFormData({ ...formData, nota_fiscal: true })}
+									className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
+										formData.nota_fiscal
+											? "bg-blue-50 text-blue-700 border-blue-300 shadow-sm"
+											: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
+									}`}
+								>
+									Com NF
+								</button>
 							</div>
 						</div>
 					</div>

@@ -76,6 +76,7 @@ export interface Order {
 	data: string;
 	data_conclusao?: string;
 	anexos: string[];
+	nota_fiscal?: boolean;
 }
 
 export interface Expense {

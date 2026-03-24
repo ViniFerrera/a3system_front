@@ -124,7 +124,8 @@ export const DashboardModule = ({
 	// ── Helpers ──────────────────────────────────────────────────────────────
 	const filterByDate = (dateStr: string, start: string, end: string) => {
 		if (!dateStr) return false;
-		const dateLocal = toLocalDate(new Date(dateStr));
+		// Extrai YYYY-MM-DD direto da string, sem converter para Date (evita bug UTC)
+		const dateLocal = dateStr.slice(0, 10);
 		return (!start || dateLocal >= start) && (!end || dateLocal <= end);
 	};
 
@@ -195,8 +196,7 @@ export const DashboardModule = ({
 		orders.forEach((o) => {
 			if (o.status === "CANCELADA") return;
 			if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return;
-			const d = new Date(o.data_conclusao || o.data);
-			const key = toLocalDate(d).slice(0, 7);
+			const key = (o.data_conclusao || o.data || "").slice(0, 7);
 			const entry = months.get(key);
 			if (!entry) return;
 			if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return;
@@ -206,8 +206,7 @@ export const DashboardModule = ({
 			else entry.receita_aberta += val;
 		});
 		expenses.filter((e) => e.status === "PAGO").forEach((e) => {
-			const d = new Date(e.vencimento);
-			const key = toLocalDate(d).slice(0, 7);
+			const key = (e.vencimento || "").slice(0, 7);
 			const entry = months.get(key);
 			if (entry) entry.despesa += e.valor;
 		});
@@ -229,7 +228,7 @@ export const DashboardModule = ({
 	const dailyData = useMemo(() => {
 		const daysMap = new Map<string, { receita: number; volume: number }>();
 		bottomOrders.forEach((o) => {
-			const key = toLocalDate(new Date(o.data_conclusao || o.data));
+			const key = (o.data_conclusao || o.data || "").slice(0, 10);
 			const cur = daysMap.get(key) || { receita: 0, volume: 0 };
 			daysMap.set(key, { receita: cur.receita + o.total, volume: cur.volume + 1 });
 		});
@@ -252,7 +251,9 @@ export const DashboardModule = ({
 		const map = new Map<number, { revenue: number; count: number }>();
 		days.forEach((_, i) => map.set(i, { revenue: 0, count: 0 }));
 		bottomOrders.forEach((o) => {
-			const day = new Date(o.data_conclusao || o.data).getDay();
+			const ds = (o.data_conclusao || o.data || "").slice(0, 10);
+			const [yy, mm, dd] = ds.split("-").map(Number);
+			const day = new Date(yy, mm - 1, dd).getDay();
 			const cur = map.get(day)!;
 			map.set(day, { revenue: cur.revenue + o.total, count: cur.count + 1 });
 		});

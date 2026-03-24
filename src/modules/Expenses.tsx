@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Utils } from "@/utils";
 import { Expense } from "@/types";
 import * as XLSX from "xlsx";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from "recharts";
 import {
 	Plus,
 	Search,
@@ -22,6 +22,11 @@ import {
 	Save,
 	AlertTriangle,
 	BarChart2,
+	TrendingUp,
+	TrendingDown,
+	Calendar,
+	Percent,
+	Clock,
 } from "lucide-react";
 import { api } from "@/services/api";
 import { useLoading } from "@/components/ui/LoadingOverlay";
@@ -71,65 +76,17 @@ export const ExpensesModule = ({
 
 	const safeExpenses = Array.isArray(expenses) ? expenses : [];
 
-	const metrics = useMemo(() => {
-		const total = safeExpenses.reduce((acc, e) => acc + e.valor, 0);
-		const paid = safeExpenses
-			.filter((e) => e.status === "PAGO")
-			.reduce((acc, e) => acc + e.valor, 0);
-		const pending = safeExpenses
-			.filter((e) => e.status === "PENDENTE")
-			.reduce((acc, e) => acc + e.valor, 0);
-		return { total, paid, pending };
-	}, [safeExpenses]);
-
+	// ── Métricas do ano completo ─────────────────────────────────────────────
 	const yearMetrics = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		const yearExpenses = safeExpenses.filter((e) => {
-			const d = new Date(e.vencimento);
-			return d.getFullYear() === currentYear;
-		});
+		const currentYear = String(new Date().getFullYear());
+		const yearExpenses = safeExpenses.filter((e) =>
+			(e.vencimento || "").slice(0, 4) === currentYear
+		);
 		const total = yearExpenses.reduce((acc, e) => acc + e.valor, 0);
 		const paid = yearExpenses.filter((e) => e.status === "PAGO").reduce((acc, e) => acc + e.valor, 0);
 		const pending = yearExpenses.filter((e) => e.status === "PENDENTE").reduce((acc, e) => acc + e.valor, 0);
 		const count = yearExpenses.length;
 		return { total, paid, pending, count };
-	}, [safeExpenses]);
-
-	const dashboardData = useMemo(() => {
-		const monthlyMap = new Map<string, { paid: number; pending: number }>();
-		const currentYear = new Date().getFullYear();
-		for (let m = 0; m < 12; m++) {
-			const key = `${currentYear}-${String(m + 1).padStart(2, "0")}`;
-			monthlyMap.set(key, { paid: 0, pending: 0 });
-		}
-		safeExpenses.forEach((e) => {
-			const d = new Date(e.vencimento);
-			if (d.getFullYear() !== currentYear) return;
-			const key = `${currentYear}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-			const entry = monthlyMap.get(key);
-			if (!entry) return;
-			if (e.status === "PAGO") entry.paid += e.valor;
-			else entry.pending += e.valor;
-		});
-		const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-		return Array.from(monthlyMap.entries()).map(([key, val], i) => ({
-			name: monthNames[i],
-			pago: val.paid,
-			pendente: val.pending,
-			total: val.paid + val.pending,
-		}));
-	}, [safeExpenses]);
-
-	const topExpenses = useMemo(() => {
-		const map = new Map<string, number>();
-		safeExpenses.forEach((e) => {
-			const current = map.get(e.produto) || 0;
-			map.set(e.produto, current + e.valor);
-		});
-		return Array.from(map.entries())
-			.map(([name, value]) => ({ name, value }))
-			.sort((a, b) => b.value - a.value)
-			.slice(0, 5);
 	}, [safeExpenses]);
 
 	const handleSort = (key: keyof Expense) => {
@@ -151,17 +108,10 @@ export const ExpensesModule = ({
 				.includes(searchTerm.toLowerCase());
 			const matchesStatus = statusFilter === "ALL" || e.status === statusFilter;
 
-			// Lógica de filtro de data
-			if (filterStart && new Date(e.vencimento) < new Date(filterStart))
-				return false;
-
-			// Ajuste: O filtro de fim deve considerar até o final do dia (23:59:59)
-			// ou simplesmente comparar string YYYY-MM-DD se a data no banco for só data.
-			if (
-				filterEnd &&
-				new Date(e.vencimento) > new Date(filterEnd + "T23:59:59")
-			)
-				return false;
+			// Comparação direta de strings YYYY-MM-DD (evita bug UTC)
+			const dateStr = (e.vencimento || "").slice(0, 10);
+			if (filterStart && dateStr < filterStart) return false;
+			if (filterEnd && dateStr > filterEnd) return false;
 
 			return matchesSearch && matchesStatus;
 		});
@@ -184,6 +134,94 @@ export const ExpensesModule = ({
 		filterEnd,
 		sortConfig,
 	]);
+
+	// ── Métricas filtradas (aplica filtros de data/status/busca) ─────────────
+	const filteredMetrics = useMemo(() => {
+		const filtered = sortedAndFilteredExpenses;
+		const total = filtered.reduce((acc, e) => acc + e.valor, 0);
+		const paid = filtered.filter((e) => e.status === "PAGO").reduce((acc, e) => acc + e.valor, 0);
+		const pending = filtered.filter((e) => e.status === "PENDENTE").reduce((acc, e) => acc + e.valor, 0);
+		const count = filtered.length;
+		const paidPercent = total > 0 ? (paid / total) * 100 : 0;
+		return { total, paid, pending, count, paidPercent };
+	}, [sortedAndFilteredExpenses]);
+
+	// ── Dashboard: gráfico mensal baseado no período filtrado ────────────────
+	const dashboardData = useMemo(() => {
+		const monthlyMap = new Map<string, { paid: number; pending: number }>();
+		const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+		const sDate = new Date(filterStart + "T12:00:00");
+		const eDate = new Date(filterEnd + "T12:00:00");
+		let curr = new Date(sDate.getFullYear(), sDate.getMonth(), 1);
+		while (curr <= eDate) {
+			const key = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}`;
+			monthlyMap.set(key, { paid: 0, pending: 0 });
+			curr.setMonth(curr.getMonth() + 1);
+		}
+		safeExpenses.forEach((e) => {
+			const dateStr = (e.vencimento || "").slice(0, 10);
+			if (dateStr < filterStart || dateStr > filterEnd) return;
+			const yearMonth = dateStr.slice(0, 7);
+			const entry = monthlyMap.get(yearMonth);
+			if (!entry) return;
+			if (e.status === "PAGO") entry.paid += e.valor;
+			else entry.pending += e.valor;
+		});
+		const keys = Array.from(monthlyMap.keys()).sort();
+		return keys.map((key) => {
+			const val = monthlyMap.get(key)!;
+			const [y, m] = key.split("-");
+			return { name: `${monthNames[parseInt(m) - 1]}/${y.slice(2)}`, pago: val.paid, pendente: val.pending, total: val.paid + val.pending };
+		});
+	}, [safeExpenses, filterStart, filterEnd]);
+
+	// ── Top despesas por descrição (período filtrado) ────────────────────────
+	const topExpenses = useMemo(() => {
+		const map = new Map<string, { total: number; count: number }>();
+		sortedAndFilteredExpenses.forEach((e) => {
+			const cur = map.get(e.produto) || { total: 0, count: 0 };
+			map.set(e.produto, { total: cur.total + e.valor, count: cur.count + 1 });
+		});
+		return Array.from(map.entries())
+			.map(([name, { total, count }]) => ({ name, value: total, count }))
+			.sort((a, b) => b.value - a.value)
+			.slice(0, 7);
+	}, [sortedAndFilteredExpenses]);
+
+	// ── Evolução acumulada (período filtrado) ────────────────────────────────
+	const cumulativeData = useMemo(() => {
+		const sorted = [...sortedAndFilteredExpenses].sort((a, b) => (a.vencimento || "").localeCompare(b.vencimento || ""));
+		let accPaid = 0, accPending = 0;
+		const map = new Map<string, { paid: number; pending: number }>();
+		sorted.forEach((e) => {
+			const month = (e.vencimento || "").slice(0, 7);
+			if (e.status === "PAGO") accPaid += e.valor;
+			else accPending += e.valor;
+			map.set(month, { paid: accPaid, pending: accPending });
+		});
+		const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+		return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([key, val]) => {
+			const [y, m] = key.split("-");
+			return { name: `${monthNames[parseInt(m) - 1]}/${y.slice(2)}`, pago: val.paid, pendente: val.pending, total: val.paid + val.pending };
+		});
+	}, [sortedAndFilteredExpenses]);
+
+	// ── Distribuição status para PieChart ────────────────────────────────────
+	const statusDistribution = useMemo(() => {
+		const paid = sortedAndFilteredExpenses.filter((e) => e.status === "PAGO").reduce((acc, e) => acc + e.valor, 0);
+		const pending = sortedAndFilteredExpenses.filter((e) => e.status === "PENDENTE").reduce((acc, e) => acc + e.valor, 0);
+		return [
+			{ name: "Pago", value: paid, color: "#10b981" },
+			{ name: "Pendente", value: pending, color: "#f59e0b" },
+		].filter((d) => d.value > 0);
+	}, [sortedAndFilteredExpenses]);
+
+	// ── Despesas vencidas (overdue) ─────────────────────────────────────────
+	const overdueMetrics = useMemo(() => {
+		const today = new Date().toISOString().slice(0, 10);
+		const overdue = safeExpenses.filter((e) => e.status === "PENDENTE" && (e.vencimento || "").slice(0, 10) < today);
+		return { count: overdue.length, total: overdue.reduce((acc, e) => acc + e.valor, 0) };
+	}, [safeExpenses]);
 
 	// --- FUNÇÕES AUXILIARES DE IMPORTAÇÃO ---
 
@@ -478,17 +516,21 @@ export const ExpensesModule = ({
 				</div>
 			</div>
 
-			{/* Dashboard Lateral */}
+			{/* Dashboard Financeiro */}
 			{showDashboard && (
 				<div className="animate-in slide-in-from-left-5 duration-300 bg-white border border-slate-100 rounded-2xl shadow-lg p-6 space-y-6">
 					<div className="flex items-center justify-between">
-						<h3 className="text-base font-bold text-slate-800">Dashboard Financeiro — {new Date().getFullYear()}</h3>
+						<h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+							<BarChart2 className="w-5 h-5 text-indigo-600" /> Dashboard Financeiro
+						</h3>
 						<button onClick={() => setShowDashboard(false)} className="text-slate-400 hover:text-slate-600 text-sm">Fechar</button>
 					</div>
-					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-						<div>
-							<h4 className="text-sm font-bold text-slate-700 mb-3">Despesas Mensais</h4>
-							<ResponsiveContainer width="100%" height={220}>
+
+					{/* Linha 1: Gráfico de barras + PieChart */}
+					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+						<div className="lg:col-span-2">
+							<h4 className="text-sm font-bold text-slate-700 mb-3">Despesas Mensais (Período Filtrado)</h4>
+							<ResponsiveContainer width="100%" height={240}>
 								<BarChart data={dashboardData} margin={{ left: -10, right: 10 }}>
 									<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
 									<XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
@@ -500,15 +542,57 @@ export const ExpensesModule = ({
 							</ResponsiveContainer>
 						</div>
 						<div>
-							<h4 className="text-sm font-bold text-slate-700 mb-3">Top Despesas por Descrição</h4>
+							<h4 className="text-sm font-bold text-slate-700 mb-3">Distribuição por Status</h4>
+							{statusDistribution.length > 0 ? (
+								<>
+									<ResponsiveContainer width="100%" height={180}>
+										<PieChart>
+											<Pie data={statusDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={75} dataKey="value" paddingAngle={3}>
+												{statusDistribution.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+											</Pie>
+											<Tooltip formatter={(v: number) => Utils.formatCurrency(v)} contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)", fontSize: "12px" }} />
+										</PieChart>
+									</ResponsiveContainer>
+									<div className="flex justify-center gap-4 mt-2">
+										{statusDistribution.map((d) => (
+											<div key={d.name} className="flex items-center gap-1.5 text-xs">
+												<span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+												<span className="font-semibold text-slate-600">{d.name}: {Utils.formatCurrency(d.value)}</span>
+											</div>
+										))}
+									</div>
+								</>
+							) : <p className="text-sm text-slate-400 text-center py-8">Sem dados no período</p>}
+						</div>
+					</div>
+
+					{/* Linha 2: Evolução acumulada + Top despesas */}
+					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+						<div>
+							<h4 className="text-sm font-bold text-slate-700 mb-3">Evolução Acumulada</h4>
+							{cumulativeData.length > 0 ? (
+								<ResponsiveContainer width="100%" height={200}>
+									<AreaChart data={cumulativeData} margin={{ left: -10, right: 10 }}>
+										<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+										<XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
+										<YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+										<Tooltip formatter={(v: number) => Utils.formatCurrency(v)} contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)", fontSize: "12px" }} />
+										<Area type="monotone" dataKey="pago" name="Pago Acum." stroke="#10b981" fill="#10b981" fillOpacity={0.15} strokeWidth={2} />
+										<Area type="monotone" dataKey="total" name="Total Acum." stroke="#6366f1" fill="#6366f1" fillOpacity={0.08} strokeWidth={2} />
+									</AreaChart>
+								</ResponsiveContainer>
+							) : <p className="text-sm text-slate-400 text-center py-8">Sem dados</p>}
+						</div>
+						<div>
+							<h4 className="text-sm font-bold text-slate-700 mb-3">Top Despesas (Período)</h4>
 							<div className="space-y-2.5">
-								{topExpenses.map((item, i) => {
+								{topExpenses.map((item) => {
 									const maxVal = topExpenses[0]?.value || 1;
 									return (
 										<div key={item.name}>
 											<div className="flex justify-between text-xs mb-1">
 												<span className="font-semibold text-slate-700 truncate max-w-[200px]">{item.name}</span>
-												<span className="font-bold text-slate-800">{Utils.formatCurrency(item.value)}</span>
+												<span className="font-bold text-slate-800">{Utils.formatCurrency(item.value)} <span className="text-slate-400 font-normal">({item.count}x)</span></span>
 											</div>
 											<div className="h-2 bg-slate-100 rounded-full overflow-hidden">
 												<div className="h-full bg-gradient-to-r from-indigo-400 to-violet-500 rounded-full transition-all" style={{ width: `${(item.value / maxVal) * 100}%` }} />
@@ -520,54 +604,68 @@ export const ExpensesModule = ({
 							</div>
 						</div>
 					</div>
+
+					{/* Linha 3: Alerta de vencidas */}
+					{overdueMetrics.count > 0 && (
+						<div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+							<AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+							<div>
+								<p className="text-sm font-bold text-red-700">{overdueMetrics.count} despesa{overdueMetrics.count > 1 ? "s" : ""} vencida{overdueMetrics.count > 1 ? "s" : ""}</p>
+								<p className="text-xs text-red-600">Total em atraso: {Utils.formatCurrency(overdueMetrics.total)}</p>
+							</div>
+						</div>
+					)}
 				</div>
 			)}
 
-			{/* Cards Ano Atual */}
+			{/* Cards Ano Atual (1ª linha - BRANCA) */}
 			<div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-				<div className="rounded-2xl p-3 sm:p-4 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg">
-					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Total {new Date().getFullYear()}</p>
-					<p className="text-base sm:text-xl font-bold mt-1">{Utils.formatCurrency(yearMetrics.total)}</p>
-					<p className="text-white/60 text-[10px] mt-1">{yearMetrics.count} despesas</p>
-				</div>
-				<div className="rounded-2xl p-3 sm:p-4 bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg">
-					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Pago {new Date().getFullYear()}</p>
-					<p className="text-base sm:text-xl font-bold mt-1">{Utils.formatCurrency(yearMetrics.paid)}</p>
-				</div>
-				<div className="rounded-2xl p-3 sm:p-4 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg">
-					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Pendente {new Date().getFullYear()}</p>
-					<p className="text-base sm:text-xl font-bold mt-1">{Utils.formatCurrency(yearMetrics.pending)}</p>
-				</div>
-				<div className="rounded-2xl p-3 sm:p-4 bg-gradient-to-br from-rose-400 to-rose-600 text-white shadow-lg">
-					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Quitação</p>
-					<p className="text-base sm:text-xl font-bold mt-1">{yearMetrics.total > 0 ? `${((yearMetrics.paid / yearMetrics.total) * 100).toFixed(0)}%` : "—"}</p>
-					<p className="text-white/60 text-[10px] mt-1">do total anual</p>
-				</div>
+				<Card className="p-3 sm:p-4">
+					<p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total {new Date().getFullYear()}</p>
+					<p className="text-base sm:text-xl font-bold text-slate-800 mt-1">{Utils.formatCurrency(yearMetrics.total)}</p>
+					<p className="text-[10px] text-slate-400 mt-1">{yearMetrics.count} despesas</p>
+				</Card>
+				<Card className="p-3 sm:p-4">
+					<p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pago {new Date().getFullYear()}</p>
+					<p className="text-base sm:text-xl font-bold text-emerald-600 mt-1">{Utils.formatCurrency(yearMetrics.paid)}</p>
+				</Card>
+				<Card className="p-3 sm:p-4">
+					<p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pendente {new Date().getFullYear()}</p>
+					<p className="text-base sm:text-xl font-bold text-amber-600 mt-1">{Utils.formatCurrency(yearMetrics.pending)}</p>
+				</Card>
+				<Card className="p-3 sm:p-4">
+					<p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quitação Anual</p>
+					<p className="text-base sm:text-xl font-bold text-slate-800 mt-1">{yearMetrics.total > 0 ? `${((yearMetrics.paid / yearMetrics.total) * 100).toFixed(0)}%` : "—"}</p>
+					<p className="text-[10px] text-slate-400 mt-1">do total anual</p>
+				</Card>
 			</div>
 
-			{/* Cards Período Filtrado */}
+			{/* Cards Período Filtrado (2ª linha - COLORIDA) */}
 			<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-				<Card className='p-5 border-l-[4px] border-indigo-600 bg-indigo-50/50'>
-					<p className='text-xs font-bold text-slate-500 uppercase tracking-wider mb-1'>Total Filtrado</p>
-					<div className='flex items-center gap-2'>
-						<DollarSign className='w-5 h-5 text-indigo-600' />
-						<span className='text-2xl font-bold text-slate-800'>{Utils.formatCurrency(sortedAndFilteredExpenses.reduce((acc, e) => acc + e.valor, 0))}</span>
+				<div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg">
+					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Total Filtrado</p>
+					<div className="flex items-center gap-2 mt-1">
+						<DollarSign className="w-5 h-5 text-white/80" />
+						<span className="text-xl sm:text-2xl font-bold">{Utils.formatCurrency(filteredMetrics.total)}</span>
 					</div>
-				</Card>
-				<Card className='p-5 border-l-[4px] border-emerald-500 bg-emerald-50/50'>
-					<p className='text-xs font-bold text-slate-500 uppercase tracking-wider mb-1'>Total Pago</p>
-					<div className='flex items-center gap-2'>
-						<CheckCircle className='w-5 h-5 text-emerald-600' />
-						<span className='text-2xl font-bold text-slate-800'>{Utils.formatCurrency(metrics.paid)}</span>
+					<p className="text-white/60 text-[10px] mt-1">{filteredMetrics.count} despesas</p>
+				</div>
+				<div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg">
+					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Pago (Filtrado)</p>
+					<div className="flex items-center gap-2 mt-1">
+						<CheckCircle className="w-5 h-5 text-white/80" />
+						<span className="text-xl sm:text-2xl font-bold">{Utils.formatCurrency(filteredMetrics.paid)}</span>
 					</div>
-				</Card>
-				<Card className='p-5 border-l-[4px] border-orange-500 bg-orange-50/50'>
-					<p className='text-xs font-bold text-slate-500 uppercase tracking-wider mb-1'>Pendente</p>
-					<div className='flex items-center gap-2'>
-						<Circle className='w-5 h-5 text-orange-600' />
-						<span className='text-2xl font-bold text-slate-800'>{Utils.formatCurrency(metrics.pending)}</span>
+					<p className="text-white/60 text-[10px] mt-1">{filteredMetrics.paidPercent.toFixed(0)}% quitado</p>
+				</div>
+				<div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg">
+					<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Pendente (Filtrado)</p>
+					<div className="flex items-center gap-2 mt-1">
+						<Clock className="w-5 h-5 text-white/80" />
+						<span className="text-xl sm:text-2xl font-bold">{Utils.formatCurrency(filteredMetrics.pending)}</span>
 					</div>
-				</Card>
+					{overdueMetrics.count > 0 && <p className="text-white/60 text-[10px] mt-1">{overdueMetrics.count} vencida{overdueMetrics.count > 1 ? "s" : ""}</p>}
+				</div>
 			</div>
 
 			<Card className='overflow-hidden'>
