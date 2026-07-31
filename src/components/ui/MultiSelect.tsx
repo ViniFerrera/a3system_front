@@ -6,9 +6,12 @@ interface MultiSelectProps {
 	selected: string[];
 	onChange: (selected: string[]) => void;
 	placeholder?: string;
+	/** Formata o rótulo exibido sem alterar o valor selecionado. */
+	formatLabel?: (value: string) => string;
 }
 
-export const MultiSelect = ({ options, selected, onChange, placeholder = "Selecione..." }: MultiSelectProps) => {
+export const MultiSelect = ({ options, selected, onChange, placeholder = "Selecione...", formatLabel }: MultiSelectProps) => {
+	const label = (value: string) => (formatLabel ? formatLabel(value) || value : value);
 	const [isOpen, setIsOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 
@@ -44,7 +47,7 @@ export const MultiSelect = ({ options, selected, onChange, placeholder = "Seleci
 					{selected.length > 0 ? (
 						selected.map(s => (
 							<span key={s} className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md text-xs font-medium border border-indigo-100">
-								{s}
+								{label(s)}
 							</span>
 						))
 					) : (
@@ -68,7 +71,7 @@ export const MultiSelect = ({ options, selected, onChange, placeholder = "Seleci
 							}`}>
 								{selected.includes(option) && <Check className="w-3 h-3 text-white" />}
 							</div>
-							<span className="text-slate-700">{option}</span>
+							<span className="text-slate-700">{label(option)}</span>
 						</div>
 					))}
 				</div>

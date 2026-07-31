@@ -1,12 +1,24 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
+// "sm" e "md" mapeiam para a mesma largura de propósito: o comportamento
+// anterior era um ternário que mandava tudo que não fosse "lg" para max-w-md.
+// Mudar "md" alargaria silenciosamente Despesas (que omite size) e Estoque.
+const SIZES: Record<string, string> = {
+	sm: "sm:max-w-md",
+	md: "sm:max-w-md",
+	lg: "sm:max-w-4xl",
+	xl: "sm:max-w-7xl",
+};
+
 export const Modal = ({ isOpen, onClose, title, children, size = "md" }: any) => {
 	if (!isOpen) return null;
-	const sizeClass = size === "lg" ? "sm:max-w-4xl" : "sm:max-w-md";
+	const sizeClass = SIZES[size] ?? SIZES.md;
+	// O modal xl (formulário de ordem) precisa de mais altura para a grade de itens.
+	const heightClass = size === "xl" ? "sm:max-h-[90vh]" : "sm:max-h-[85vh]";
 	return (
 		<div className="fixed inset-0 bg-slate-900/50 backdrop-blur-[3px] z-[9999] flex items-end sm:items-center justify-center sm:p-4 animate-fade-in overflow-y-auto">
-			<div className={`bg-white w-full ${sizeClass} flex flex-col animate-slide-in-bottom sm:animate-scale-in sm:my-8 mx-auto relative rounded-t-2xl sm:rounded-2xl shadow-elevated max-h-[92vh] sm:max-h-[85vh]`}>
+			<div className={`bg-white w-full ${sizeClass} flex flex-col animate-slide-in-bottom sm:animate-scale-in sm:my-8 mx-auto relative rounded-t-2xl sm:rounded-2xl shadow-elevated max-h-[92vh] ${heightClass}`}>
 				<div className="flex justify-between items-center p-4 sm:p-5 border-b border-slate-100 flex-shrink-0">
 					<h3 className="text-base sm:text-lg font-bold text-slate-800">{title}</h3>
 					<button
