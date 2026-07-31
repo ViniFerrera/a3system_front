@@ -3,19 +3,15 @@ import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { Utils } from "@/utils";
-import { Order, Client, PriceRule, OrderItem } from "@/types";
+import { Order, Client, PriceRule } from "@/types";
 import { MultiSelect } from "@/components/ui/MultiSelect";
 import {
 	Plus,
 	Edit2,
 	CheckCircle,
 	Trash2,
-	Paperclip,
 	Clock,
-	Check,
 	X,
-	FileText,
-	Printer,
 	ChevronDown,
 	ChevronUp,
 	Search,
@@ -25,11 +21,9 @@ import {
 	TrendingDown,
 	AlertCircle,
 	FolderOpen,
-	Eraser,
 	Minus,
 	CreditCard,
 	Settings,
-	Save,
 	RefreshCcw,
 	CheckCircle2,
 	XCircle,
@@ -38,16 +32,15 @@ import {
 import { api } from "@/services/api";
 import { useLoading } from "@/components/ui/LoadingOverlay";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { ItemGrid } from "./orders/ItemGrid";
+import { PresetBar, OrderPreset } from "./orders/PresetBar";
+import { PresetManagerModal } from "./orders/PresetManagerModal";
+import { EditableItem, toEditableItem } from "./orders/itemOptions";
 
 interface Machine {
 	id: number;
 	nome: string;
 	tipo: string;
-}
-
-interface OrderItemWithMachine extends OrderItem {
-	maquina_id?: number;
-	maquina_nome?: string;
 }
 
 // COMPONENTE SEARCHABLE SELECT (MANTIDO IGUAL)
@@ -300,39 +293,52 @@ export const OrderModule = ({
 				if (res.data.value) setDebitTaxPercent(Number(res.data.value));
 			})
 			.catch(console.error);
+
+		api
+			.get("/order-presets")
+			.then((res) => {
+				if (Array.isArray(res.data)) setPresets(res.data);
+			})
+			.catch(console.error);
 	}, []);
 
-	// --- FORM STATE ---
-	const [formData, setFormData] = useState<Partial<Order>>({
+	// Defaults de ordem nova: 99,5% das ordens são PAGO e 63,2% em PIX.
+	// Aplicam-se só à criação — edição preserva o que está gravado.
+	const DEFAULT_NEW_ORDER: Partial<Order> = {
 		cliente_id: 0,
 		descricao: "",
 		items: [],
 		anexos: [],
-		status_pagamento: "NAO_PAGO",
-		forma_pagamento: "",
+		status_pagamento: "PAGO",
+		forma_pagamento: "PIX",
 		taxa_extra: 0,
 		desconto_pontual: 0,
-		data: new Date().toISOString(),
 		nota_fiscal: false,
+	};
+
+	// --- FORM STATE ---
+	const [formData, setFormData] = useState<Partial<Order>>({
+		...DEFAULT_NEW_ORDER,
+		data: new Date().toISOString(),
 	});
 
-	const [tempItem, setTempItem] = useState({
-		servico: "",
-		material: "",
-		cor: "",
-		quantidade: 0,
-		gramatura: "",
-		tamanho: "",
-		is_double_sided: false,
-		maquina_id: 0,
-	});
+	// Itens da ordem em edição. Fonte única da grade — substitui o antigo par
+	// "tempItem + formData.items só-leitura".
+	const [gridItems, setGridItems] = useState<EditableItem[]>([]);
+	const [presets, setPresets] = useState<OrderPreset[]>([]);
+	const [isPresetManagerOpen, setIsPresetManagerOpen] = useState(false);
+
+	// Subtotal dos itens da grade, antes de desconto e taxa.
+	const gridSubtotal = useMemo(
+		() => gridItems.reduce((acc, i) => acc + (i.total || 0), 0),
+		[gridItems]
+	);
 
 	// --- EFEITO: Calcular Taxa ao Mudar Forma de Pagamento ---
 	useEffect(() => {
 		if (formData.forma_pagamento === "DEBITO" && debitTaxPercent > 0) {
 			const subtotal =
-				(formData.items?.reduce((acc, i) => acc + i.total, 0) || 0) *
-				(1 - (formData.desconto_pontual || 0) / 100);
+				gridSubtotal * (1 - (formData.desconto_pontual || 0) / 100);
 			const extra = subtotal * (debitTaxPercent / 100);
 			setFormData((prev) => ({ ...prev, taxa_extra: extra }));
 		} else if (
@@ -344,7 +350,7 @@ export const OrderModule = ({
 		}
 	}, [
 		formData.forma_pagamento,
-		formData.items,
+		gridSubtotal,
 		formData.desconto_pontual,
 		debitTaxPercent,
 	]);
@@ -570,128 +576,29 @@ export const OrderModule = ({
 		() => [...new Set(priceTable.map((p) => p.Servico))].sort(),
 		[priceTable]
 	);
-	const availableMaterials = useMemo(() => {
-		if (!tempItem.servico) return [];
-		return [
-			...new Set(
-				priceTable
-					.filter((p) => p.Servico === tempItem.servico)
-					.map((p) => p.Material)
-			),
-		].sort();
-	}, [tempItem.servico, priceTable]);
-	const availableSpecs = useMemo(() => {
-		if (!tempItem.material) return [];
-		return [
-			...new Set(
-				priceTable
-					.filter(
-						(p) =>
-							p.Servico === tempItem.servico && p.Material === tempItem.material
-					)
-					.map((p) => p.Gramatura || "")
-			),
-		]
-			.filter((g) => g !== "")
-			.sort();
-	}, [tempItem.servico, tempItem.material, priceTable]);
-	const availableSizes = useMemo(() => {
-		if (!tempItem.material) return [];
-		const baseFilter = priceTable.filter(
-			(p) => p.Servico === tempItem.servico && p.Material === tempItem.material
-		);
-		const refinedFilter = tempItem.gramatura
-			? baseFilter.filter((p) => p.Gramatura === tempItem.gramatura)
-			: baseFilter;
-		return [...new Set(refinedFilter.map((p) => p.Papel))]
-			.filter(Boolean)
-			.sort();
-	}, [tempItem.servico, tempItem.material, tempItem.gramatura, priceTable]);
-	const availableColors = useMemo(() => {
-		if (!tempItem.material) return [];
-		const baseFilter = priceTable.filter(
-			(p) => p.Servico === tempItem.servico && p.Material === tempItem.material
-		);
-		let refinedFilter = baseFilter;
-		if (tempItem.gramatura)
-			refinedFilter = refinedFilter.filter(
-				(p) => p.Gramatura === tempItem.gramatura
-			);
-		if (tempItem.tamanho)
-			refinedFilter = refinedFilter.filter((p) => p.Papel === tempItem.tamanho);
-		return [...new Set(refinedFilter.map((p) => p.Cor))].filter(Boolean).sort();
-	}, [
-		tempItem.servico,
-		tempItem.material,
-		tempItem.gramatura,
-		tempItem.tamanho,
-		priceTable,
-	]);
 
-	const isHyphen = (val: string) =>
-		val === "-" || val === " - " || val.trim() === "-";
-	const shouldHideField = (options: string[]) =>
-		options.length === 1 && isHyphen(options[0]);
+	// Acrescenta itens de um preset ou de uma sugestão do cliente à grade.
+	// Acrescenta em vez de substituir, para permitir empilhar pré-definições.
+	const handleAddItems = (novos: any[]) => {
+		const convertidos = novos.map((raw) => toEditableItem(raw, priceTable));
+		setGridItems((prev) => [...prev, ...convertidos]);
+	};
 
-	useEffect(() => {
-		if (availableMaterials.length === 1 && isHyphen(availableMaterials[0]))
-			setTempItem((prev) => ({ ...prev, material: availableMaterials[0] }));
-	}, [availableMaterials]);
-	useEffect(() => {
-		const spec = availableSpecs[0] || "";
-		if (availableSpecs.length === 1 && isHyphen(spec))
-			setTempItem((prev) => ({ ...prev, gramatura: spec }));
-	}, [availableSpecs]);
-	useEffect(() => {
-		if (availableSizes.length === 1 && isHyphen(availableSizes[0]))
-			setTempItem((prev) => ({ ...prev, tamanho: availableSizes[0] }));
-	}, [availableSizes]);
-	useEffect(() => {
-		if (availableColors.length === 1 && isHyphen(availableColors[0]))
-			setTempItem((prev) => ({ ...prev, cor: availableColors[0] }));
-	}, [availableColors]);
-
-	const handleAddItem = () => {
-		// CORREÇÃO PONTO 1: Adicionado tempItem.tamanho (Papel) na chamada
-		// para diferenciar A3 de A4 e buscar o preço correto.
-		const pricing = Utils.calculatePrice(
-			priceTable,
-			tempItem.servico,
-			tempItem.material,
-			tempItem.cor,
-			Number(tempItem.quantidade),
-			tempItem.gramatura,
-			tempItem.tamanho // <--- Item Faltante adicionado aqui
-		);
-		const selectedMachine = machinesList.find(
-			(m) => m.id == tempItem.maquina_id
-		);
-		const newItem: OrderItemWithMachine = {
-			id: Date.now(),
-			servico: tempItem.servico,
-			material: tempItem.material,
-			cor: tempItem.cor,
-			quantidade: Number(tempItem.quantidade),
-			unitPrice: pricing.unit,
-			total: pricing.total,
-			ruleApplied: pricing.rule || "N/A", // Regra aplicada
-			gramatura: tempItem.gramatura,
-			tamanho: tempItem.tamanho, // Salva o tamanho
-			is_double_sided: tempItem.is_double_sided,
-			maquina_id: Number(tempItem.maquina_id),
-			maquina_nome: selectedMachine?.nome,
-		};
-		setFormData((prev) => ({
-			...prev,
-			items: [...(prev.items || []), newItem],
-		}));
-		setTempItem((prev) => ({ ...prev, quantidade: 0 }));
+	const reloadPresets = () => {
+		api
+			.get("/order-presets")
+			.then((res) => setPresets(Array.isArray(res.data) ? res.data : []))
+			.catch(console.error);
 	};
 
 	const handleSave = async () => {
-		const items = formData.items || [];
+		// Linha em branco (usuário clicou "Adicionar linha" e não preencheu)
+		// não vira item da ordem.
+		const items = gridItems
+			.filter((i) => i.servico)
+			.map(({ _key, ...item }) => item);
 		const subtotal =
-			(formData.items?.reduce((acc, i) => acc + i.total, 0) || 0) *
+			items.reduce((acc, i) => acc + (i.total || 0), 0) *
 			(1 - (formData.desconto_pontual || 0) / 100);
 		// Valor Final = Subtotal + Taxa Extra
 		const total = subtotal + (formData.taxa_extra || 0);
@@ -751,15 +658,9 @@ export const OrderModule = ({
 			setIsModalOpen(false);
 			setEditingOrder(null);
 			setFilesToUpload([]);
+			setGridItems([]);
 			setFormData({
-				cliente_id: 0,
-				descricao: "",
-				items: [],
-				anexos: [],
-				status_pagamento: "NAO_PAGO",
-				forma_pagamento: "",
-				taxa_extra: 0,
-				desconto_pontual: 0,
+				...DEFAULT_NEW_ORDER,
 				data: new Date().toISOString(),
 			});
 		} catch (err) {
@@ -848,12 +749,14 @@ export const OrderModule = ({
 	const openModal = (order?: Order) => {
 		if (order) {
 			setEditingOrder(order);
+			const rawItems =
+				typeof order.items === "string"
+					? JSON.parse(order.items)
+					: order.items || [];
+			setGridItems(rawItems.map((i: any) => toEditableItem(i, priceTable)));
 			setFormData({
 				...order,
-				items:
-					typeof order.items === "string"
-						? JSON.parse(order.items)
-						: order.items || [],
+				items: rawItems,
 				anexos:
 					typeof order.anexos === "string"
 						? JSON.parse(order.anexos)
@@ -863,15 +766,10 @@ export const OrderModule = ({
 		} else {
 			setEditingOrder(null);
 			setFilesToUpload([]);
+			setGridItems([]);
 			setFormData({
-				items: [],
-				anexos: [],
-				status_pagamento: "NAO_PAGO",
-				forma_pagamento: "",
-				taxa_extra: 0,
-				desconto_pontual: 0,
+				...DEFAULT_NEW_ORDER,
 				data: new Date().toISOString(),
-				nota_fiscal: false,
 			});
 		}
 		setIsModalOpen(true);
@@ -985,6 +883,7 @@ export const OrderModule = ({
 							selected={filterServices}
 							onChange={setFilterServices}
 							placeholder='Filtrar Serviços'
+							formatLabel={Utils.displayName}
 						/>
 					</div>
 					<div className='w-full sm:w-64'>
@@ -1157,7 +1056,9 @@ export const OrderModule = ({
 												</td>
 												<td
 													className='p-2 sm:p-4 text-xs max-w-[200px] truncate hidden md:table-cell'
-													title={order.items.map((i) => i.servico).join(", ")}
+													title={order.items
+														.map((i) => Utils.displayName(i.servico))
+														.join(", ")}
 												>
 													{order.items.length > 0 ? (
 														<div className='flex gap-1 overflow-hidden'>
@@ -1166,7 +1067,7 @@ export const OrderModule = ({
 																	key={idx}
 																	className='inline-flex items-center px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[10px] text-slate-600 whitespace-nowrap'
 																>
-																	{i.servico}
+																	{Utils.displayName(i.servico)}
 																</span>
 															))}
 														</div>
@@ -1280,13 +1181,21 @@ export const OrderModule = ({
 																					<strong className='text-indigo-600'>
 																						{item.quantidade}x
 																					</strong>{" "}
-																					{item.servico} - {item.material}{" "}
-																					{item.gramatura
-																						? `(${item.gramatura})`
+																					{Utils.displayName(item.servico)}
+																					{Utils.displayName(item.material)
+																						? ` - ${Utils.displayName(item.material)}`
 																						: ""}
-																					<span className='text-slate-400 text-[10px] ml-1'>
-																						({item.cor})
-																					</span>
+																					{Utils.displayName(item.gramatura)
+																						? ` (${Utils.displayName(item.gramatura)})`
+																						: ""}
+																					{Utils.displayName(item.tamanho)
+																						? ` · ${Utils.displayName(item.tamanho)}`
+																						: ""}
+																					{Utils.displayName(item.cor) && (
+																						<span className='text-slate-400 text-[10px] ml-1'>
+																							({Utils.displayName(item.cor)})
+																						</span>
+																					)}
 																				</span>
 																				<span className='font-bold text-slate-600'>
 																					{Utils.formatCurrency(item.total)}
@@ -1477,7 +1386,7 @@ export const OrderModule = ({
 				isOpen={isModalOpen}
 				onClose={() => setIsModalOpen(false)}
 				title={editingOrder ? "Editar Ordem" : "Nova Ordem"}
-				size='lg'
+				size='xl'
 			>
 				<div className='space-y-6'>
 					<div className='grid grid-cols-1 md:grid-cols-12 gap-5'>
@@ -1629,259 +1538,22 @@ export const OrderModule = ({
 						/>
 					</div>
 
-					{/* ÁREA DE INSERÇÃO DE ITENS */}
-					<div className='bg-slate-50 p-5 rounded-[10px] border border-slate-200 shadow-inner'>
-						<div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 items-end'>
-							{/* 1. Serviço */}
-							<div className='md:col-span-4'>
-								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-									1. Serviço
-								</label>
-								<select
-									className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
-									value={tempItem.servico}
-									onChange={(e) =>
-										setTempItem({
-											...tempItem,
-											servico: e.target.value,
-											material: "",
-											cor: "",
-											gramatura: "",
-											tamanho: "",
-										})
-									}
-								>
-									<option value=''>...</option>
-									{uniqueServices.map((s) => (
-										<option key={s} value={s}>
-											{s}
-										</option>
-									))}
-								</select>
-							</div>
+					{/* PRÉ-DEFINIÇÕES E SUGESTÕES DO CLIENTE */}
+					<PresetBar
+						clienteId={formData.cliente_id || undefined}
+						clienteNome={clients.find((c) => c.id == formData.cliente_id)?.nome}
+						onAddItems={handleAddItems}
+						onManage={() => setIsPresetManagerOpen(true)}
+						presets={presets}
+					/>
 
-							{/* 2. Material */}
-							{!shouldHideField(availableMaterials) && (
-								<div className='md:col-span-4'>
-									<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-										2. Material
-									</label>
-									<select
-										className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
-										value={tempItem.material}
-										onChange={(e) =>
-											setTempItem({
-												...tempItem,
-												material: e.target.value,
-												cor: "",
-												gramatura: "",
-												tamanho: "",
-											})
-										}
-										disabled={!tempItem.servico}
-									>
-										<option value=''>...</option>
-										{availableMaterials.map((m) => (
-											<option key={m} value={m}>
-												{m}
-											</option>
-										))}
-									</select>
-								</div>
-							)}
-
-							{/* 3. Especificação / Gramatura */}
-							{!shouldHideField(availableSpecs) && (
-								<div className='md:col-span-4'>
-									<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-										3. Especificação
-									</label>
-									<select
-										className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
-										value={tempItem.gramatura || ""}
-										onChange={(e) =>
-											setTempItem({
-												...tempItem,
-												gramatura: e.target.value,
-												tamanho: "",
-												cor: "",
-											})
-										}
-										disabled={!availableSpecs.length}
-									>
-										<option value=''>N/A</option>
-										{availableSpecs.map((g) => (
-											<option key={g} value={g}>
-												{g}
-											</option>
-										))}
-									</select>
-								</div>
-							)}
-
-							{/* 4. Tamanho */}
-							{!shouldHideField(availableSizes) && (
-								<div className='md:col-span-3'>
-									<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-										4. Tamanho
-									</label>
-									<select
-										className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
-										value={tempItem.tamanho || ""}
-										onChange={(e) =>
-											setTempItem({ ...tempItem, tamanho: e.target.value })
-										}
-										disabled={!availableSizes.length}
-									>
-										<option value=''>N/A</option>
-										{availableSizes.map((s) => (
-											<option key={s} value={s}>
-												{s}
-											</option>
-										))}
-									</select>
-								</div>
-							)}
-
-							{/* 5. Cor */}
-							{!shouldHideField(availableColors) && (
-								<div className='md:col-span-3'>
-									<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-										5. Cor
-									</label>
-									<select
-										className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
-										value={tempItem.cor}
-										onChange={(e) =>
-											setTempItem({ ...tempItem, cor: e.target.value })
-										}
-										disabled={!tempItem.material}
-									>
-										<option value=''>...</option>
-										{availableColors.map((c) => (
-											<option key={c} value={c}>
-												{c}
-											</option>
-										))}
-									</select>
-								</div>
-							)}
-
-							{/* 6. Maquinário */}
-							<div className='md:col-span-4'>
-								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1'>
-									<Printer className='w-3 h-3' /> Maquinário (Estoque)
-								</label>
-								<select
-									className='w-full text-sm border border-slate-200 p-2 rounded-[10px] bg-white'
-									value={tempItem.maquina_id || 0}
-									onChange={(e) =>
-										setTempItem({
-											...tempItem,
-											maquina_id: Number(e.target.value),
-										})
-									}
-								>
-									<option value='0'>Nenhum / Manual</option>
-									{machinesList.map((m) => (
-										<option key={m.id} value={m.id}>
-											{m.nome}
-										</option>
-									))}
-								</select>
-							</div>
-
-							{/* 7. Quantidade */}
-							<div className='md:col-span-2'>
-								<label className='text-[10px] font-bold text-slate-400 uppercase mb-1 block'>
-									Qtd
-								</label>
-								<input
-									type='number'
-									className='w-full text-sm border border-slate-200 p-2 rounded-[10px]'
-									value={tempItem.quantidade}
-									onChange={(e) =>
-										setTempItem({
-											...tempItem,
-											quantidade: Number(e.target.value),
-										})
-									}
-								/>
-							</div>
-
-							{/* 8. Frente e Verso */}
-							<div className='md:col-span-8 flex items-center h-full pb-2'>
-								<label className='flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-600'>
-									<input
-										type='checkbox'
-										className='w-4 h-4 rounded text-indigo-600'
-										checked={tempItem.is_double_sided}
-										onChange={(e) =>
-											setTempItem({
-												...tempItem,
-												is_double_sided: e.target.checked,
-											})
-										}
-									/>
-									Frente/Verso
-								</label>
-							</div>
-
-							{/* Botão Adicionar */}
-							<div className='md:col-span-4'>
-								<button
-									onClick={handleAddItem}
-									disabled={!tempItem.quantidade}
-									className='w-full bg-slate-800 text-white text-sm py-2 rounded-[10px] hover:bg-slate-900 transition h-[38px] mt-auto'
-								>
-									Adicionar Item
-								</button>
-							</div>
-						</div>
-					</div>
-
-					{/* LISTA DE ITENS ADICIONADOS (PONTO 2: MAIS DETALHES) */}
-					<div className='space-y-2 max-h-40 overflow-y-auto custom-scrollbar bg-white rounded-[10px] border border-slate-100 p-1'>
-						{formData.items?.map((item: any, idx) => (
-							<div
-								key={idx}
-								className='flex justify-between items-center p-2 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition'
-							>
-								<div className='flex-1 pr-2'>
-									<p className='font-bold text-xs text-slate-800'>
-										{item.servico} - {item.material}
-									</p>
-									<div className='flex flex-wrap gap-2 text-[10px] text-slate-500 mt-0.5'>
-										<span>Qtd: {item.quantidade}</span>
-										{item.tamanho && <span>| {item.tamanho}</span>}
-										{item.gramatura && <span>| {item.gramatura}</span>}
-										{item.cor && <span>| {item.cor}</span>}
-									</div>
-									{item.ruleApplied && item.ruleApplied !== "N/A" && (
-										<p className='text-[9px] text-indigo-500 mt-0.5'>
-											Regra: {item.ruleApplied}
-										</p>
-									)}
-								</div>
-								<div className='flex items-center gap-3 pl-2 border-l border-slate-100'>
-									<span className='font-bold text-xs text-slate-700 whitespace-nowrap'>
-										{Utils.formatCurrency(item.total)}
-									</span>
-									<button
-										onClick={() =>
-											setFormData((prev) => ({
-												...prev,
-												items: prev.items?.filter((_, i) => i !== idx),
-											}))
-										}
-										className='text-slate-300 hover:text-red-500 transition'
-									>
-										<Trash2 className='w-3.5 h-3.5' />
-									</button>
-								</div>
-							</div>
-						))}
-					</div>
+					{/* GRADE EDITÁVEL DE ITENS */}
+					<ItemGrid
+						items={gridItems}
+						priceTable={priceTable}
+						machines={machinesList}
+						onChange={setGridItems}
+					/>
 
 					<div className='pt-5 border-t border-slate-100 flex justify-between items-center'>
 						<div className='flex items-center gap-3'>
@@ -1906,8 +1578,7 @@ export const OrderModule = ({
 							</p>
 							<p className='text-2xl font-bold text-indigo-600 tracking-tight'>
 								{Utils.formatCurrency(
-									(formData.items?.reduce((acc, i) => acc + i.total, 0) || 0) *
-										(1 - (formData.desconto_pontual || 0) / 100) +
+									gridSubtotal * (1 - (formData.desconto_pontual || 0) / 100) +
 										(formData.taxa_extra || 0)
 								)}
 							</p>
@@ -1963,6 +1634,16 @@ export const OrderModule = ({
 					</div>
 				</div>
 			</Modal>
+
+			{/* MODAL GERENCIAR PRÉ-DEFINIÇÕES */}
+			<PresetManagerModal
+				isOpen={isPresetManagerOpen}
+				onClose={() => setIsPresetManagerOpen(false)}
+				presets={presets}
+				priceTable={priceTable}
+				machines={machinesList}
+				onChanged={reloadPresets}
+			/>
 
 			{/* MODAL CLIENTE RÁPIDO */}
 			<Modal

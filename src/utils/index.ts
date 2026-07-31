@@ -77,6 +77,16 @@ export const Utils = {
         if (match) { return { unit: match.Valor_Cliente, total: match.Valor_Cliente * qtd, rule: match.Especificacao }; }
         return { unit: 0, total: 0, rule: 'Não encontrado' };
     },
+    /**
+     * Remove o prefixo numérico de ordenação da taxonomia ("1_Impressao" → "Impressao").
+     * Só para exibição — o valor gravado mantém o prefixo, que é o que casa com
+     * a tabela pricing e define a ordem dos selects.
+     */
+    displayName: (value?: string) => {
+        if (!value) return '';
+        const clean = value.replace(/^\d+_/, '');
+        return clean === '-' ? '' : clean;
+    },
     formatCurrency: (value: number) => { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value); },
     formatDateTime: (dateString?: string) => {
         if (!dateString) return '-';
