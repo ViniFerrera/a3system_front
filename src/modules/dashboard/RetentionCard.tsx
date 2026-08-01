@@ -8,10 +8,10 @@ export const RetentionCard = ({ metrics }: { metrics: DashboardMetrics | null })
 	if (!metrics) return <SkeletonTile />;
 
 	const { novos, recorrentes, pctPedidoUnico, sumidos } = metrics.retencao;
-	// Atenção: esta soma é a receita dos clientes IDENTIFICADOS, não o
-	// faturamento do período — a rota deixa as vendas de balcão de fora.
-	const receitaIdentificada = novos.receita + recorrentes.receita;
-	const pctRecorrente = receitaIdentificada > 0 ? (recorrentes.receita / receitaIdentificada) * 100 : 0;
+	// Todo cliente do período entra aqui, balcão incluído, então esta soma é a
+	// receita do período.
+	const receitaPeriodo = novos.receita + recorrentes.receita;
+	const pctRecorrente = receitaPeriodo > 0 ? (recorrentes.receita / receitaPeriodo) * 100 : 0;
 	const ticketNovo = novos.pedidos > 0 ? novos.receita / novos.pedidos : 0;
 	const ticketRecorrente = recorrentes.pedidos > 0 ? recorrentes.receita / recorrentes.pedidos : 0;
 
@@ -81,9 +81,8 @@ export const RetentionCard = ({ metrics }: { metrics: DashboardMetrics | null })
 			)}
 
 			<p className="text-2xs text-ink-faint mt-3 pt-3 border-t border-slate-100 leading-relaxed">
-				Novos e recorrentes somam apenas os clientes identificados
-				({Utils.formatCurrency(receitaIdentificada)}) — as vendas de balcão ficam de fora,
-				então esta soma não é o faturamento do período mostrado no KPI de Receita.
+				Novos e recorrentes somam a receita do período:{" "}
+				<span className="num font-semibold">{Utils.formatCurrency(receitaPeriodo)}</span>.
 			</p>
 		</div>
 	);

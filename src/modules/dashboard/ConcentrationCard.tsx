@@ -17,7 +17,7 @@ export const ConcentrationCard = ({ metrics }: { metrics: DashboardMetrics | nul
 						<Users className="w-4 h-4 text-primary-500" /> Concentração
 					</h4>
 					<p className="text-xs text-ink-faint mt-0.5">
-						Peso dos cinco maiores na receita de clientes identificados
+						Peso dos cinco maiores na receita do período
 					</p>
 				</div>
 				<span className="num text-xl font-bold text-primary-600">{top5Pct.toFixed(0)}%</span>
@@ -43,14 +43,8 @@ export const ConcentrationCard = ({ metrics }: { metrics: DashboardMetrics | nul
 				))}
 			</div>
 
-			{/*
-				NÃO rotular como "receita total do período": a rota exclui o "Cliente
-				Balcão" das análises de cliente, então este valor é menor que o KPI de
-				Receita da mesma tela. Rótulo ambíguo aqui vira decisão errada.
-			*/}
 			<p className="text-2xs text-ink-faint mt-3 pt-3 border-t border-slate-100 leading-relaxed">
-				Receita de clientes identificados: <span className="num font-semibold">{Utils.formatCurrency(receitaTotal)}</span>.
-				As vendas de balcão ficam de fora deste bloco — elas entram no KPI de Receita, que por isso é maior.
+				Receita total do período: <span className="num font-semibold">{Utils.formatCurrency(receitaTotal)}</span>.
 			</p>
 		</div>
 	);
