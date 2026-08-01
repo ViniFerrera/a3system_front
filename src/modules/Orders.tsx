@@ -916,10 +916,16 @@ export const OrderModule = ({
 		setIsModalOpen(false);
 	};
 
-	// Atalhos válidos só enquanto o formulário está aberto. O módulo nunca
-	// desmonta, então o listener precisa sair junto com o modal.
+	// Atalhos válidos só enquanto o formulário está aberto E é o diálogo do
+	// topo. Cliente rápido, pré-definições e taxa abrem POR CIMA do formulário
+	// (isModalOpen continua true); sem esta guarda, um Ctrl+Enter digitado
+	// dentro deles gravava a ordem e fechava o formulário por baixo, deixando o
+	// diálogo de cima órfão. O módulo nunca desmonta, então o listener precisa
+	// sair junto com o modal.
+	const atalhosAtivos =
+		isModalOpen && !isQuickClientOpen && !isPresetManagerOpen && !isConfigModalOpen;
 	useEffect(() => {
-		if (!isModalOpen) return;
+		if (!atalhosAtivos) return;
 		const onKey = (e: KeyboardEvent) => {
 			if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
 				e.preventDefault();
@@ -931,7 +937,18 @@ export const OrderModule = ({
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [isModalOpen, formData, gridItems, filesToUpload, isSaving]);
+		// `editingOrder` e `clients` entram porque handleSave lê os dois: sem
+		// eles o listener podia gravar com o modo (criação/edição) ou o nome do
+		// cliente de um render anterior.
+	}, [
+		atalhosAtivos,
+		formData,
+		gridItems,
+		filesToUpload,
+		isSaving,
+		editingOrder,
+		clients,
+	]);
 
 	// Abre o formulário quando a topbar/paleta/atalho pede "nova ordem".
 	// Ignora o valor inicial 0 para não abrir sozinho no primeiro render.
