@@ -11,6 +11,9 @@ import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import { NAV_ITEMS } from "@/components/shell/navItems";
+import { ShortcutsDrawer } from "@/components/shortcuts/ShortcutsDrawer";
+import { useShortcuts } from "@/hooks/useShortcuts";
+import { ACTIONS, OrderFilterPayload, Shortcut } from "@/components/shortcuts/shortcutTypes";
 
 // ─── Módulos carregados sob demanda ──────────────────────────────────────────
 // Cada módulo vira um chunk próprio; só é baixado quando a aba é aberta.
@@ -104,6 +107,50 @@ const AppInner = () => {
 	}, [goToTab]);
 	const abrirPaleta = useCallback(() => setPaletteOpen(true), []);
 	const fecharPaleta = useCallback(() => setPaletteOpen(false), []);
+
+	// ─── Atalhos programáveis (gaveta da borda direita) ──────────────────────
+	const { shortcuts, adicionar, remover, mover, cheio } = useShortcuts(user?.email);
+
+	// Sinal genérico de ação por módulo: o módulo alvo observa o nonce e reage.
+	const [quickAction, setQuickAction] = useState<{ tab: string; action: string; nonce: number } | null>(null);
+
+	// Filtro vindo de um atalho. O módulo Ordens aplica e o App limpa.
+	const [pendingOrderFilter, setPendingOrderFilter] =
+		useState<(OrderFilterPayload & { nonce: number }) | null>(null);
+
+	const runShortcut = useCallback(
+		(s: Shortcut) => {
+			if (s.kind === "module") {
+				goToTab(s.target);
+				return;
+			}
+			if (s.kind === "action") {
+				const acao = ACTIONS.find((a) => a.id === s.target);
+				if (!acao) return;
+				goToTab(acao.tab);
+				setQuickAction({ tab: acao.tab, action: acao.action, nonce: Date.now() });
+				return;
+			}
+			// Filtro salvo: só navega e entrega o payload. Nada aqui mexe em
+			// `newOrderSignal`, então o formulário de ordem não é perturbado.
+			if (s.kind === "orderFilter" && s.payload) {
+				goToTab("orders");
+				setPendingOrderFilter({ ...s.payload, nonce: Date.now() });
+			}
+		},
+		[goToTab]
+	);
+
+	const limparFiltroPendente = useCallback(() => setPendingOrderFilter(null), []);
+
+	// A ação "nova ordem" reaproveita o canal que já existe: o módulo Ordens
+	// observa `newOrderSignal` e abre o formulário (perguntando antes se há
+	// rascunho em jogo).
+	useEffect(() => {
+		if (quickAction?.tab === "orders" && quickAction.action === "new") {
+			setNewOrderSignal((n) => n + 1);
+		}
+	}, [quickAction?.nonce]);
 
 	// Estados de dados
 	const [clients, setClients] = useState<Client[]>([]);
@@ -321,6 +368,15 @@ const AppInner = () => {
 				onClose={fecharPaleta}
 				onGoTo={goToTab}
 				onNewOrder={abrirNovaOrdem}
+			/>
+
+			<ShortcutsDrawer
+				shortcuts={shortcuts}
+				onRun={runShortcut}
+				onAdd={adicionar}
+				onRemove={remover}
+				onMove={mover}
+				cheio={cheio}
 			/>
 		</div>
 	);
