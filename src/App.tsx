@@ -378,7 +378,7 @@ const AppInner = () => {
 								{painel("expenses", <ExpensesModule expenses={expenses} setExpenses={setExpenses} quickAction={quickAction} />)}
 								{painel("dre", <DreModule orders={orders} expenses={expenses} />)}
 								{painel("estudo", <EstudoModule />)}
-								{painel("nota-fiscal", <NotaFiscalModule orders={orders} />)}
+								{painel("nota-fiscal", <NotaFiscalModule orders={orders} quickAction={quickAction} />)}
 								{painel("users", <UsersModule />)}
 								{painel("db-security", <DatabaseSecurityModule />)}
 							</Suspense>
