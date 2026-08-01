@@ -885,9 +885,10 @@ export const ExpensesModule = ({
 						</Field>
 					</div>
 					<Field label='Observação'>
+						{/* `!` obrigatório: `.bg-white` do kit vem depois no CSS gerado. */}
 						<Textarea
 							rows={3}
-							className='resize-none bg-surface-sunken focus:bg-white'
+							className='resize-none !bg-surface-sunken focus:!bg-white'
 							value={formData.obs || ""}
 							onChange={(e) =>
 								setFormData({ ...formData, obs: e.target.value })

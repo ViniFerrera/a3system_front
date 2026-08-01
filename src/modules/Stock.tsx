@@ -600,9 +600,10 @@ export const StockModule = ({
 					</div>
 
 					<Field label='Saldo Atual'>
+						{/* `!` obrigatório: `.bg-white` do kit vem depois no CSS gerado. */}
 						<Input
 							type='number'
-							className='num bg-surface-sunken'
+							className='num !bg-surface-sunken'
 							value={formData.saldo || 0}
 							onChange={(e) =>
 								setFormData({ ...formData, saldo: Number(e.target.value) })

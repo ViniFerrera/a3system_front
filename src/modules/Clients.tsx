@@ -250,10 +250,11 @@ export const ClientsModule = ({
 			/>
 			<div className='relative group'>
 				<Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint group-focus-within:text-primary-500 transition-colors z-10' />
+				{/* `!` obrigatório: no CSS gerado `.h-9` do kit vem depois de `.h-11`. */}
 				<Input
 					type='text'
 					placeholder='Buscar por nome, telefone, email ou documento...'
-					className='!pl-10 h-11'
+					className='!pl-10 !h-11'
 					value={searchTerm}
 					onChange={(e) => setSearchTerm(e.target.value)}
 				/>
