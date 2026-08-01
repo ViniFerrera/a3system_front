@@ -35,6 +35,7 @@ import { EstudoModule } from "@/modules/Estudo";
 import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
 import { api } from "@/services/api";
 import { LoadingProvider, useLoading } from "@/components/ui/LoadingOverlay";
+import { ToastProvider } from "@/components/ui/Toast";
 
 // ─── Helpers de Auth ─────────────────────────────────────────────────────────
 interface JwtUser {
@@ -392,7 +393,9 @@ const AppInner = () => {
 
 const App = () => (
 	<LoadingProvider>
-		<AppInner />
+		<ToastProvider>
+			<AppInner />
+		</ToastProvider>
 	</LoadingProvider>
 );
 
