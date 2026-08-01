@@ -36,6 +36,7 @@ import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
 import { api } from "@/services/api";
 import { LoadingProvider, useLoading } from "@/components/ui/LoadingOverlay";
 import { ToastProvider } from "@/components/ui/Toast";
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 
 // ─── Helpers de Auth ─────────────────────────────────────────────────────────
 interface JwtUser {
@@ -394,7 +395,9 @@ const AppInner = () => {
 const App = () => (
 	<LoadingProvider>
 		<ToastProvider>
-			<AppInner />
+			<ConfirmProvider>
+				<AppInner />
+			</ConfirmProvider>
 		</ToastProvider>
 	</LoadingProvider>
 );
