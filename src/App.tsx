@@ -1,27 +1,31 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { Printer, Menu, X } from "lucide-react";
 import { LoginPage } from "@/pages/Login";
-import { DashboardModule } from "@/modules/Dashboard";
-import { OrderModule } from "@/modules/Orders";
-import { StockModule } from "@/modules/Stock";
-import { PricingModule } from "@/modules/Pricing";
-import { ClientsModule } from "@/modules/Clients";
-import { ExpensesModule } from "@/modules/Expenses";
-import { MachineryModule } from "@/modules/Machinery";
-import { AiInsightsModule } from "@/modules/AiInsights";
-import { UsersModule } from "@/modules/Users";
-import { DatabaseSecurityModule } from "@/modules/DatabaseSecurity";
-import { NotaFiscalModule } from "@/modules/NotaFiscal";
-import { DreModule } from "@/modules/Dre";
-import { EstudoModule } from "@/modules/Estudo";
 import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
 import { api } from "@/services/api";
-import { LoadingProvider, useLoading } from "@/components/ui/LoadingOverlay";
+import { LoadingProvider } from "@/components/ui/LoadingOverlay";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
+import { Skeleton, SkeletonTile } from "@/components/ui/Skeleton";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
 import { NAV_ITEMS } from "@/components/shell/navItems";
+
+// ─── Módulos carregados sob demanda ──────────────────────────────────────────
+// Cada módulo vira um chunk próprio; só é baixado quando a aba é aberta.
+const DashboardModule = lazy(() => import("@/modules/Dashboard").then((m) => ({ default: m.DashboardModule })));
+const OrderModule = lazy(() => import("@/modules/Orders").then((m) => ({ default: m.OrderModule })));
+const StockModule = lazy(() => import("@/modules/Stock").then((m) => ({ default: m.StockModule })));
+const PricingModule = lazy(() => import("@/modules/Pricing").then((m) => ({ default: m.PricingModule })));
+const ClientsModule = lazy(() => import("@/modules/Clients").then((m) => ({ default: m.ClientsModule })));
+const ExpensesModule = lazy(() => import("@/modules/Expenses").then((m) => ({ default: m.ExpensesModule })));
+const MachineryModule = lazy(() => import("@/modules/Machinery").then((m) => ({ default: m.MachineryModule })));
+const AiInsightsModule = lazy(() => import("@/modules/AiInsights").then((m) => ({ default: m.AiInsightsModule })));
+const UsersModule = lazy(() => import("@/modules/Users").then((m) => ({ default: m.UsersModule })));
+const DatabaseSecurityModule = lazy(() => import("@/modules/DatabaseSecurity").then((m) => ({ default: m.DatabaseSecurityModule })));
+const NotaFiscalModule = lazy(() => import("@/modules/NotaFiscal").then((m) => ({ default: m.NotaFiscalModule })));
+const DreModule = lazy(() => import("@/modules/Dre").then((m) => ({ default: m.DreModule })));
+const EstudoModule = lazy(() => import("@/modules/Estudo").then((m) => ({ default: m.EstudoModule })));
 
 // ─── Helpers de Auth ─────────────────────────────────────────────────────────
 interface JwtUser {
@@ -49,12 +53,20 @@ const decodeToken = (token: string): JwtUser | null => {
 
 // ─── App ─────────────────────────────────────────────────────────────────────
 const AppInner = () => {
-	const loading = useLoading();
 	const [user, setUser] = useState<JwtUser | null>(null);
 	const [authReady, setAuthReady] = useState(false);
 
 	const [activeTab, setActiveTab] = useState("dashboard");
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+	const [dadosCarregando, setDadosCarregando] = useState(true);
+
+	// Abas já abertas ao menos uma vez. Uma vez montado, o módulo não é
+	// desmontado — é o que preserva filtros e formulários entre trocas de aba.
+	const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(["dashboard"]));
+
+	useEffect(() => {
+		setVisitedTabs((prev) => (prev.has(activeTab) ? prev : new Set(prev).add(activeTab)));
+	}, [activeTab]);
 
 	// Menu recolhido sobrevive ao recarregamento da página.
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -114,7 +126,7 @@ const AppInner = () => {
 			}
 		};
 
-		loading.show("Carregando dados do sistema...");
+		setDadosCarregando(true);
 		Promise.all([
 			fetchSafe("/clients", setClients),
 			fetchSafe("/stock", setStock),
@@ -122,7 +134,7 @@ const AppInner = () => {
 			fetchSafe("/expenses", setExpenses),
 			fetchSafe("/pricing", setPriceTable),
 			fetchSafe("/machinery", setMachinery),
-		]).finally(() => loading.hide());
+		]).finally(() => setDadosCarregando(false));
 	}, [user]);
 
 	const handleStockUpdate = () => {
@@ -158,6 +170,16 @@ const AppInner = () => {
 
 	// ─── Navegação ────────────────────────────────────────────────────────────
 	const activeLabel = NAV_ITEMS.find((n) => n.id === activeTab)?.label ?? "";
+
+	// Auxiliar — é uma FUNÇÃO chamada, nunca um componente <Panel>. Um componente
+	// declarado aqui dentro seria recriado a cada render e o React remontaria o
+	// módulo inteiro a cada tecla digitada, destruindo o estado das abas.
+	const painel = (id: string, conteudo: React.ReactNode) =>
+		visitedTabs.has(id) ? (
+			<div key={id} style={{ display: activeTab === id ? "block" : "none" }}>
+				{conteudo}
+			</div>
+		) : null;
 
 	return (
 		<div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -214,54 +236,48 @@ const AppInner = () => {
 
 				<main className="flex-1 overflow-y-auto p-4 md:p-8 mt-14 md:mt-0">
 					<div className="max-w-7xl mx-auto">
-						<div style={{ display: activeTab === "dashboard" ? "block" : "none" }}>
-							<DashboardModule orders={orders} expenses={expenses} stock={stock} />
-						</div>
-						<div style={{ display: activeTab === "ai" ? "block" : "none" }}>
-							<AiInsightsModule />
-						</div>
-						<div style={{ display: activeTab === "orders" ? "block" : "none" }}>
-							<OrderModule
-								clients={clients}
-								priceTable={priceTable}
-								orders={orders}
-								setOrders={setOrders}
-								onStockUpdate={handleStockUpdate}
-								machinery={machinery}
-								setClients={setClients}
-								newOrderSignal={newOrderSignal}
-							/>
-						</div>
-						<div style={{ display: activeTab === "stock" ? "block" : "none" }}>
-							<StockModule stock={stock} setStock={setStock} priceTable={priceTable} />
-						</div>
-						<div style={{ display: activeTab === "machinery" ? "block" : "none" }}>
-							<MachineryModule machinery={machinery} setMachinery={setMachinery} stock={stock} />
-						</div>
-						<div style={{ display: activeTab === "pricing" ? "block" : "none" }}>
-							<PricingModule data={priceTable} setData={setPriceTable} />
-						</div>
-						<div style={{ display: activeTab === "clients" ? "block" : "none" }}>
-							<ClientsModule clients={clients} setClients={setClients} />
-						</div>
-						<div style={{ display: activeTab === "expenses" ? "block" : "none" }}>
-							<ExpensesModule expenses={expenses} setExpenses={setExpenses} />
-						</div>
-						<div style={{ display: activeTab === "dre" ? "block" : "none" }}>
-							<DreModule orders={orders} expenses={expenses} />
-						</div>
-						<div style={{ display: activeTab === "estudo" ? "block" : "none" }}>
-							<EstudoModule />
-						</div>
-						<div style={{ display: activeTab === "nota-fiscal" ? "block" : "none" }}>
-							<NotaFiscalModule orders={orders} />
-						</div>
-						<div style={{ display: activeTab === "users" ? "block" : "none" }}>
-							<UsersModule />
-						</div>
-						<div style={{ display: activeTab === "db-security" ? "block" : "none" }}>
-							<DatabaseSecurityModule />
-						</div>
+						{dadosCarregando ? (
+							<div className="space-y-4">
+								<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+									{Array.from({ length: 6 }).map((_, i) => <SkeletonTile key={i} />)}
+								</div>
+								<Skeleton className="h-64 w-full" />
+							</div>
+						) : (
+							<Suspense
+								fallback={
+									<div className="space-y-4">
+										<Skeleton className="h-24 w-full" />
+										<Skeleton className="h-64 w-full" />
+									</div>
+								}
+							>
+								{painel("dashboard", <DashboardModule orders={orders} expenses={expenses} stock={stock} />)}
+								{painel("ai", <AiInsightsModule />)}
+								{painel("orders", (
+									<OrderModule
+										clients={clients}
+										priceTable={priceTable}
+										orders={orders}
+										setOrders={setOrders}
+										onStockUpdate={handleStockUpdate}
+										machinery={machinery}
+										setClients={setClients}
+										newOrderSignal={newOrderSignal}
+									/>
+								))}
+								{painel("stock", <StockModule stock={stock} setStock={setStock} priceTable={priceTable} />)}
+								{painel("machinery", <MachineryModule machinery={machinery} setMachinery={setMachinery} stock={stock} />)}
+								{painel("pricing", <PricingModule data={priceTable} setData={setPriceTable} />)}
+								{painel("clients", <ClientsModule clients={clients} setClients={setClients} />)}
+								{painel("expenses", <ExpensesModule expenses={expenses} setExpenses={setExpenses} />)}
+								{painel("dre", <DreModule orders={orders} expenses={expenses} />)}
+								{painel("estudo", <EstudoModule />)}
+								{painel("nota-fiscal", <NotaFiscalModule orders={orders} />)}
+								{painel("users", <UsersModule />)}
+								{painel("db-security", <DatabaseSecurityModule />)}
+							</Suspense>
+						)}
 					</div>
 				</main>
 			</div>

@@ -14,4 +14,15 @@ export default defineConfig({
 		port: 7072,
 		host: true,
 	},
+	build: {
+		rollupOptions: {
+			output: {
+				manualChunks: {
+					recharts: ["recharts"],
+					xlsx: ["xlsx"],
+					markdown: ["react-markdown"],
+				},
+			},
+		},
+	},
 });
