@@ -18,6 +18,7 @@ import { ServiceMixChart } from "./dashboard/ServiceMixChart";
 import { VolumeRevenueChart } from "./dashboard/VolumeRevenueChart";
 import { TicketBandsCard } from "./dashboard/TicketBandsCard";
 import { ConcentrationCard } from "./dashboard/ConcentrationCard";
+import { RetentionCard } from "./dashboard/RetentionCard";
 
 type OrderStatusFilter = "CONCLUIDA" | "ABERTA" | "CANCELADA" | "ALL";
 type PeriodPreset = "30d" | "3m" | "6m" | "12m" | "custom";
@@ -570,8 +571,10 @@ export const DashboardModule = ({
 				<ConcentrationCard metrics={metrics} />
 			</div>
 
-			{/* ── Top Clientes ── */}
+			{/* ── Retenção + Top Clientes ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+				<RetentionCard metrics={metrics} />
+
 				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
 					<h4 className="text-base font-bold text-slate-800">Top Clientes</h4>
 					<p className="text-xs text-slate-400 mt-0.5 mb-4">Ranking por receita</p>
@@ -583,12 +586,15 @@ export const DashboardModule = ({
 									<div className="flex-1 min-w-0">
 										<div className="flex items-center justify-between mb-1">
 											<span className="text-xs font-semibold text-slate-700 truncate pr-2">{c.name}</span>
-											<span className="text-xs font-bold text-slate-800 flex-shrink-0">{fmt(c.revenue)}</span>
+											{/* Volume ao lado da receita: o ranking passa a mostrar os dois. */}
+											<span className="flex items-baseline gap-2 flex-shrink-0">
+												<span className="num text-2xs text-ink-faint">{c.volume} OS</span>
+												<span className="text-xs font-bold text-slate-800">{fmt(c.revenue)}</span>
+											</span>
 										</div>
 										<div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
 											<div className="h-full bg-gradient-to-r from-indigo-400 to-violet-500 rounded-full" style={{ width: `${(c.revenue / maxClientRevenue) * 100}%` }} />
 										</div>
-										<p className="text-[10px] text-slate-400 mt-0.5">{c.volume} pedido{c.volume !== 1 ? "s" : ""}</p>
 									</div>
 								</div>
 							))}
@@ -658,6 +664,17 @@ export const DashboardModule = ({
 							</Bar>
 						</BarChart>
 					</ResponsiveContainer>
+					{/* O gráfico segue igual — só ganhou a contagem ao lado do valor. */}
+					<div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+						{dayOfWeekData.map((d) => (
+							<div key={d.name} className="flex items-center justify-between text-xs">
+								<span className="font-semibold text-ink-muted">{d.name}</span>
+								<span className="num text-2xs text-ink-faint">
+									{d.count} OS · {fmt(d.revenue)}
+								</span>
+							</div>
+						))}
+					</div>
 				</div>
 
 				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
