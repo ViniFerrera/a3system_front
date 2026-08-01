@@ -4,13 +4,14 @@ import {
 	ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart,
 } from "recharts";
 import {
-	TrendingUp, Wallet, ArrowDownRight, ArrowUpRight, Filter,
+	TrendingUp, Wallet, ArrowDownRight, Filter,
 	CheckCircle2, Clock, XCircle, BarChart2, AlertTriangle, Receipt,
-	Target, Package, RefreshCw, DollarSign, ChevronDown,
+	Target, Package, RefreshCw, DollarSign,
 } from "lucide-react";
 import { Order, Expense, StockItem } from "@/types";
 import { Utils } from "@/utils";
 import { MultiSelect } from "@/components/ui/MultiSelect";
+import { StatTile } from "@/components/ui/StatTile";
 import { fetchDashboardMetrics, DashboardMetrics } from "@/services/dashboardMetrics";
 import { BreakEvenCard } from "./dashboard/BreakEvenCard";
 
@@ -47,29 +48,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 		</div>
 	);
 };
-
-interface KpiCardProps {
-	label: string; value: string; sub: string;
-	icon: React.ReactNode; gradient: string; trend?: number;
-}
-const KpiCard = ({ label, value, sub, icon, gradient, trend }: KpiCardProps) => (
-	<div className={`rounded-2xl p-3.5 sm:p-5 text-white shadow-lg ${gradient} relative overflow-hidden group hover:shadow-xl transition-shadow duration-200`}>
-		<div className="absolute right-3 top-3 opacity-[0.10] scale-[2.2] origin-center group-hover:scale-[2.4] transition-transform duration-300">{icon}</div>
-		<div className="relative z-10">
-			<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1.5">{label}</p>
-			<p className="text-lg sm:text-2xl font-bold leading-tight tracking-tight tabular-nums">{value}</p>
-			<div className="flex items-center gap-2 mt-2 flex-wrap">
-				<p className="text-white/60 text-xs">{sub}</p>
-				{trend !== undefined && (
-					<span className={`flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${trend >= 0 ? "bg-white/20" : "bg-black/15"}`}>
-						{trend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-						{Math.abs(trend).toFixed(1)}%
-					</span>
-				)}
-			</div>
-		</div>
-	</div>
-);
 
 // ─── Local date string (YYYY-MM-DD) sem conversão UTC ────────────────────────
 const toLocalDate = (d: Date) =>
@@ -168,14 +146,25 @@ export const DashboardModule = ({
 		[expenses, startDate, endDate]);
 
 	// ── Dados do período anterior (tendência) ────────────────────────────────
-	const prevRevenue = useMemo(() => {
+	// A janela anterior tem a mesma duração e termina na véspera do início.
+	// `new Date("YYYY-MM-DD")` ancora em meia-noite UTC, então o recorte volta
+	// com `toISOString()`: os getters locais deslocariam um dia em UTC-3.
+	const prevRange = useMemo(() => {
 		const dur = new Date(endDate).getTime() - new Date(startDate).getTime() + 86400000;
 		const pe = new Date(new Date(startDate).getTime() - 1);
 		const ps = new Date(pe.getTime() - dur + 1);
-		return orders
-			.filter((o) => o.status !== "CANCELADA" && (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, ps.toISOString().split("T")[0], pe.toISOString().split("T")[0]))
-			.reduce((acc, o) => acc + o.total, 0);
-	}, [orders, startDate, endDate, orderStatusFilter]);
+		return { start: ps.toISOString().split("T")[0], end: pe.toISOString().split("T")[0] };
+	}, [startDate, endDate]);
+
+	const prevOrders = useMemo(() => orders.filter((o) =>
+		o.status !== "CANCELADA"
+		&& (orderStatusFilter === "ALL" || o.status === orderStatusFilter)
+		&& filterByDate(o.data_conclusao || o.data, prevRange.start, prevRange.end)
+	), [orders, prevRange, orderStatusFilter]);
+
+	const prevRevenue = useMemo(() =>
+		prevOrders.reduce((acc, o) => acc + o.total, 0),
+		[prevOrders]);
 
 	// ── Status counts ─────────────────────────────────────────────────────────
 	const statusCounts = useMemo(() => ({
@@ -195,8 +184,16 @@ export const DashboardModule = ({
 			.filter((o) => o.status !== "CANCELADA" && (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, startDate, endDate) && (o.status_pagamento || "NAO_PAGO") !== "PAGO")
 			.reduce((acc, o) => acc + o.total, 0);
 		const revTrend = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : undefined;
-		return { revenue, expense, profit, margin, ticket, toReceive, revTrend };
-	}, [currentOrders, currentExpenses, prevRevenue, orders, startDate, endDate, orderStatusFilter]);
+		// Volume e ticket do período anterior, para as variações dos tiles novos.
+		const volTrend = prevOrders.length > 0
+			? ((currentOrders.length - prevOrders.length) / prevOrders.length) * 100
+			: undefined;
+		const prevTicket = prevOrders.length > 0
+			? prevOrders.reduce((a, o) => a + calcOrderTotal(o), 0) / prevOrders.length
+			: 0;
+		const ticketTrend = prevTicket > 0 ? ((ticket - prevTicket) / prevTicket) * 100 : undefined;
+		return { revenue, expense, profit, margin, ticket, toReceive, revTrend, volTrend, ticketTrend };
+	}, [currentOrders, currentExpenses, prevRevenue, prevOrders, orders, startDate, endDate, orderStatusFilter, selectedServices]);
 
 	// ── Gráfico Mensal (dinâmico baseado no período) ──────────────────────────
 	const monthlyData = useMemo(() => {
@@ -233,6 +230,13 @@ export const DashboardModule = ({
 			lucro: d.receita_concluida + d.receita_aberta - d.despesa,
 		}));
 	}, [orders, expenses, selectedServices, selectedPaymentStatus, orderStatusFilter, startDate, endDate]);
+
+	// ── Sparklines dos KPIs (derivados do mesmo array do gráfico mensal) ──────
+	const sparks = useMemo(() => ({
+		receita: monthlyData.map((m) => m.receita_concluida + m.receita_aberta),
+		despesa: monthlyData.map((m) => m.despesa),
+		lucro: monthlyData.map((m) => m.lucro),
+	}), [monthlyData]);
 
 	// ── Dados do filtro inferior ──────────────────────────────────────────────
 	const bottomOrders = useMemo(() => orders.filter((o) => {
@@ -411,13 +415,21 @@ export const DashboardModule = ({
 			</div>
 
 			{/* ── KPI Cards ── */}
-			<div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-				<KpiCard label="Receita" value={fmt(kpis.revenue)} sub={`${currentOrders.length} ordens`} icon={<TrendingUp />} gradient="bg-gradient-to-br from-emerald-400 to-emerald-600" trend={kpis.revTrend} />
-				<KpiCard label="Despesas" value={fmt(kpis.expense)} sub="pagas no período" icon={<ArrowDownRight />} gradient="bg-gradient-to-br from-rose-400 to-rose-600" />
-				<KpiCard label="Lucro Líquido" value={fmt(kpis.profit)} sub={`Margem: ${kpis.margin.toFixed(1)}%`} icon={<Wallet />} gradient={kpis.profit >= 0 ? "bg-gradient-to-br from-indigo-500 to-violet-600" : "bg-gradient-to-br from-orange-500 to-red-600"} />
-				<KpiCard label="Ticket Médio" value={fmt(kpis.ticket)} sub="por ordem" icon={<Receipt />} gradient="bg-gradient-to-br from-sky-400 to-sky-600" />
-				<KpiCard label="Total de OS" value={String(currentOrders.length)} sub={`${statusCounts.open} em aberto`} icon={<Target />} gradient="bg-gradient-to-br from-violet-500 to-purple-600" />
-				<KpiCard label="A Receber" value={fmt(kpis.toReceive)} sub="pendente + parcial" icon={<DollarSign />} gradient={kpis.toReceive > 0 ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-slate-400 to-slate-500"} />
+			{/* Os gradientes de `accent` são literais de propósito: o Tailwind varre
+			    o código estaticamente e classe montada por concatenação não vira CSS. */}
+			<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+				<StatTile label="Receita" value={fmt(kpis.revenue)} sub="no período" icon={<TrendingUp className="w-4 h-4" />}
+					accent="from-emerald-400 to-emerald-600" sparkColor="#10b981" trend={kpis.revTrend} spark={sparks.receita} />
+				<StatTile label="Volume de OS" value={String(currentOrders.length)} sub={`${statusCounts.open} em aberto`} icon={<Target className="w-4 h-4" />}
+					accent="from-violet-500 to-purple-600" sparkColor="#8b5cf6" trend={kpis.volTrend} />
+				<StatTile label="Ticket Médio" value={fmt(kpis.ticket)} sub="por ordem" icon={<Receipt className="w-4 h-4" />}
+					accent="from-sky-400 to-sky-600" sparkColor="#0ea5e9" trend={kpis.ticketTrend} />
+				<StatTile label="Despesas" value={fmt(kpis.expense)} sub="pagas no período" icon={<ArrowDownRight className="w-4 h-4" />}
+					accent="from-rose-400 to-rose-600" sparkColor="#f43f5e" spark={sparks.despesa} />
+				<StatTile label="Lucro Líquido" value={fmt(kpis.profit)} sub={`Margem: ${kpis.margin.toFixed(1)}%`} icon={<Wallet className="w-4 h-4" />}
+					accent={kpis.profit >= 0 ? "from-primary-500 to-violet-600" : "from-orange-500 to-red-600"} sparkColor="#6366f1" spark={sparks.lucro} />
+				<StatTile label="A Receber" value={fmt(kpis.toReceive)} sub="pendente + parcial" icon={<DollarSign className="w-4 h-4" />}
+					accent={kpis.toReceive > 0 ? "from-amber-400 to-orange-500" : "from-slate-400 to-slate-500"} sparkColor="#f59e0b" />
 			</div>
 
 			{/* ── Aviso discreto: só os blocos de métricas agregadas dependem da rota ── */}
