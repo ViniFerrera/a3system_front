@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, AlertTriangle, Info, X } from "lucide-react";
 
 type ToastKind = "success" | "error" | "info";
@@ -26,22 +26,30 @@ export const useToast = () => useContext(ToastContext);
 const STYLES: Record<ToastKind, { box: string; icon: React.ReactNode }> = {
 	success: {
 		box: "bg-white border-success-200 text-ink",
-		icon: <CheckCircle2 className="w-5 h-5 text-success-600 flex-shrink-0" />,
+		icon: <CheckCircle2 className="w-5 h-5 text-success-600 flex-shrink-0" aria-hidden="true" />,
 	},
 	error: {
 		box: "bg-white border-danger-200 text-ink",
-		icon: <AlertTriangle className="w-5 h-5 text-danger-600 flex-shrink-0" />,
+		icon: <AlertTriangle className="w-5 h-5 text-danger-600 flex-shrink-0" aria-hidden="true" />,
 	},
 	info: {
 		box: "bg-white border-info-200 text-ink",
-		icon: <Info className="w-5 h-5 text-info-600 flex-shrink-0" />,
+		icon: <Info className="w-5 h-5 text-info-600 flex-shrink-0" aria-hidden="true" />,
 	},
 };
 
 export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
 	const [items, setItems] = useState<ToastItem[]>([]);
+	// Um timer por aviso: fechar no "X" precisa cancelar o timer correspondente,
+	// senão ele sobrevive ao aviso e ainda dispara um setState depois.
+	const timers = useRef(new Map<number, number>());
 
 	const remove = useCallback((id: number) => {
+		const timer = timers.current.get(id);
+		if (timer !== undefined) {
+			window.clearTimeout(timer);
+			timers.current.delete(id);
+		}
 		setItems((prev) => prev.filter((t) => t.id !== id));
 	}, []);
 
@@ -50,21 +58,41 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
 			const id = Date.now() + Math.random();
 			setItems((prev) => [...prev, { id, kind, message }]);
 			// Erro fica mais tempo na tela — costuma exigir leitura.
-			window.setTimeout(() => remove(id), kind === "error" ? 7000 : 4000);
+			timers.current.set(
+				id,
+				window.setTimeout(() => remove(id), kind === "error" ? 7000 : 4000)
+			);
 		},
 		[remove]
 	);
 
-	const api: ToastApi = {
-		success: useCallback((m: string) => push("success", m), [push]),
-		error: useCallback((m: string) => push("error", m), [push]),
-		info: useCallback((m: string) => push("info", m), [push]),
-	};
+	// Nenhum timer pode sobreviver ao provider.
+	useEffect(() => {
+		const pending = timers.current;
+		return () => {
+			pending.forEach((timer) => window.clearTimeout(timer));
+			pending.clear();
+		};
+	}, []);
+
+	const success = useCallback((m: string) => push("success", m), [push]);
+	const error = useCallback((m: string) => push("error", m), [push]);
+	const info = useCallback((m: string) => push("info", m), [push]);
+	// Sem o memo, o objeto muda de identidade a cada aviso e re-renderiza
+	// todo componente que chamou useToast().
+	const api = useMemo<ToastApi>(() => ({ success, error, info }), [success, error, info]);
 
 	return (
 		<ToastContext.Provider value={api}>
 			{children}
-			<div className="fixed bottom-5 right-5 z-[10000] flex flex-col gap-2 w-[min(380px,calc(100vw-2.5rem))]">
+			{/* Região viva permanente: leitores de tela anunciam o aviso inserido
+			    de forma confiável, o que não acontece quando a própria região
+			    só aparece junto com o conteúdo. */}
+			<div
+				aria-live="polite"
+				aria-atomic="false"
+				className="fixed bottom-5 right-5 z-[10000] flex flex-col gap-2 w-[min(380px,calc(100vw-2.5rem))]"
+			>
 				{items.map((t) => (
 					<div
 						key={t.id}
@@ -74,11 +102,12 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
 						{STYLES[t.kind].icon}
 						<p className="text-sm font-medium flex-1">{t.message}</p>
 						<button
+							type="button"
 							onClick={() => remove(t.id)}
 							className="text-ink-faint hover:text-ink transition-colors"
 							aria-label="Fechar aviso"
 						>
-							<X className="w-4 h-4" />
+							<X className="w-4 h-4" aria-hidden="true" />
 						</button>
 					</div>
 				))}
