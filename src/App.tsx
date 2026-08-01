@@ -374,7 +374,7 @@ const AppInner = () => {
 								{painel("stock", <StockModule stock={stock} setStock={setStock} priceTable={priceTable} />)}
 								{painel("machinery", <MachineryModule machinery={machinery} setMachinery={setMachinery} stock={stock} />)}
 								{painel("pricing", <PricingModule data={priceTable} setData={setPriceTable} />)}
-								{painel("clients", <ClientsModule clients={clients} setClients={setClients} />)}
+								{painel("clients", <ClientsModule clients={clients} setClients={setClients} quickAction={quickAction} />)}
 								{painel("expenses", <ExpensesModule expenses={expenses} setExpenses={setExpenses} />)}
 								{painel("dre", <DreModule orders={orders} expenses={expenses} />)}
 								{painel("estudo", <EstudoModule />)}
