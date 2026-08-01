@@ -1554,7 +1554,10 @@ export const OrderModule = ({
 							</label>
 							<Input
 								type='number'
-								className='w-20 text-center font-bold'
+								// `!w-20`: o Input do kit já traz `w-full`, e no CSS gerado
+								// `.w-full` vem depois de `.w-20` — sem o `!` o campo de
+								// desconto esticava e esmagava o Total Final no rodapé.
+								className='!w-20 text-center font-bold'
 								value={formData.desconto_pontual || 0}
 								onChange={(e) =>
 									setFormData({
