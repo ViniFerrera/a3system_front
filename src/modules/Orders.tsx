@@ -227,6 +227,22 @@ const EXT_PERMITIDAS = [
 	"doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "zip", "rar",
 ];
 
+/** Estado do formulário que decide se há algo a perder ao trocar de ordem. */
+interface RascunhoState {
+	formData: Partial<Order>;
+	gridItems: EditableItem[];
+	filesToUpload: File[];
+}
+
+// Rascunho é qualquer coisa que o usuário já tenha preenchido. Fica fora do
+// componente para os dois caminhos de descarte (fechar o modal e "nova ordem"
+// vinda da topbar/paleta) usarem exatamente a mesma régua.
+const temRascunho = (estado: RascunhoState) =>
+	!!estado.formData.cliente_id ||
+	!!estado.formData.descricao ||
+	estado.gridItems.some((i) => i.servico) ||
+	estado.filesToUpload.length > 0;
+
 export const OrderModule = ({
 	clients,
 	priceTable,
@@ -898,11 +914,7 @@ export const OrderModule = ({
 	// Fechar com dados preenchidos pede confirmação — hoje o preenchimento
 	// evapora sem aviso.
 	const handleCloseModal = async () => {
-		const temConteudo =
-			!!formData.cliente_id ||
-			!!formData.descricao ||
-			gridItems.some((i) => i.servico) ||
-			filesToUpload.length > 0;
+		const temConteudo = temRascunho({ formData, gridItems, filesToUpload });
 		if (temConteudo && !editingOrder) {
 			const ok = await confirm({
 				title: "Descartar esta ordem?",
@@ -950,10 +962,63 @@ export const OrderModule = ({
 		clients,
 	]);
 
+	// Espelho do formulário para o efeito abaixo consultar sem depender dele.
+	// Se `formData`/`gridItems` entrassem nas dependências, o efeito re-rodaria
+	// a cada tecla digitada e perguntaria sozinho no meio do preenchimento.
+	const formStateRef = useRef({
+		isModalOpen,
+		editingOrder,
+		formData,
+		gridItems,
+		filesToUpload,
+	});
+	useEffect(() => {
+		formStateRef.current = {
+			isModalOpen,
+			editingOrder,
+			formData,
+			gridItems,
+			filesToUpload,
+		};
+	});
+
 	// Abre o formulário quando a topbar/paleta/atalho pede "nova ordem".
 	// Ignora o valor inicial 0 para não abrir sozinho no primeiro render.
+	//
+	// Com o formulário aberto e algo em jogo — rascunho novo ou edição de uma
+	// ordem existente —, pergunta antes: `openModal()` faz o reset completo e
+	// não há como voltar atrás depois dele. Recusando, nada é tocado.
 	useEffect(() => {
-		if (newOrderSignal > 0) openModal();
+		if (newOrderSignal <= 0) return;
+		// Um sinal mais novo (ou uma recusa) não pode abrir o formulário depois
+		// que este efeito já foi substituído — o módulo nunca desmonta.
+		let cancelado = false;
+		const pedirNovaOrdem = async () => {
+			const atual = formStateRef.current;
+			const emJogo =
+				atual.isModalOpen && (!!atual.editingOrder || temRascunho(atual));
+			if (emJogo) {
+				const ok = await confirm({
+					title: "Descartar e começar uma ordem nova?",
+					message: atual.editingOrder
+						? `As alterações da ordem #${atual.editingOrder.id} serão perdidas.`
+						: "O que você preencheu será perdido.",
+					confirmLabel: "Começar nova",
+					cancelLabel: "Continuar editando",
+					danger: true,
+				});
+				if (!ok) return;
+			}
+			if (cancelado) return;
+			openModal();
+		};
+		pedirNovaOrdem();
+		return () => {
+			cancelado = true;
+		};
+		// Depende só do sinal, de propósito: `confirm` é estável e o resto do
+		// estado é lido pelo ref.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [newOrderSignal]);
 
 	const clientOptions = useMemo(
