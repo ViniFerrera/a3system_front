@@ -371,7 +371,7 @@ const AppInner = () => {
 										onSaveFilterAsShortcut={salvarFiltroComoAtalho}
 									/>
 								))}
-								{painel("stock", <StockModule stock={stock} setStock={setStock} priceTable={priceTable} />)}
+								{painel("stock", <StockModule stock={stock} setStock={setStock} priceTable={priceTable} quickAction={quickAction} />)}
 								{painel("machinery", <MachineryModule machinery={machinery} setMachinery={setMachinery} stock={stock} />)}
 								{painel("pricing", <PricingModule data={priceTable} setData={setPriceTable} />)}
 								{painel("clients", <ClientsModule clients={clients} setClients={setClients} quickAction={quickAction} />)}

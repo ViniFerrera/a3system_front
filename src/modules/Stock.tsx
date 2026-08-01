@@ -5,6 +5,15 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { MultiSelect } from "@/components/ui/MultiSelect";
+import {
+	Button,
+	EmptyState,
+	Field,
+	Input,
+	Select,
+	useConfirm,
+	useToast,
+} from "@/components/ui";
 import { StockItem, PriceRule } from "@/types";
 import * as XLSX from "xlsx";
 import {
@@ -38,18 +47,24 @@ export const StockModule = ({
 	stock,
 	setStock,
 	priceTable,
+	quickAction,
 }: {
 	stock: StockItemWithToner[];
 	setStock: Function;
 	priceTable: PriceRule[];
+	quickAction?: { tab: string; action: string; nonce: number } | null;
 }) => {
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const toast = useToast();
+	const confirm = useConfirm();
 	const [searchTerm, setSearchTerm] = useState("");
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [editingItem, setEditingItem] = useState<StockItemWithToner | null>(
 		null
 	);
 	const [machinesList, setMachinesList] = useState<Machine[]>([]);
+	const [isSaving, setIsSaving] = useState(false);
+	const [isImporting, setIsImporting] = useState(false);
 
 	useEffect(() => {
 		api
@@ -177,6 +192,7 @@ export const StockModule = ({
 		const file = e.target.files?.[0];
 		if (!file) return;
 
+		setIsImporting(true);
 		const reader = new FileReader();
 		reader.onload = async (evt) => {
 			try {
@@ -213,14 +229,21 @@ export const StockModule = ({
 					await Promise.all(promises);
 					const res = await api.get("/stock");
 					setStock(res.data);
-					alert(`${normalizedData.length} itens importados com sucesso.`);
+					toast.success(`${normalizedData.length} itens importados com sucesso.`);
 				} else {
-					alert("O arquivo parece estar vazio ou ilegível.");
+					toast.error("O arquivo parece estar vazio ou ilegível.");
 				}
 			} catch (err) {
 				console.error(err);
-				alert("Erro ao importar arquivo Excel.");
+				toast.error("Erro ao importar arquivo Excel.");
+			} finally {
+				setIsImporting(false);
 			}
+		};
+		// Sem isto, uma falha de leitura deixaria o botão preso em "carregando".
+		reader.onerror = () => {
+			setIsImporting(false);
+			toast.error("Erro ao ler o arquivo.");
 		};
 		reader.readAsBinaryString(file);
 		if (fileInputRef.current) fileInputRef.current.value = "";
@@ -228,7 +251,7 @@ export const StockModule = ({
 
 	const handleSave = async () => {
 		if (!formData.nome || !formData.unidade) {
-			alert("Nome e Unidade são obrigatórios.");
+			toast.error("Nome e Unidade são obrigatórios.");
 			return;
 		}
 
@@ -249,6 +272,7 @@ export const StockModule = ({
 			maquinas_associadas_ids: JSON.stringify(selectedIds),
 		};
 
+		setIsSaving(true);
 		try {
 			if (editingItem && editingItem.id) {
 				const res = await api.put(`/stock/${editingItem.id}`, payload);
@@ -273,23 +297,32 @@ export const StockModule = ({
 			setEditingItem(null);
 			setFormData(initialFormState);
 			setSelectedMachineNames([]);
+			toast.success("Item salvo com sucesso.");
 		} catch (err) {
 			console.error(err);
-			alert("Erro ao salvar item.");
+			toast.error("Erro ao salvar item.");
+		} finally {
+			setIsSaving(false);
 		}
 	};
 
 	const handleDelete = async (id: number) => {
 		if (!id) return;
-		if (confirm("Tem certeza que deseja excluir este item?")) {
-			try {
-				await api.delete(`/stock/${id}`);
-				setStock((prev: StockItemWithToner[]) =>
-					prev.filter((item) => String(item.id) !== String(id))
-				);
-			} catch (err) {
-				alert("Erro ao excluir item.");
-			}
+		const ok = await confirm({
+			title: "Excluir item?",
+			message: "Tem certeza que deseja excluir este item?",
+			confirmLabel: "Excluir",
+			danger: true,
+		});
+		if (!ok) return;
+		try {
+			await api.delete(`/stock/${id}`);
+			setStock((prev: StockItemWithToner[]) =>
+				prev.filter((item) => String(item.id) !== String(id))
+			);
+			toast.success("Item excluído.");
+		} catch (err) {
+			toast.error("Erro ao excluir item.");
 		}
 	};
 
@@ -309,35 +342,41 @@ export const StockModule = ({
 		setIsModalOpen(true);
 	};
 
+	// Ação rápida vinda da gaveta de atalhos: abre o formulário em branco.
+	useEffect(() => {
+		if (quickAction?.tab === "stock" && quickAction.action === "new") openModal();
+	}, [quickAction?.nonce]);
+
 	return (
 		<div className='space-y-6 pb-20'>
 			<div className='flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200/60 shadow-card'>
 				<div>
-					<h2 className='text-xl font-bold text-slate-800 flex items-center gap-2'>
-						<Box className='w-5 h-5 text-indigo-600' /> Controle de Estoque
+					<h2 className='text-lg font-bold text-ink flex items-center gap-2'>
+						<Box className='w-5 h-5 text-primary-600' /> Controle de Estoque
 					</h2>
-					<p className='text-xs text-slate-500 mt-1'>
+					<p className='text-xs text-ink-faint mt-1'>
 						Gerencie papéis, insumos e toners.
 					</p>
 				</div>
 
-				<div className='flex w-full md:w-auto gap-3'>
+				<div className='flex flex-wrap w-full md:w-auto gap-3'>
 					<div className='relative group flex-1 md:w-56'>
-						<Search className='absolute left-3 top-2.5 w-4 h-4 text-slate-400' />
-						<input
+						<Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint z-10' />
+						<Input
 							type='text'
 							placeholder='Buscar...'
-							className='w-full pl-9 pr-4 py-2 border border-slate-200 rounded-[8px] focus:ring-2 focus:ring-indigo-500 text-sm outline-none'
+							className='!pl-9'
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
 						/>
 					</div>
-					<button
+					<Button
+						variant='secondary'
 						onClick={handleExportExcel}
-						className='flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2 rounded-[8px] hover:bg-slate-50 transition text-sm font-medium shadow-sm'
+						icon={<Download className='w-4 h-4' />}
 					>
-						<Download className='w-4 h-4' /> Exportar
-					</button>
+						Exportar
+					</Button>
 					<input
 						type='file'
 						ref={fileInputRef}
@@ -345,18 +384,17 @@ export const StockModule = ({
 						className='hidden'
 						accept='.csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel'
 					/>
-					<button
+					<Button
+						variant='secondary'
 						onClick={() => fileInputRef.current?.click()}
-						className='flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-[8px] hover:bg-slate-900 transition text-sm font-medium shadow-sm'
+						loading={isImporting}
+						icon={<Upload className='w-4 h-4' />}
 					>
-						<Upload className='w-4 h-4' /> Importar
-					</button>
-					<button
-						onClick={() => openModal()}
-						className='flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-[8px] hover:bg-slate-900 transition text-sm font-medium'
-					>
-						<Plus className='w-4 h-4' /> Novo Item
-					</button>
+						Importar
+					</Button>
+					<Button onClick={() => openModal()} icon={<Plus className='w-4 h-4' />}>
+						Novo Item
+					</Button>
 				</div>
 			</div>
 
@@ -369,14 +407,14 @@ export const StockModule = ({
 						<div key={groupKey} className='animate-in fade-in duration-500'>
 							<div className='flex items-center gap-2 mb-3 border-b border-slate-200 pb-2'>
 								{isTonerGroup ? (
-									<Printer className='w-5 h-5 text-indigo-600' />
+									<Printer className='w-5 h-5 text-primary-600' />
 								) : (
-									<Layers className='w-5 h-5 text-slate-400' />
+									<Layers className='w-5 h-5 text-ink-faint' />
 								)}
-								<h3 className='text-lg font-bold text-slate-700 capitalize'>
+								<h3 className='text-lg font-bold text-ink capitalize'>
 									{groupKey}
 								</h3>
-								<span className='text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold'>
+								<span className='num text-xs bg-slate-100 text-ink-muted px-2 py-0.5 rounded-full font-bold'>
 									{items.length}
 								</span>
 							</div>
@@ -385,31 +423,31 @@ export const StockModule = ({
 								{items.map((item) => (
 									<Card
 										key={item.id}
-										className={`p-3 relative group hover:border-indigo-300 transition-all duration-200 bg-white flex flex-col justify-between ${
+										className={`p-3 relative group hover:border-primary-300 transition-all duration-200 bg-white flex flex-col justify-between ${
 											item.saldo < item.minimo
-												? "border-red-200 bg-red-50/30"
+												? "border-danger-200 bg-danger-50/30"
 												: ""
 										}`}
 									>
 										<div className='flex justify-between items-start mb-2'>
 											<div className='pr-6'>
-												<h4 className='font-bold text-slate-700 text-sm leading-tight line-clamp-2'>
+												<h4 className='font-bold text-ink text-sm leading-tight line-clamp-2'>
 													{item.nome}
 												</h4>
 												<div className='flex flex-wrap gap-1 mt-1.5'>
 													{item.is_toner ? (
-														<span className='text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 font-medium'>
+														<span className='num text-2xs bg-primary-50 text-primary-700 px-1.5 py-0.5 rounded border border-primary-100 font-medium'>
 															{item.print_yield} pgs/un
 														</span>
 													) : (
 														<>
 															{item.associacao_especificacao && (
-																<span className='text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded'>
+																<span className='text-2xs bg-slate-100 text-ink-muted px-1.5 py-0.5 rounded'>
 																	{item.associacao_especificacao}
 																</span>
 															)}
 															{item.associacao_tamanho && (
-																<span className='text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded'>
+																<span className='text-2xs bg-slate-100 text-ink-muted px-1.5 py-0.5 rounded'>
 																	{item.associacao_tamanho}
 																</span>
 															)}
@@ -417,7 +455,7 @@ export const StockModule = ({
 													)}
 													{item.maquinas_associadas_ids &&
 														item.maquinas_associadas_ids.length > 0 && (
-															<span className='text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 font-medium flex items-center gap-1'>
+															<span className='num text-2xs bg-success-50 text-success-700 px-1.5 py-0.5 rounded border border-success-100 font-medium flex items-center gap-1'>
 																<Settings className='w-3 h-3' />{" "}
 																{item.maquinas_associadas_ids.length} Maq.
 															</span>
@@ -427,13 +465,15 @@ export const StockModule = ({
 											<div className='absolute top-3 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity'>
 												<button
 													onClick={() => openModal(item)}
-													className='p-1 text-slate-400 hover:text-indigo-600 transition'
+													className='p-1 text-ink-faint hover:text-primary-600 transition'
+													title='Editar item'
 												>
 													<Edit2 className='w-3.5 h-3.5' />
 												</button>
 												<button
 													onClick={() => handleDelete(item.id!)}
-													className='p-1 text-slate-400 hover:text-red-600 transition'
+													className='p-1 text-ink-faint hover:text-danger-600 transition'
+													title='Excluir item'
 												>
 													<Trash2 className='w-3.5 h-3.5' />
 												</button>
@@ -442,27 +482,27 @@ export const StockModule = ({
 
 										<div className='flex items-end justify-between mt-2 pt-2 border-t border-slate-200/60 border-dashed'>
 											<div className='flex flex-col'>
-												<span className='text-[10px] text-slate-400 uppercase font-bold'>
+												<span className='text-2xs text-ink-faint uppercase font-bold'>
 													Saldo
 												</span>
 												<div className='flex items-baseline gap-1'>
 													<span
-														className={`text-xl font-bold ${
+														className={`num text-xl font-bold ${
 															item.saldo < item.minimo
-																? "text-red-600"
-																: "text-slate-800"
+																? "text-danger-600"
+																: "text-ink"
 														}`}
 													>
 														{/* CORREÇÃO: DUAS CASAS DECIMAIS */}
 														{Number(item.saldo).toFixed(2)}
 													</span>
-													<span className='text-xs text-slate-500'>
+													<span className='text-xs text-ink-muted'>
 														{item.unidade}
 													</span>
 												</div>
 											</div>
 											{item.saldo < item.minimo && (
-												<AlertTriangle className='w-4 h-4 text-red-500 mb-1' />
+												<AlertTriangle className='w-4 h-4 text-danger-500 mb-1' />
 											)}
 										</div>
 									</Card>
@@ -473,10 +513,17 @@ export const StockModule = ({
 				})}
 
 				{filteredStock.length === 0 && (
-					<div className='text-center py-12 text-slate-400'>
-						<Search className='w-8 h-8 mx-auto mb-2 opacity-50' />
-						<p>Nenhum item encontrado.</p>
-					</div>
+					<Card>
+						<EmptyState
+							icon={<Search className='w-10 h-10' />}
+							title='Nenhum item encontrado.'
+							description={
+								searchTerm
+									? "Nenhum item corresponde à busca."
+									: "Cadastre o primeiro item de estoque."
+							}
+						/>
+					</Card>
 				)}
 			</div>
 
@@ -487,14 +534,14 @@ export const StockModule = ({
 				size='md'
 			>
 				<div className='space-y-4'>
-					<div className='bg-indigo-50 p-3 rounded-[8px] border border-indigo-100 flex items-center justify-between'>
+					<div className='bg-primary-50 p-3 rounded-[8px] border border-primary-100 flex items-center justify-between'>
 						<div className='flex items-center gap-2'>
-							<Printer className='w-4 h-4 text-indigo-600' />
+							<Printer className='w-4 h-4 text-primary-600' />
 							<div>
-								<p className='text-xs font-bold text-indigo-900'>
+								<p className='text-xs font-bold text-primary-900'>
 									Item de Impressão (Toner)?
 								</p>
-								<p className='text-[10px] text-indigo-600'>
+								<p className='text-2xs text-primary-600'>
 									Habilita vínculo com máquinas e rendimento.
 								</p>
 							</div>
@@ -514,113 +561,94 @@ export const StockModule = ({
 									})
 								}
 							/>
-							<div className='w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-indigo-600'></div>
+							<div className="w-9 h-5 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-100 rounded-full peer after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-primary-600"></div>
 						</label>
 					</div>
 
-					<div>
-						<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
-							Nome *
-						</label>
-						<input
+					<Field label='Nome' required>
+						<Input
 							type='text'
-							className='w-full border border-slate-200 p-2 rounded-[8px] outline-none focus:ring-2 focus:ring-indigo-500 text-sm'
 							value={formData.nome || ""}
 							onChange={(e) =>
 								setFormData({ ...formData, nome: e.target.value })
 							}
 							placeholder='Ex: Papel Sulfite A4'
 						/>
-					</div>
+					</Field>
 
 					<div className='grid grid-cols-2 gap-3'>
-						<div>
-							<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
-								Unidade
-							</label>
-							<input
+						<Field label='Unidade'>
+							<Input
 								type='text'
-								className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
 								value={formData.unidade || ""}
 								onChange={(e) =>
 									setFormData({ ...formData, unidade: e.target.value })
 								}
 								placeholder='Ex: un, cx, kg'
 							/>
-						</div>
-						<div>
-							<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
-								Mínimo
-							</label>
-							<input
+						</Field>
+						<Field label='Mínimo'>
+							<Input
 								type='number'
-								className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+								className='num'
 								value={formData.minimo || 0}
 								onChange={(e) =>
 									setFormData({ ...formData, minimo: Number(e.target.value) })
 								}
 							/>
-						</div>
+						</Field>
 					</div>
 
-					<div>
-						<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
-							Saldo Atual
-						</label>
-						<input
+					<Field label='Saldo Atual'>
+						<Input
 							type='number'
-							className='w-full border border-slate-200 p-2 rounded-[8px] text-sm bg-slate-50'
+							className='num bg-surface-sunken'
 							value={formData.saldo || 0}
 							onChange={(e) =>
 								setFormData({ ...formData, saldo: Number(e.target.value) })
 							}
 						/>
-					</div>
+					</Field>
 
 					{formData.is_toner ? (
 						<div className='space-y-4 animate-in slide-in-from-top-2'>
-							<div className='bg-slate-50 p-3 rounded-[8px] border border-slate-200'>
-								<label className='block text-xs font-bold text-slate-600 uppercase mb-1'>
-									Rendimento (Cópias/Impressões)
-								</label>
-								<div className='flex items-center gap-2'>
-									<input
-										type='number'
-										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
-										value={formData.print_yield || 1500}
-										onChange={(e) =>
-											setFormData({
-												...formData,
-												print_yield: Number(e.target.value),
-											})
-										}
-									/>
-									<span className='text-xs text-slate-400 whitespace-nowrap'>
-										p/ unidade
-									</span>
-								</div>
+							<div className='bg-surface-sunken p-3 rounded-[8px] border border-slate-200'>
+								<Field label='Rendimento (Cópias/Impressões)'>
+									<div className='flex items-center gap-2'>
+										<Input
+											type='number'
+											className='num'
+											value={formData.print_yield || 1500}
+											onChange={(e) =>
+												setFormData({
+													...formData,
+													print_yield: Number(e.target.value),
+												})
+											}
+										/>
+										<span className='text-xs text-ink-faint whitespace-nowrap'>
+											p/ unidade
+										</span>
+									</div>
+								</Field>
 							</div>
-							<div>
-								<label className='block text-xs font-bold text-slate-500 uppercase mb-1'>
-									Vincular a Máquinas
-								</label>
+							<Field label='Vincular a Máquinas'>
 								<MultiSelect
 									options={machineOptions}
 									selected={selectedMachineNames}
 									onChange={setSelectedMachineNames}
 									placeholder='Selecione as máquinas...'
 								/>
-							</div>
+							</Field>
 						</div>
 					) : (
-						<div className='bg-slate-50 p-3 rounded-[8px] border border-slate-200'>
-							<p className='text-xs font-bold text-slate-600 uppercase mb-2 flex items-center gap-1'>
+						<div className='bg-surface-sunken p-3 rounded-[8px] border border-slate-200'>
+							<p className='text-2xs font-bold text-ink-muted uppercase tracking-wide mb-2 flex items-center gap-1'>
 								<Link className='w-3 h-3' /> Vínculo com Tabela de Preços
 								(Papel)
 							</p>
 							<div className='space-y-2'>
-								<select
-									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+								<Select
 									value={formData.associacao_material || ""}
 									onChange={(e) =>
 										setFormData({
@@ -635,11 +663,10 @@ export const StockModule = ({
 											{m}
 										</option>
 									))}
-								</select>
+								</Select>
 
 								<div className='grid grid-cols-2 gap-2'>
-									<select
-										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm disabled:opacity-50'
+									<Select
 										value={formData.associacao_especificacao || ""}
 										onChange={(e) =>
 											setFormData({
@@ -655,9 +682,8 @@ export const StockModule = ({
 												{s}
 											</option>
 										))}
-									</select>
-									<select
-										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm disabled:opacity-50'
+									</Select>
+									<Select
 										value={formData.associacao_tamanho || ""}
 										onChange={(e) =>
 											setFormData({
@@ -673,25 +699,19 @@ export const StockModule = ({
 												{s}
 											</option>
 										))}
-									</select>
+									</Select>
 								</div>
 							</div>
 						</div>
 					)}
 
 					<div className='flex justify-end pt-4 border-t border-slate-200/60 gap-2'>
-						<button
-							onClick={() => setIsModalOpen(false)}
-							className='px-4 py-2 text-slate-500 hover:text-slate-700 font-medium text-sm'
-						>
+						<Button variant='ghost' onClick={() => setIsModalOpen(false)}>
 							Cancelar
-						</button>
-						<button
-							onClick={handleSave}
-							className='bg-indigo-600 text-white px-6 py-2 rounded-[8px] hover:bg-indigo-700 font-bold text-sm shadow-sm'
-						>
+						</Button>
+						<Button onClick={handleSave} loading={isSaving}>
 							Salvar
-						</button>
+						</Button>
 					</div>
 				</div>
 			</Modal>
