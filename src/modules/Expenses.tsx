@@ -83,7 +83,8 @@ export const ExpensesModule = ({
 	});
 	// ----------------------------------------------------
 
-	const [filterDesc, setFilterDesc] = useState("");
+	// `filterDesc` foi removido: a caixa de busca escrevia nele, mas o filtro
+	// sempre leu `searchTerm` — nada ligava os dois e a busca nunca funcionou.
 	const [sortConfig, setSortConfig] = useState<{
 		key: keyof Expense;
 		direction: "asc" | "desc";
@@ -508,8 +509,8 @@ export const ExpensesModule = ({
 							type='text'
 							placeholder='Buscar descrição...'
 							className='!pl-9 text-xs'
-							value={filterDesc}
-							onChange={(e) => setFilterDesc(e.target.value)}
+							value={searchTerm}
+							onChange={(e) => setSearchTerm(e.target.value)}
 						/>
 					</div>
 					<Select
