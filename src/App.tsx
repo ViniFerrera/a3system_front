@@ -1,23 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import {
-	LayoutDashboard,
-	FileText,
-	Users,
-	Box,
-	Settings,
-	Printer,
-	DollarSign,
-	Menu,
-	X,
-	Bot,
-	ChevronRight,
-	LogOut,
-	Shield,
-	HardDrive,
-	Receipt,
-	BarChart3,
-	FileBarChart,
-} from "lucide-react";
+import { Printer, Menu, X } from "lucide-react";
 import { LoginPage } from "@/pages/Login";
 import { DashboardModule } from "@/modules/Dashboard";
 import { OrderModule } from "@/modules/Orders";
@@ -37,6 +19,8 @@ import { api } from "@/services/api";
 import { LoadingProvider, useLoading } from "@/components/ui/LoadingOverlay";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
+import { Sidebar } from "@/components/shell/Sidebar";
+import { NAV_ITEMS } from "@/components/shell/navItems";
 
 // ─── Helpers de Auth ─────────────────────────────────────────────────────────
 interface JwtUser {
@@ -62,14 +46,6 @@ const decodeToken = (token: string): JwtUser | null => {
 	}
 };
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-interface NavItem {
-	id: string;
-	icon: React.ElementType;
-	label: string;
-	group?: string;
-}
-
 // ─── App ─────────────────────────────────────────────────────────────────────
 const AppInner = () => {
 	const loading = useLoading();
@@ -78,6 +54,17 @@ const AppInner = () => {
 
 	const [activeTab, setActiveTab] = useState("dashboard");
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+	// Menu recolhido sobrevive ao recarregamento da página.
+	const [sidebarCollapsed, setSidebarCollapsed] = useState(
+		() => localStorage.getItem("a3_sidebar_collapsed") === "1"
+	);
+	const toggleSidebar = () => {
+		setSidebarCollapsed((prev) => {
+			localStorage.setItem("a3_sidebar_collapsed", prev ? "0" : "1");
+			return !prev;
+		});
+	};
 
 	// Estados de dados
 	const [clients, setClients] = useState<Client[]>([]);
@@ -164,40 +151,7 @@ const AppInner = () => {
 	if (!user) return <LoginPage />;
 
 	// ─── Navegação ────────────────────────────────────────────────────────────
-	const navItems: NavItem[] = [
-		{ id: "dashboard", icon: LayoutDashboard, label: "Dashboard", group: "Principal" },
-		{ id: "ai", icon: Bot, label: "Insights IA", group: "Principal" },
-		{ id: "orders", icon: FileText, label: "Ordens", group: "Operacional" },
-		{ id: "clients", icon: Users, label: "Clientes", group: "Operacional" },
-		{ id: "stock", icon: Box, label: "Estoque", group: "Operacional" },
-		{ id: "machinery", icon: Printer, label: "Maquinário", group: "Operacional" },
-		{ id: "pricing", icon: Settings, label: "Preços", group: "Configuração" },
-		{ id: "expenses", icon: DollarSign, label: "Financeiro", group: "Configuração" },
-		{ id: "dre", icon: BarChart3, label: "DRE", group: "Configuração" },
-		{ id: "estudo", icon: FileBarChart, label: "Estudo", group: "Configuração" },
-		{ id: "nota-fiscal", icon: Receipt, label: "Nota Fiscal", group: "Configuração" },
-		{ id: "users", icon: Shield, label: "Usuários", group: "Configuração" },
-		{ id: "db-security", icon: HardDrive, label: "Banco de Dados", group: "Configuração" },
-	];
-
-	const groups = ["Principal", "Operacional", "Configuração"];
-
-	const getBadge = (id: string) => {
-		let count = 0;
-		let color = "";
-		if (id === "orders") { count = counts.orders; color = "bg-blue-500"; }
-		else if (id === "stock") { count = counts.stock; color = "bg-amber-500"; }
-		else if (id === "expenses") { count = counts.expenses; color = "bg-red-500"; }
-		if (count > 0)
-			return (
-				<span className={`ml-auto text-[10px] font-bold min-w-[20px] text-center px-1.5 py-0.5 rounded-full ${color} text-white shadow-sm`}>
-					{count}
-				</span>
-			);
-		return null;
-	};
-
-	const activeLabel = navItems.find((n) => n.id === activeTab)?.label ?? "";
+	const activeLabel = NAV_ITEMS.find((n) => n.id === activeTab)?.label ?? "";
 
 	return (
 		<div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -220,83 +174,16 @@ const AppInner = () => {
 			</div>
 
 			{/* ── Sidebar ── */}
-			<aside
-				className={`fixed inset-y-0 left-0 w-[260px] bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col z-40 transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:translate-x-0 shadow-2xl ${
-					isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-				} md:sticky md:top-0 md:h-screen pt-16 md:pt-0`}
-			>
-				{/* Logo */}
-				<div className="hidden md:flex items-center gap-3 px-5 py-4 border-b border-slate-800/60">
-					<div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-2.5 rounded-xl shadow-lg shadow-indigo-900/40">
-						<Printer className="w-5 h-5 text-white" />
-					</div>
-					<div>
-						<span className="font-bold text-lg text-white tracking-tight block">A3 System</span>
-						<span className="text-[11px] text-slate-500 font-medium">Gestão Gráfica</span>
-					</div>
-				</div>
-
-				{/* Nav */}
-				<nav className="flex-1 px-3 py-2 overflow-hidden space-y-2">
-					{groups.map((group) => {
-						const items = navItems.filter((n) => n.group === group);
-						return (
-							<div key={group}>
-								<p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 px-3 mb-1">
-									{group}
-								</p>
-								<div className="space-y-0.5">
-									{items.map((item) => {
-										const isActive = activeTab === item.id;
-										return (
-											<button
-												key={item.id}
-												onClick={() => {
-													setActiveTab(item.id);
-													setIsMobileMenuOpen(false);
-												}}
-												className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group ${
-													isActive
-														? "bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-900/30"
-														: "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
-												}`}
-											>
-												<item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"}`} />
-												<span className="flex-1 text-left">{item.label}</span>
-												{getBadge(item.id)}
-												{isActive && <ChevronRight className="w-3 h-3 opacity-40" />}
-											</button>
-										);
-									})}
-								</div>
-							</div>
-						);
-					})}
-				</nav>
-
-				{/* Rodapé — usuário + logout */}
-				<div className="px-4 py-3 border-t border-slate-800/60">
-					<div className="flex items-center gap-3 mb-2">
-						{user.picture ? (
-							<img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full border-2 border-slate-700/80 object-cover ring-2 ring-slate-800" />
-						) : (
-							<div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
-								{user.name?.charAt(0)}
-							</div>
-						)}
-						<div className="flex-1 min-w-0">
-							<p className="text-[13px] font-semibold text-slate-300 truncate">{user.name}</p>
-							<p className="text-[10px] text-slate-500 truncate">{user.email}</p>
-						</div>
-					</div>
-					<button
-						onClick={handleLogout}
-						className="w-full flex items-center gap-2 text-xs text-slate-500 hover:text-red-400 transition-colors px-3 py-2 rounded-lg hover:bg-red-500/10"
-					>
-						<LogOut className="w-3.5 h-3.5" /> Sair
-					</button>
-				</div>
-			</aside>
+			<Sidebar
+				activeTab={activeTab}
+				onSelect={(id) => { setActiveTab(id); setIsMobileMenuOpen(false); }}
+				collapsed={sidebarCollapsed}
+				onToggleCollapse={toggleSidebar}
+				isMobileOpen={isMobileMenuOpen}
+				counts={counts}
+				user={{ name: user.name, email: user.email, picture: user.picture }}
+				onLogout={handleLogout}
+			/>
 
 			{/* ── Overlay mobile ── */}
 			{isMobileMenuOpen && (
