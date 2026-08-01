@@ -68,8 +68,9 @@ export const RetentionCard = ({ metrics }: { metrics: DashboardMetrics | null })
 						<Clock className="w-3.5 h-3.5 text-warning-500" /> Clientes sem pedido há mais de 60 dias
 					</p>
 					<div className="space-y-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
-						{sumidos.map((s) => (
-							<div key={s.nome} className="flex items-center gap-2 text-xs">
+						{/* Índice na chave: a rota agrupa por `cliente_id` e nomes repetem. */}
+						{sumidos.map((s, i) => (
+							<div key={`${i}-${s.nome}`} className="flex items-center gap-2 text-xs">
 								<span className="font-semibold text-ink-muted flex-1 truncate">{s.nome}</span>
 								<span className="num text-2xs text-ink-faint">{s.diasSem}d</span>
 								<span className="num text-xs font-bold text-ink">{Utils.formatCurrency(s.receitaHistorica)}</span>

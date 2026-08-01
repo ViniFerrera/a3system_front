@@ -14,7 +14,12 @@ export interface ServiceMixPoint {
 export const ServiceMixChart = ({ data }: { data: ServiceMixPoint[] }) => (
 	<div className="bg-white border border-slate-200/70 rounded-2xl shadow-card p-5">
 		<h4 className="text-base font-bold text-ink">Mix por serviço</h4>
-		<p className="text-xs text-ink-faint mt-0.5 mb-4">Receita, pedidos e ticket médio por tipo</p>
+		{/* Os dois eixos de valor estão ocultos e têm escalas diferentes — sem
+		    dizer isso, comparar o comprimento das duas barras induz a erro. */}
+		<p className="text-xs text-ink-faint mt-0.5 mb-4">
+			Receita, pedidos e ticket médio por tipo — as barras usam escalas próprias
+			(reais e nº de OS); compare cada cor com ela mesma
+		</p>
 		{data.length === 0 ? (
 			<EmptyState title="Sem dados no período" />
 		) : (

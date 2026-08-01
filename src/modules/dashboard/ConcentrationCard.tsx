@@ -31,8 +31,10 @@ export const ConcentrationCard = ({ metrics }: { metrics: DashboardMetrics | nul
 			</div>
 
 			<div className="space-y-2 mt-4">
+				{/* A chave leva o índice: a rota agrupa por `cliente_id` e dois ids
+				    distintos podem carregar o mesmo nome. */}
 				{top5.map((c, i) => (
-					<div key={c.nome} className="flex items-center gap-2.5">
+					<div key={`${i}-${c.nome}`} className="flex items-center gap-2.5">
 						<span className="num text-2xs font-bold text-ink-faint w-4">{i + 1}</span>
 						<span className="text-xs font-semibold text-ink-muted flex-1 truncate">{c.nome}</span>
 						<span className="num text-2xs text-ink-faint">{c.pedidos} OS</span>
