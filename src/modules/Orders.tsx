@@ -218,6 +218,14 @@ const VariationIndicator = ({
 	);
 };
 
+// Limite por arquivo. O servidor recusa acima disso; validar aqui evita
+// esperar um upload de 40MB só para receber erro.
+const MAX_FILE_MB = 25;
+const EXT_PERMITIDAS = [
+	"pdf", "jpg", "jpeg", "png", "gif", "webp", "svg", "ai", "cdr", "psd", "eps",
+	"doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "zip", "rar",
+];
+
 export const OrderModule = ({
 	clients,
 	priceTable,
@@ -410,7 +418,7 @@ export const OrderModule = ({
 			setOrders(processed);
 		} catch (err) {
 			console.error("Erro ao atualizar ordens:", err);
-			alert("Não foi possível atualizar a lista.");
+			toast.error("Não foi possível atualizar a lista.");
 		} finally {
 			setIsRefreshing(false);
 			loading.hide();
@@ -438,15 +446,35 @@ export const OrderModule = ({
 	};
 
 	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-		if (e.target.files) {
-			const files = Array.from(e.target.files);
-			setFilesToUpload((prev) => [...prev, ...files]);
-			const newFileNames = files.map((f) => f.name);
-			setFormData((prev) => ({
-				...prev,
-				anexos: [...(prev.anexos || []), ...newFileNames],
-			}));
+		if (!e.target.files) return;
+		const escolhidos = Array.from(e.target.files);
+		const aceitos: File[] = [];
+
+		escolhidos.forEach((f) => {
+			const ext = f.name.split(".").pop()?.toLowerCase() || "";
+			if (f.size > MAX_FILE_MB * 1024 * 1024) {
+				toast.error(
+					`"${f.name}" tem ${(f.size / 1024 / 1024).toFixed(
+						1
+					)}MB — o limite é ${MAX_FILE_MB}MB.`
+				);
+			} else if (!EXT_PERMITIDAS.includes(ext)) {
+				toast.error(`"${f.name}": extensão .${ext} não é aceita.`);
+			} else {
+				aceitos.push(f);
+			}
+		});
+
+		if (aceitos.length === 0) {
+			e.target.value = "";
+			return;
 		}
+		setFilesToUpload((prev) => [...prev, ...aceitos]);
+		setFormData((prev) => ({
+			...prev,
+			anexos: [...(prev.anexos || []), ...aceitos.map((f) => f.name)],
+		}));
+		e.target.value = "";
 	};
 
 	const filteredOrders = useMemo(() => {
@@ -737,22 +765,38 @@ export const OrderModule = ({
 	};
 
 	const handleDelete = async (id: number) => {
-		// window.confirm explícito: o hook useConfirm sombreia o global.
-		if (window.confirm("Tem certeza que deseja apagar esta ordem?")) {
-			try {
-				await api.delete(`/orders/${id}`);
-				setOrders((prev: Order[]) => prev.filter((o) => o.id !== id));
-			} catch (err) {
-				alert("Erro ao apagar ordem");
-			}
+		const ok = await confirm({
+			title: `Apagar a ordem #${id}?`,
+			message: "Esta ação não pode ser desfeita.",
+			confirmLabel: "Apagar",
+			danger: true,
+		});
+		if (!ok) return;
+		try {
+			await api.delete(`/orders/${id}`);
+			setOrders((prev: Order[]) => prev.filter((o) => o.id !== id));
+			toast.success(`Ordem #${id} apagada.`);
+		} catch (err) {
+			toast.error("Erro ao apagar a ordem.");
 		}
 	};
 
 	const updateStatus = async (order: Order, updates: Partial<Order>) => {
 		if (updates.status === "CONCLUIDA" && order.status !== "CONCLUIDA") {
-			if (!window.confirm("Confirmar conclusão e dar baixa no estoque?")) return;
+			const ok = await confirm({
+				title: `Concluir a ordem #${order.id}?`,
+				message: "O estoque será baixado conforme os itens da ordem.",
+				confirmLabel: "Concluir",
+			});
+			if (!ok) return;
 		} else if (updates.status === "CANCELADA") {
-			if (!window.confirm("Confirmar cancelamento da ordem?")) return;
+			const ok = await confirm({
+				title: `Cancelar a ordem #${order.id}?`,
+				confirmLabel: "Cancelar ordem",
+				cancelLabel: "Voltar",
+				danger: true,
+			});
+			if (!ok) return;
 		}
 		const statusLabel = updates.status === "CONCLUIDA" ? "Concluindo" : updates.status === "CANCELADA" ? "Cancelando" : "Atualizando";
 		loading.show(`${statusLabel} ordem #${order.id}...`);
@@ -773,7 +817,7 @@ export const OrderModule = ({
 			);
 			if (updates.status === "CONCLUIDA") onStockUpdate(order.items);
 		} catch (err) {
-			alert("Erro ao atualizar status");
+			toast.error("Erro ao atualizar o status da ordem.");
 		} finally {
 			loading.hide();
 		}
@@ -786,16 +830,16 @@ export const OrderModule = ({
 				key: "taxa_debito",
 				value: String(debitTaxPercent),
 			});
-			alert("Taxa salva com sucesso!");
+			toast.success("Taxa salva com sucesso.");
 			setIsConfigModalOpen(false);
 		} catch (err) {
-			alert("Erro ao salvar configuração.");
+			toast.error("Erro ao salvar a configuração.");
 		}
 	};
 
 	// SALVAR NOVO CLIENTE RÁPIDO
 	const handleQuickClientSave = async () => {
-		if (!quickClientData.nome) return alert("Nome é obrigatório");
+		if (!quickClientData.nome) return toast.error("Informe o nome do cliente.");
 		try {
 			const res = await api.post("/clients", {
 				nome: quickClientData.nome,
@@ -808,7 +852,7 @@ export const OrderModule = ({
 			setIsQuickClientOpen(false);
 			setQuickClientData({ nome: "", telefone: "", email: "" });
 		} catch (e) {
-			alert("Erro ao criar cliente");
+			toast.error("Erro ao criar o cliente.");
 		}
 	};
 
