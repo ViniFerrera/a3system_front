@@ -16,6 +16,8 @@ import { fetchDashboardMetrics, DashboardMetrics } from "@/services/dashboardMet
 import { BreakEvenCard } from "./dashboard/BreakEvenCard";
 import { ServiceMixChart } from "./dashboard/ServiceMixChart";
 import { VolumeRevenueChart } from "./dashboard/VolumeRevenueChart";
+import { TicketBandsCard } from "./dashboard/TicketBandsCard";
+import { ConcentrationCard } from "./dashboard/ConcentrationCard";
 
 type OrderStatusFilter = "CONCLUIDA" | "ABERTA" | "CANCELADA" | "ALL";
 type PeriodPreset = "30d" | "3m" | "6m" | "12m" | "custom";
@@ -560,6 +562,12 @@ export const DashboardModule = ({
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 				<ServiceMixChart data={serviceMix} />
 				<VolumeRevenueChart data={volumeReceitaData} />
+			</div>
+
+			{/* ── Faixas de ticket + Concentração de clientes ── */}
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+				<TicketBandsCard metrics={metrics} />
+				<ConcentrationCard metrics={metrics} />
 			</div>
 
 			{/* ── Top Clientes ── */}
