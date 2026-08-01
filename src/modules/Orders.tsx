@@ -1187,7 +1187,11 @@ export const OrderModule = ({
 				<DataTable
 					isEmpty={paginatedOrders.length === 0}
 					emptyTitle='Nenhuma ordem no período e filtros selecionados'
-					maxHeight='calc(100vh - 420px)'
+					// Piso de 420px: em telas curtas (celular, notebook 768px)
+					// `100vh - 420px` deixava a janela da tabela com ~250px, bem
+					// menos do que a lista ocupava antes, quando crescia com a
+					// página. O teto por viewport continua valendo no desktop.
+					maxHeight='max(420px, calc(100vh - 420px))'
 				>
 					<TableHead>
 						<tr>
