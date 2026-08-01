@@ -190,6 +190,11 @@ export const EstudoModule = ({
 						ref={iframeRef}
 						srcDoc={html}
 						title="Estudo Empresarial"
+						// Sem allow-scripts: o gerador produz SVG e HTML estáticos.
+						// allow-same-origin é necessário para o botão de exportar
+						// alcançar contentWindow.print(); allow-modals é o que
+						// permite o diálogo de impressão abrir.
+						sandbox="allow-same-origin allow-modals"
 						className="w-full border-0"
 						style={{ height: "calc(100vh - 260px)", minHeight: 520 }}
 					/>

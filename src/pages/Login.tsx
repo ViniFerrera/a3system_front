@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Printer, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui";
 
@@ -20,6 +20,13 @@ export const LoginPage = () => {
 	const errorKey = params.get("error") || "";
 	const errorMsg = errorMessages[errorKey] || null;
 
+	// Marca deixada pelo interceptor de 401 em services/api.ts. Lida na
+	// primeira renderização e apagada em seguida, para não reaparecer.
+	const sessaoExpirada = sessionStorage.getItem("a3_session_expired") === "1";
+	useEffect(() => {
+		if (sessaoExpirada) sessionStorage.removeItem("a3_session_expired");
+	}, []);
+
 	return (
 		<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-primary-950 to-slate-900 p-4 relative overflow-hidden">
 			{/* Glows decorativos */}
@@ -40,6 +47,12 @@ export const LoginPage = () => {
 				<p className="text-ink-muted text-sm mt-1.5 mb-8 font-medium">
 					Gestão Gráfica — Recife
 				</p>
+
+				{sessaoExpirada && (
+					<div className="bg-warning-50 border border-warning-100 text-warning-700 rounded-xl px-4 py-3 text-sm font-medium mb-4">
+						Sua sessão expirou. Entre novamente para continuar.
+					</div>
+				)}
 
 				{/* Botão Google — mesma navegação de sempre para /auth/google. */}
 				<Button
