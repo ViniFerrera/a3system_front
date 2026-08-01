@@ -35,7 +35,12 @@ export const Sidebar = ({
 		);
 	};
 
-	const width = collapsed ? "w-[76px]" : "w-[260px]";
+	// O recolhimento só existe no desktop (o botão que o aciona é `hidden md:flex`).
+	// No mobile a sidebar é uma gaveta: se respeitasse `collapsed`, quem tivesse
+	// recolhido o menu no desktop abriria no celular uma faixa de 76px sem rótulos.
+	const isCollapsed = collapsed && !isMobileOpen;
+
+	const width = isCollapsed ? "w-[76px]" : "w-[260px]";
 
 	return (
 		<aside
@@ -47,13 +52,14 @@ export const Sidebar = ({
 				<div className="bg-gradient-to-br from-primary-500 to-violet-600 p-2.5 rounded-xl shadow-lg shadow-primary-900/40 flex-shrink-0">
 					<Printer className="w-5 h-5 text-white" />
 				</div>
-				{!collapsed && (
+				{!isCollapsed && (
 					<div className="min-w-0">
 						<span className="font-bold text-lg text-white tracking-tight block truncate">A3 System</span>
 						<span className="text-2xs text-slate-500 font-medium">Gestão Gráfica</span>
 					</div>
 				)}
 				<button
+					type="button"
 					onClick={onToggleCollapse}
 					className="hidden md:flex ml-auto text-slate-500 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10"
 					aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
@@ -63,10 +69,10 @@ export const Sidebar = ({
 				</button>
 			</div>
 
-			<nav className="flex-1 px-3 py-2 overflow-y-auto custom-scrollbar space-y-2">
+			<nav aria-label="Módulos" className="flex-1 px-3 py-2 overflow-y-auto custom-scrollbar space-y-2">
 				{NAV_GROUPS.map((group) => (
 					<div key={group}>
-						{!collapsed && (
+						{!isCollapsed && (
 							<p className="text-2xs font-bold uppercase tracking-widest text-slate-600 px-3 mb-1">{group}</p>
 						)}
 						<div className="space-y-0.5">
@@ -75,10 +81,13 @@ export const Sidebar = ({
 								return (
 									<button
 										key={item.id}
+										type="button"
 										onClick={() => onSelect(item.id)}
-										title={collapsed ? item.label : undefined}
+										title={isCollapsed ? item.label : undefined}
+										aria-label={isCollapsed ? item.label : undefined}
+										aria-current={isActive ? "page" : undefined}
 										className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group ${
-											collapsed ? "justify-center" : ""
+											isCollapsed ? "justify-center" : ""
 										} ${
 											isActive
 												? "bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-lg shadow-primary-900/30"
@@ -90,7 +99,7 @@ export const Sidebar = ({
 												isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"
 											}`}
 										/>
-										{!collapsed && (
+										{!isCollapsed && (
 											<>
 												<span className="flex-1 text-left truncate">{item.label}</span>
 												{badgeFor(item.id)}
@@ -105,7 +114,7 @@ export const Sidebar = ({
 			</nav>
 
 			<div className="px-3 py-3 border-t border-slate-800/60">
-				<div className={`flex items-center gap-3 mb-2 ${collapsed ? "justify-center" : ""}`}>
+				<div className={`flex items-center gap-3 mb-2 ${isCollapsed ? "justify-center" : ""}`}>
 					{user.picture ? (
 						<img
 							src={user.picture}
@@ -117,7 +126,7 @@ export const Sidebar = ({
 							{user.name?.charAt(0)}
 						</div>
 					)}
-					{!collapsed && (
+					{!isCollapsed && (
 						<div className="flex-1 min-w-0">
 							<p className="text-xs font-semibold text-slate-300 truncate">{user.name}</p>
 							<p className="text-2xs text-slate-500 truncate">{user.email}</p>
@@ -125,14 +134,16 @@ export const Sidebar = ({
 					)}
 				</div>
 				<button
+					type="button"
 					onClick={onLogout}
 					className={`w-full flex items-center gap-2 text-xs text-slate-500 hover:text-danger-500 transition-colors px-3 py-2 rounded-lg hover:bg-danger-500/10 ${
-						collapsed ? "justify-center" : ""
+						isCollapsed ? "justify-center" : ""
 					}`}
+					aria-label="Sair"
 					title="Sair"
 				>
-					<LogOut className="w-3.5 h-3.5" />
-					{!collapsed && "Sair"}
+					<LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+					{!isCollapsed && "Sair"}
 				</button>
 			</div>
 		</aside>
