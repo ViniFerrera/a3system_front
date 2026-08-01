@@ -11,6 +11,7 @@ import {
 import { Order, Expense, StockItem } from "@/types";
 import { Utils } from "@/utils";
 import { MultiSelect } from "@/components/ui/MultiSelect";
+import { fetchDashboardMetrics, DashboardMetrics } from "@/services/dashboardMetrics";
 
 type OrderStatusFilter = "CONCLUIDA" | "ABERTA" | "CANCELADA" | "ALL";
 type PeriodPreset = "30d" | "3m" | "6m" | "12m" | "custom";
@@ -114,6 +115,21 @@ export const DashboardModule = ({
 			setEndDate(end);
 		}
 	}, [periodPreset]);
+
+	// ── Métricas agregadas (rota do backend) ─────────────────────────────────
+	// Alimentam só os blocos novos. Enquanto `metrics` é null cada bloco mostra
+	// esqueleto; em erro, aviso discreto — o resto do Dashboard segue normal.
+	const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+	const [metricsError, setMetricsError] = useState(false);
+
+	useEffect(() => {
+		let cancelado = false;
+		setMetricsError(false);
+		fetchDashboardMetrics(startDate, endDate)
+			.then((data) => { if (!cancelado) setMetrics(data); })
+			.catch(() => { if (!cancelado) { setMetrics(null); setMetricsError(true); } });
+		return () => { cancelado = true; };
+	}, [startDate, endDate]);
 
 	const allServices = useMemo(() => {
 		const s = new Set<string>();
