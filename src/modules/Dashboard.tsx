@@ -139,16 +139,22 @@ export const DashboardModule = ({
 		return order.total;
 	};
 
-	// ── Dados filtrados (filtro principal) ───────────────────────────────────
-	// Canceladas nunca contribuem valores — apenas contam no statusCounts
-	const currentOrders = useMemo(() => orders.filter((o) => {
+	// Recorte que NÃO depende da data — o mesmo tem de valer para o período
+	// atual e para o anterior, senão a variação compara uma janela filtrada por
+	// serviço/pagamento contra outra sem filtro nenhum e o percentual mente.
+	// Canceladas nunca contribuem valores — apenas contam no statusCounts.
+	const matchesFilters = (o: Order) => {
 		if (o.status === "CANCELADA") return false;
 		if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return false;
-		if (!filterByDate(o.data_conclusao || o.data, startDate, endDate)) return false;
 		if (selectedServices.length > 0 && !o.items.some((i) => selectedServices.includes(i.servico))) return false;
 		if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return false;
 		return true;
-	}), [orders, startDate, endDate, selectedServices, selectedPaymentStatus, orderStatusFilter]);
+	};
+
+	// ── Dados filtrados (filtro principal) ───────────────────────────────────
+	const currentOrders = useMemo(() => orders.filter((o) =>
+		matchesFilters(o) && filterByDate(o.data_conclusao || o.data, startDate, endDate)
+	), [orders, startDate, endDate, selectedServices, selectedPaymentStatus, orderStatusFilter]);
 
 	const currentExpenses = useMemo(() =>
 		expenses.filter((e) => e.status === "PAGO" && filterByDate(e.vencimento, startDate, endDate)),
@@ -165,15 +171,17 @@ export const DashboardModule = ({
 		return { start: ps.toISOString().split("T")[0], end: pe.toISOString().split("T")[0] };
 	}, [startDate, endDate]);
 
+	// Mesmo recorte de `currentOrders`, só que na janela anterior. Sem filtro
+	// ativo o resultado é idêntico ao de antes (`matchesFilters` e
+	// `calcOrderTotal` viram identidade); com filtro, a comparação passa a ser
+	// entre iguais.
 	const prevOrders = useMemo(() => orders.filter((o) =>
-		o.status !== "CANCELADA"
-		&& (orderStatusFilter === "ALL" || o.status === orderStatusFilter)
-		&& filterByDate(o.data_conclusao || o.data, prevRange.start, prevRange.end)
-	), [orders, prevRange, orderStatusFilter]);
+		matchesFilters(o) && filterByDate(o.data_conclusao || o.data, prevRange.start, prevRange.end)
+	), [orders, prevRange, selectedServices, selectedPaymentStatus, orderStatusFilter]);
 
 	const prevRevenue = useMemo(() =>
-		prevOrders.reduce((acc, o) => acc + o.total, 0),
-		[prevOrders]);
+		prevOrders.reduce((acc, o) => acc + calcOrderTotal(o), 0),
+		[prevOrders, selectedServices]);
 
 	// ── Status counts ─────────────────────────────────────────────────────────
 	const statusCounts = useMemo(() => ({
