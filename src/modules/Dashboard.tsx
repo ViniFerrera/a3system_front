@@ -12,6 +12,7 @@ import { Order, Expense, StockItem } from "@/types";
 import { Utils } from "@/utils";
 import { MultiSelect } from "@/components/ui/MultiSelect";
 import { fetchDashboardMetrics, DashboardMetrics } from "@/services/dashboardMetrics";
+import { BreakEvenCard } from "./dashboard/BreakEvenCard";
 
 type OrderStatusFilter = "CONCLUIDA" | "ABERTA" | "CANCELADA" | "ALL";
 type PeriodPreset = "30d" | "3m" | "6m" | "12m" | "custom";
@@ -418,6 +419,17 @@ export const DashboardModule = ({
 				<KpiCard label="Total de OS" value={String(currentOrders.length)} sub={`${statusCounts.open} em aberto`} icon={<Target />} gradient="bg-gradient-to-br from-violet-500 to-purple-600" />
 				<KpiCard label="A Receber" value={fmt(kpis.toReceive)} sub="pendente + parcial" icon={<DollarSign />} gradient={kpis.toReceive > 0 ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-slate-400 to-slate-500"} />
 			</div>
+
+			{/* ── Aviso discreto: só os blocos de métricas agregadas dependem da rota ── */}
+			{metricsError && (
+				<div className="flex items-center gap-2 text-2xs text-warning-700 bg-warning-50 border border-warning-200 rounded-xl px-3 py-2">
+					<AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+					Não foi possível carregar as análises agregadas (equilíbrio, faixas, concentração e retenção). O restante do painel segue atualizado.
+				</div>
+			)}
+
+			{/* ── Ponto de Equilíbrio do mês ── */}
+			<BreakEvenCard metrics={metrics} />
 
 			{/* ── Fluxo Mensal + Distribuição Pagamento ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
