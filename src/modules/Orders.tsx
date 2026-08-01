@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import { api } from "@/services/api";
 import { useLoading } from "@/components/ui/LoadingOverlay";
+import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { ItemGrid } from "./orders/ItemGrid";
 import { PresetBar, OrderPreset } from "./orders/PresetBar";
@@ -243,6 +245,7 @@ export const OrderModule = ({
 		api.get("/onedrive-web-config").then((res) => setOnedriveConfig(res.data)).catch(() => {});
 	}, []);
 	const loading = useLoading();
+	const toast = useToast();
 
 	// Configuração Taxa Débito
 	const [debitTaxPercent, setDebitTaxPercent] = useState(0);
@@ -319,10 +322,16 @@ export const OrderModule = ({
 	};
 
 	// --- FORM STATE ---
+	// Data em hora local (sem sufixo Z): o banco guarda hora local e
+	// toISOString() faria a ordem criada após as 21h nascer com a data de amanhã.
 	const [formData, setFormData] = useState<Partial<Order>>({
 		...DEFAULT_NEW_ORDER,
-		data: new Date().toISOString(),
+		data: Utils.localIsoNow(),
 	});
+
+	// Trava de gravação: impede o segundo clique enquanto o POST está em voo.
+	const [isSaving, setIsSaving] = useState(false);
+	const [formErrors, setFormErrors] = useState<{ cliente?: string }>({});
 
 	// Itens da ordem em edição. Fonte única da grade — substitui o antigo par
 	// "tempItem + formData.items só-leitura".
@@ -594,6 +603,16 @@ export const OrderModule = ({
 	};
 
 	const handleSave = async () => {
+		// Segunda guarda contra duplo envio (a primeira é o botão desabilitado).
+		if (isSaving) return;
+
+		if (!formData.cliente_id) {
+			setFormErrors({ cliente: "Selecione um cliente" });
+			toast.error("Selecione um cliente antes de salvar a ordem.");
+			return;
+		}
+		setFormErrors({});
+
 		// Linha em branco (usuário clicou "Adicionar linha" e não preencheu)
 		// não vira item da ordem.
 		const items = gridItems
@@ -636,6 +655,7 @@ export const OrderModule = ({
 		);
 		filesToUpload.forEach((file) => dataPayload.append("files", file));
 
+		setIsSaving(true);
 		loading.show(editingOrder ? "Salvando ordem..." : "Criando ordem...");
 		try {
 			let savedOrder: Order;
@@ -657,18 +677,24 @@ export const OrderModule = ({
 				savedOrder = sanitizeOrderResponse(mergedData);
 				setOrders((prev: Order[]) => [savedOrder, ...prev]);
 			}
+			toast.success(
+				editingOrder
+					? `Ordem #${editingOrder.id} atualizada.`
+					: `Ordem #${savedOrder.id} criada.`
+			);
 			setIsModalOpen(false);
 			setEditingOrder(null);
 			setFilesToUpload([]);
 			setGridItems([]);
 			setFormData({
 				...DEFAULT_NEW_ORDER,
-				data: new Date().toISOString(),
+				data: Utils.localIsoNow(),
 			});
 		} catch (err) {
 			console.error(err);
-			alert("Erro ao salvar ordem");
+			toast.error("Erro ao salvar a ordem. Nada foi gravado — tente novamente.");
 		} finally {
+			setIsSaving(false);
 			loading.hide();
 		}
 	};
@@ -771,9 +797,11 @@ export const OrderModule = ({
 			setGridItems([]);
 			setFormData({
 				...DEFAULT_NEW_ORDER,
-				data: new Date().toISOString(),
+				data: Utils.localIsoNow(),
 			});
 		}
+		setFormErrors({});
+		setIsSaving(false);
 		setIsModalOpen(true);
 	};
 
@@ -1400,18 +1428,24 @@ export const OrderModule = ({
 					<div className='grid grid-cols-1 md:grid-cols-12 gap-5'>
 						<div className='md:col-span-8 flex gap-2 items-end'>
 							<div className='flex-1'>
-								<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-									Cliente *
+								<label className='block text-2xs font-bold text-ink-muted uppercase mb-1.5'>
+									Cliente <span className='text-danger-500'>*</span>
 								</label>
 								<SearchableSelect
 									options={clientOptionsForForm}
 									value={formData.cliente_id || 0}
-									onChange={(val) =>
-										setFormData({ ...formData, cliente_id: val })
-									}
+									onChange={(val) => {
+										setFormData({ ...formData, cliente_id: val });
+										setFormErrors({});
+									}}
 									placeholder='Busque nome ou telefone...'
 									fullClients={clients}
 								/>
+								{formErrors.cliente && (
+									<p className='text-2xs text-danger-600 mt-1 font-medium'>
+										{formErrors.cliente}
+									</p>
+								)}
 							</div>
 							<button
 								onClick={() => setIsQuickClientOpen(true)}
@@ -1599,12 +1633,9 @@ export const OrderModule = ({
 						>
 							Cancelar
 						</button>
-						<button
-							onClick={handleSave}
-							className='bg-indigo-600 text-white px-6 py-2.5 rounded-[10px] hover:bg-indigo-700 font-bold shadow-md text-sm'
-						>
+						<Button onClick={handleSave} loading={isSaving}>
 							Salvar Ordem
-						</button>
+						</Button>
 					</div>
 				</div>
 			</Modal>
