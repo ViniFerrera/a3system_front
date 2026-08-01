@@ -33,6 +33,8 @@ import { api } from "@/services/api";
 import { useLoading } from "@/components/ui/LoadingOverlay";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Input } from "@/components/ui/Field";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { ItemGrid } from "./orders/ItemGrid";
 import { PresetBar, OrderPreset } from "./orders/PresetBar";
@@ -251,6 +253,7 @@ export const OrderModule = ({
 	}, []);
 	const loading = useLoading();
 	const toast = useToast();
+	const confirm = useConfirm();
 
 	// Configuração Taxa Débito
 	const [debitTaxPercent, setDebitTaxPercent] = useState(0);
@@ -629,7 +632,7 @@ export const OrderModule = ({
 			.catch(console.error);
 	};
 
-	const handleSave = async () => {
+	const handleSave = async (keepOpen = false) => {
 		// Segunda guarda contra duplo envio (a primeira é o botão desabilitado).
 		if (isSaving) return;
 
@@ -709,14 +712,21 @@ export const OrderModule = ({
 					? `Ordem #${editingOrder.id} atualizada.`
 					: `Ordem #${savedOrder.id} criada.`
 			);
-			setIsModalOpen(false);
+			// Limpeza comum aos dois caminhos.
 			setEditingOrder(null);
 			setFilesToUpload([]);
-			setGridItems([]);
 			setFormData({
 				...DEFAULT_NEW_ORDER,
 				data: Utils.localIsoNow(),
 			});
+			if (keepOpen) {
+				// Mantém o modal aberto e já pronto para a próxima ordem do balcão.
+				setGridItems([createEmptyItem()]);
+				setFinanceOpen(false);
+			} else {
+				setGridItems([]);
+				setIsModalOpen(false);
+			}
 		} catch (err) {
 			console.error(err);
 			toast.error("Erro ao salvar a ordem. Nada foi gravado — tente novamente.");
@@ -727,7 +737,8 @@ export const OrderModule = ({
 	};
 
 	const handleDelete = async (id: number) => {
-		if (confirm("Tem certeza que deseja apagar esta ordem?")) {
+		// window.confirm explícito: o hook useConfirm sombreia o global.
+		if (window.confirm("Tem certeza que deseja apagar esta ordem?")) {
 			try {
 				await api.delete(`/orders/${id}`);
 				setOrders((prev: Order[]) => prev.filter((o) => o.id !== id));
@@ -739,9 +750,9 @@ export const OrderModule = ({
 
 	const updateStatus = async (order: Order, updates: Partial<Order>) => {
 		if (updates.status === "CONCLUIDA" && order.status !== "CONCLUIDA") {
-			if (!confirm("Confirmar conclusão e dar baixa no estoque?")) return;
+			if (!window.confirm("Confirmar conclusão e dar baixa no estoque?")) return;
 		} else if (updates.status === "CANCELADA") {
-			if (!confirm("Confirmar cancelamento da ordem?")) return;
+			if (!window.confirm("Confirmar cancelamento da ordem?")) return;
 		}
 		const statusLabel = updates.status === "CONCLUIDA" ? "Concluindo" : updates.status === "CANCELADA" ? "Cancelando" : "Atualizando";
 		loading.show(`${statusLabel} ordem #${order.id}...`);
@@ -838,6 +849,44 @@ export const OrderModule = ({
 		setIsSaving(false);
 		setIsModalOpen(true);
 	};
+
+	// Fechar com dados preenchidos pede confirmação — hoje o preenchimento
+	// evapora sem aviso.
+	const handleCloseModal = async () => {
+		const temConteudo =
+			!!formData.cliente_id ||
+			!!formData.descricao ||
+			gridItems.some((i) => i.servico) ||
+			filesToUpload.length > 0;
+		if (temConteudo && !editingOrder) {
+			const ok = await confirm({
+				title: "Descartar esta ordem?",
+				message: "O que você preencheu será perdido.",
+				confirmLabel: "Descartar",
+				cancelLabel: "Continuar editando",
+				danger: true,
+			});
+			if (!ok) return;
+		}
+		setIsModalOpen(false);
+	};
+
+	// Atalhos válidos só enquanto o formulário está aberto. O módulo nunca
+	// desmonta, então o listener precisa sair junto com o modal.
+	useEffect(() => {
+		if (!isModalOpen) return;
+		const onKey = (e: KeyboardEvent) => {
+			if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+				e.preventDefault();
+				handleSave(false);
+			} else if (e.altKey && e.key.toLowerCase() === "n") {
+				e.preventDefault();
+				setGridItems((prev) => [...prev, createEmptyItem()]);
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [isModalOpen, formData, gridItems, filesToUpload, isSaving]);
 
 	// Abre o formulário quando a topbar/paleta/atalho pede "nova ordem".
 	// Ignora o valor inicial 0 para não abrir sozinho no primeiro render.
@@ -1454,9 +1503,58 @@ export const OrderModule = ({
 			{/* MODAL PRINCIPAL */}
 			<Modal
 				isOpen={isModalOpen}
-				onClose={() => setIsModalOpen(false)}
+				onClose={handleCloseModal}
 				title={editingOrder ? "Editar Ordem" : "Nova Ordem"}
 				size='xl'
+				footer={
+					<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
+						<div className='flex items-center gap-3'>
+							<label className='text-2xs font-bold text-ink-muted uppercase'>
+								Desconto (%)
+							</label>
+							<Input
+								type='number'
+								className='w-20 text-center font-bold'
+								value={formData.desconto_pontual || 0}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+										desconto_pontual: Number(e.target.value),
+									})
+								}
+							/>
+							<div className='pl-3 border-l border-slate-200'>
+								<p className='text-2xs text-ink-faint font-bold uppercase'>
+									Total Final
+								</p>
+								<p className='num text-xl font-bold text-primary-600 tracking-tight'>
+									{Utils.formatCurrency(
+										gridSubtotal *
+											(1 - (formData.desconto_pontual || 0) / 100) +
+											(formData.taxa_extra || 0)
+									)}
+								</p>
+							</div>
+						</div>
+						<div className='flex items-center gap-2 justify-end'>
+							<Button variant='ghost' onClick={handleCloseModal}>
+								Cancelar
+							</Button>
+							{!editingOrder && (
+								<Button
+									variant='secondary'
+									onClick={() => handleSave(true)}
+									loading={isSaving}
+								>
+									Salvar e nova
+								</Button>
+							)}
+							<Button onClick={() => handleSave(false)} loading={isSaving}>
+								Salvar Ordem
+							</Button>
+						</div>
+					</div>
+				}
 			>
 				<div className='space-y-6'>
 					<div className='grid grid-cols-1 md:grid-cols-12 gap-5'>
@@ -1654,46 +1752,6 @@ export const OrderModule = ({
 						onChange={setGridItems}
 					/>
 
-					<div className='pt-5 border-t border-slate-100 flex justify-between items-center'>
-						<div className='flex items-center gap-3'>
-							<label className='text-xs font-bold text-slate-500 uppercase'>
-								Desconto (%)
-							</label>
-							<input
-								type='number'
-								className='w-16 border border-slate-200 rounded-[8px] p-2 text-sm text-center font-bold text-slate-700 outline-none'
-								value={formData.desconto_pontual || 0}
-								onChange={(e) =>
-									setFormData({
-										...formData,
-										desconto_pontual: Number(e.target.value),
-									})
-								}
-							/>
-						</div>
-						<div className='text-right'>
-							<p className='text-xs text-slate-400 font-bold uppercase mb-1'>
-								Total Final
-							</p>
-							<p className='text-2xl font-bold text-indigo-600 tracking-tight'>
-								{Utils.formatCurrency(
-									gridSubtotal * (1 - (formData.desconto_pontual || 0) / 100) +
-										(formData.taxa_extra || 0)
-								)}
-							</p>
-						</div>
-					</div>
-					<div className='flex justify-end gap-3'>
-						<button
-							onClick={() => setIsModalOpen(false)}
-							className='text-slate-500 hover:text-slate-700 font-medium px-4 text-sm'
-						>
-							Cancelar
-						</button>
-						<Button onClick={handleSave} loading={isSaving}>
-							Salvar Ordem
-						</Button>
-					</div>
 				</div>
 			</Modal>
 
