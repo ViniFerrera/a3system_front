@@ -37,7 +37,7 @@ import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { ItemGrid } from "./orders/ItemGrid";
 import { PresetBar, OrderPreset } from "./orders/PresetBar";
 import { PresetManagerModal } from "./orders/PresetManagerModal";
-import { EditableItem, toEditableItem } from "./orders/itemOptions";
+import { EditableItem, toEditableItem, createEmptyItem } from "./orders/itemOptions";
 
 interface Machine {
 	id: number;
@@ -52,14 +52,19 @@ const SearchableSelect = ({
 	onChange,
 	placeholder = "Selecione...",
 	fullClients,
+	autoFocus = false,
 }: {
 	options: { id: number; label: string }[];
 	value: number;
 	onChange: (val: number) => void;
 	placeholder?: string;
 	fullClients?: Client[];
+	/** Abre a lista já na montagem — o cursor cai direto no campo de busca. */
+	autoFocus?: boolean;
 }) => {
-	const [isOpen, setIsOpen] = useState(false);
+	// O campo de busca só existe enquanto a lista está aberta; para o foco
+	// automático chegar nele, a lista precisa nascer aberta.
+	const [isOpen, setIsOpen] = useState(autoFocus);
 	const [search, setSearch] = useState("");
 	const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -332,6 +337,28 @@ export const OrderModule = ({
 	// Trava de gravação: impede o segundo clique enquanto o POST está em voo.
 	const [isSaving, setIsSaving] = useState(false);
 	const [formErrors, setFormErrors] = useState<{ cliente?: string }>({});
+
+	// Bloco Financeiro colapsável — nada some, apenas deixa de ocupar tela
+	// quando está no padrão.
+	const [financeOpen, setFinanceOpen] = useState(false);
+
+	// Resumo de uma linha do que está configurado — evita expandir só para conferir.
+	const financeSummary = useMemo(() => {
+		const status = { NAO_PAGO: "Não pago", PARCIAL: "Parcial", PAGO: "Pago" }[
+			formData.status_pagamento || "NAO_PAGO"
+		];
+		const forma = formData.forma_pagamento || "sem forma";
+		const taxa = formData.taxa_extra
+			? ` · taxa ${Utils.formatCurrency(formData.taxa_extra)}`
+			: "";
+		const nf = formData.nota_fiscal ? " · com NF" : "";
+		return `${status} · ${forma}${taxa}${nf}`;
+	}, [
+		formData.status_pagamento,
+		formData.forma_pagamento,
+		formData.taxa_extra,
+		formData.nota_fiscal,
+	]);
 
 	// Itens da ordem em edição. Fonte única da grade — substitui o antigo par
 	// "tempItem + formData.items só-leitura".
@@ -791,14 +818,21 @@ export const OrderModule = ({
 						: order.anexos || [],
 				taxa_extra: order.taxa_extra || 0,
 			});
+			// Edição abre expandido: os valores gravados precisam ficar à vista.
+			setFinanceOpen(true);
 		} else {
 			setEditingOrder(null);
 			setFilesToUpload([]);
-			setGridItems([]);
+			// Uma linha já criada poupa um clique em toda ordem — e ordens de item
+			// único são 61,9% do histórico. Linha em branco não vira item: handleSave
+			// filtra por `i.servico`.
+			setGridItems([createEmptyItem()]);
 			setFormData({
 				...DEFAULT_NEW_ORDER,
 				data: Utils.localIsoNow(),
 			});
+			// Ordem nova nasce no padrão — o bloco não precisa ocupar tela.
+			setFinanceOpen(false);
 		}
 		setFormErrors({});
 		setIsSaving(false);
@@ -1440,6 +1474,7 @@ export const OrderModule = ({
 									}}
 									placeholder='Busque nome ou telefone...'
 									fullClients={clients}
+									autoFocus={!editingOrder}
 								/>
 								{formErrors.cliente && (
 									<p className='text-2xs text-danger-600 mt-1 font-medium'>
@@ -1470,99 +1505,121 @@ export const OrderModule = ({
 						</div>
 					</div>
 
-					<div className='bg-slate-50 p-4 rounded-[10px] border border-slate-200'>
-						<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-2'>
-							<CreditCard className='w-4 h-4' /> Financeiro
-						</h5>
-						<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-							<div>
-								<label className='block text-xs font-bold text-slate-500 mb-1'>
-									Status
-								</label>
-								<select
-									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
-									value={formData.status_pagamento || "NAO_PAGO"}
-									onChange={(e) =>
-										setFormData({
-											...formData,
-											status_pagamento: e.target.value as any,
-										})
-									}
-								>
-									<option value='NAO_PAGO'>Não Pago</option>
-									<option value='PARCIAL'>Parcial</option>
-									<option value='PAGO'>Pago</option>
-								</select>
-							</div>
-							<div>
-								<label className='block text-xs font-bold text-slate-500 mb-1'>
-									Forma Pagamento
-								</label>
-								<select
-									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
-									value={formData.forma_pagamento || ""}
-									onChange={(e) =>
-										setFormData({
-											...formData,
-											forma_pagamento: e.target.value,
-										})
-									}
-								>
-									<option value=''>Selecione...</option>
-									<option value='DINHEIRO'>Dinheiro</option>
-									<option value='PIX'>PIX</option>
-									<option value='DEBITO'>Cartão de Débito</option>
-									<option value='CREDITO'>Cartão de Crédito</option>
-								</select>
-							</div>
-							<div>
-								<label className='block text-xs font-bold text-slate-500 mb-1'>
-									Taxa Extra / Juros (R$)
-								</label>
-								<input
-									type='number'
-									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm bg-white'
-									value={formData.taxa_extra || 0}
-									onChange={(e) =>
-										setFormData({
-											...formData,
-											taxa_extra: Number(e.target.value),
-										})
-									}
-								/>
-							</div>
-						</div>
+					<div className='bg-surface-sunken p-4 rounded-[10px] border border-slate-200'>
+						<button
+							type='button'
+							onClick={() => setFinanceOpen((v) => !v)}
+							className='w-full flex items-center gap-2 text-left'
+						>
+							<CreditCard className='w-4 h-4 text-ink-muted' />
+							<span className='text-2xs font-bold text-ink-muted uppercase'>
+								Financeiro
+							</span>
+							{!financeOpen && (
+								<span className='text-xs text-ink-muted font-medium truncate'>
+									{financeSummary}
+								</span>
+							)}
+							<ChevronDown
+								className={`w-4 h-4 text-ink-faint ml-auto transition-transform ${
+									financeOpen ? "rotate-180" : ""
+								}`}
+							/>
+						</button>
 
-						{/* Nota Fiscal */}
-						<div className='mt-3'>
-							<label className='block text-xs font-bold text-slate-500 mb-1.5'>
-								Nota Fiscal
-							</label>
-							<div className='flex gap-2'>
-								<button
-									type='button'
-									onClick={() => setFormData({ ...formData, nota_fiscal: false })}
-									className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
-										!formData.nota_fiscal
-											? "bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
-											: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
-									}`}
-								>
-									Sem NF
-								</button>
-								<button
-									type='button'
-									onClick={() => setFormData({ ...formData, nota_fiscal: true })}
-									className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
-										formData.nota_fiscal
-											? "bg-blue-50 text-blue-700 border-blue-300 shadow-sm"
-											: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
-									}`}
-								>
-									Com NF
-								</button>
+						{financeOpen && (
+							<div className='mt-3'>
+							<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+								<div>
+									<label className='block text-xs font-bold text-slate-500 mb-1'>
+										Status
+									</label>
+									<select
+										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+										value={formData.status_pagamento || "NAO_PAGO"}
+										onChange={(e) =>
+											setFormData({
+												...formData,
+												status_pagamento: e.target.value as any,
+											})
+										}
+									>
+										<option value='NAO_PAGO'>Não Pago</option>
+										<option value='PARCIAL'>Parcial</option>
+										<option value='PAGO'>Pago</option>
+									</select>
+								</div>
+								<div>
+									<label className='block text-xs font-bold text-slate-500 mb-1'>
+										Forma Pagamento
+									</label>
+									<select
+										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+										value={formData.forma_pagamento || ""}
+										onChange={(e) =>
+											setFormData({
+												...formData,
+												forma_pagamento: e.target.value,
+											})
+										}
+									>
+										<option value=''>Selecione...</option>
+										<option value='DINHEIRO'>Dinheiro</option>
+										<option value='PIX'>PIX</option>
+										<option value='DEBITO'>Cartão de Débito</option>
+										<option value='CREDITO'>Cartão de Crédito</option>
+									</select>
+								</div>
+								<div>
+									<label className='block text-xs font-bold text-slate-500 mb-1'>
+										Taxa Extra / Juros (R$)
+									</label>
+									<input
+										type='number'
+										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm bg-white'
+										value={formData.taxa_extra || 0}
+										onChange={(e) =>
+											setFormData({
+												...formData,
+												taxa_extra: Number(e.target.value),
+											})
+										}
+									/>
+								</div>
 							</div>
-						</div>
+
+							{/* Nota Fiscal */}
+							<div className='mt-3'>
+								<label className='block text-xs font-bold text-slate-500 mb-1.5'>
+									Nota Fiscal
+								</label>
+								<div className='flex gap-2'>
+									<button
+										type='button'
+										onClick={() => setFormData({ ...formData, nota_fiscal: false })}
+										className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
+											!formData.nota_fiscal
+												? "bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
+												: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
+										}`}
+									>
+										Sem NF
+									</button>
+									<button
+										type='button'
+										onClick={() => setFormData({ ...formData, nota_fiscal: true })}
+										className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
+											formData.nota_fiscal
+												? "bg-blue-50 text-blue-700 border-blue-300 shadow-sm"
+												: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
+										}`}
+									>
+										Com NF
+									</button>
+								</div>
+							</div>
+							</div>
+						)}
 					</div>
 
 					{/* ... Campos Descrição e Itens ... */}
