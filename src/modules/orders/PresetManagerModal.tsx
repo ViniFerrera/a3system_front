@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Plus, Trash2, Edit2, Save, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { api } from "@/services/api";
 import { PriceRule } from "@/types";
 import { ItemGrid } from "./ItemGrid";
@@ -33,6 +35,8 @@ export const PresetManagerModal = ({
 	machines: Machine[];
 	onChanged: () => void;
 }) => {
+	const toast = useToast();
+	const confirm = useConfirm();
 	const [editandoId, setEditandoId] = useState<number | "novo" | null>(null);
 	const [nome, setNome] = useState("");
 	const [itens, setItens] = useState<EditableItem[]>([]);
@@ -57,10 +61,15 @@ export const PresetManagerModal = ({
 	};
 
 	const salvar = async () => {
-		if (!nome.trim()) return alert("Dê um nome à pré-definição.");
+		if (!nome.trim()) {
+			toast.error("Dê um nome à pré-definição.");
+			return;
+		}
 		const validos = itens.filter((i) => i.servico);
-		if (validos.length === 0)
-			return alert("Adicione ao menos um item com serviço definido.");
+		if (validos.length === 0) {
+			toast.error("Adicione ao menos um item com serviço definido.");
+			return;
+		}
 
 		// Só os campos que definem o item — preço é recalculado ao aplicar.
 		const payload = validos.map((i) => ({
@@ -90,20 +99,26 @@ export const PresetManagerModal = ({
 			onChanged();
 			fecharEdicao();
 		} catch (e: any) {
-			alert(e?.response?.data?.error || "Erro ao salvar pré-definição.");
+			toast.error(e?.response?.data?.error || "Erro ao salvar pré-definição.");
 		} finally {
 			setSalvando(false);
 		}
 	};
 
 	const remover = async (preset: OrderPreset) => {
-		if (!confirm(`Apagar a pré-definição "${preset.nome}"?`)) return;
+		const ok = await confirm({
+			title: "Apagar pré-definição?",
+			message: `Tem certeza que deseja apagar "${preset.nome}"?`,
+			confirmLabel: "Apagar",
+			danger: true,
+		});
+		if (!ok) return;
 		try {
 			await api.delete(`/order-presets/${preset.id}`);
 			onChanged();
 			if (editandoId === preset.id) fecharEdicao();
 		} catch {
-			alert("Erro ao apagar pré-definição.");
+			toast.error("Erro ao apagar pré-definição.");
 		}
 	};
 
