@@ -28,7 +28,9 @@ import {
 	CheckCircle2,
 	XCircle,
 	BarChart2,
+	Bookmark,
 } from "lucide-react";
+import { OrderFilterPayload } from "@/components/shortcuts/shortcutTypes";
 import { api } from "@/services/api";
 import { useLoading } from "@/components/ui/LoadingOverlay";
 import { Button } from "@/components/ui/Button";
@@ -252,6 +254,9 @@ export const OrderModule = ({
 	machinery = [],
 	setClients,
 	newOrderSignal = 0,
+	pendingOrderFilter = null,
+	onPendingFilterApplied,
+	onSaveFilterAsShortcut,
 }: {
 	clients: Client[];
 	priceTable: PriceRule[];
@@ -261,6 +266,10 @@ export const OrderModule = ({
 	machinery?: Machine[];
 	setClients: Function;
 	newOrderSignal?: number;
+	/** Filtro congelado num atalho, entregue pelo App com um nonce novo a cada clique. */
+	pendingOrderFilter?: (OrderFilterPayload & { nonce: number }) | null;
+	onPendingFilterApplied?: () => void;
+	onSaveFilterAsShortcut?: (p: OrderFilterPayload) => void;
 }) => {
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -1021,6 +1030,26 @@ export const OrderModule = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [newOrderSignal]);
 
+	// Aplica o filtro que veio de um atalho. Mexe só nos estados de filtro e na
+	// paginação — nada aqui toca no formulário, então clicar num atalho salvo
+	// nunca dispara a pergunta de descartar rascunho acima.
+	//
+	// Depende do nonce: o App zera `pendingOrderFilter` no callback, então o
+	// mesmo atalho clicado duas vezes seguidas volta a passar por aqui.
+	useEffect(() => {
+		if (!pendingOrderFilter) return;
+		setFilterStart(pendingOrderFilter.filterStart);
+		setFilterEnd(pendingOrderFilter.filterEnd);
+		setFilterClient(pendingOrderFilter.filterClient);
+		setFilterServices(pendingOrderFilter.filterServices);
+		setFilterPaymentStatus(pendingOrderFilter.filterPaymentStatus);
+		setFilterOrderStatus(pendingOrderFilter.filterOrderStatus);
+		setFilterNF(pendingOrderFilter.filterNF);
+		setCurrentPage(1);
+		onPendingFilterApplied?.();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [pendingOrderFilter?.nonce]);
+
 	const clientOptions = useMemo(
 		() => [
 			{ id: 0, label: "Todos Clientes" },
@@ -1143,6 +1172,19 @@ export const OrderModule = ({
 					</div>
 				</div>
 				<div className='flex items-center gap-2 justify-end'>
+					{/* Congela os filtros atuais num atalho da gaveta lateral. */}
+					<Button
+						variant="ghost"
+						size="sm"
+						className="mr-auto"
+						icon={<Bookmark className="w-3.5 h-3.5" />}
+						onClick={() => onSaveFilterAsShortcut?.({
+							filterStart, filterEnd, filterClient, filterServices,
+							filterPaymentStatus, filterOrderStatus, filterNF,
+						})}
+					>
+						Salvar como atalho
+					</Button>
 					<button
 						onClick={handleRefreshOrders}
 						disabled={isRefreshing}

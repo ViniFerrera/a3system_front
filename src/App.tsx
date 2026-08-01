@@ -141,7 +141,28 @@ const AppInner = () => {
 		[goToTab]
 	);
 
+	// Limpar assim que o módulo aplica é o que permite clicar duas vezes no
+	// mesmo atalho: sem isso o nonce repetido não reativaria o efeito de lá.
 	const limparFiltroPendente = useCallback(() => setPendingOrderFilter(null), []);
+
+	// `window.prompt` é o último aviso nativo do sistema, mantido de propósito:
+	// um modal só para pedir um texto curto não pagaria o código.
+	const salvarFiltroComoAtalho = useCallback(
+		(payload: OrderFilterPayload) => {
+			const rotulo = window.prompt("Nome do atalho:", "Ordens filtradas");
+			if (!rotulo) return;
+			adicionar({
+				id: `orderFilter:${Date.now()}`,
+				kind: "orderFilter",
+				label: rotulo,
+				icon: "filter",
+				color: "sky",
+				target: "orders",
+				payload,
+			});
+		},
+		[adicionar]
+	);
 
 	// A ação "nova ordem" reaproveita o canal que já existe: o módulo Ordens
 	// observa `newOrderSignal` e abre o formulário (perguntando antes se há
@@ -345,6 +366,9 @@ const AppInner = () => {
 										machinery={machinery}
 										setClients={setClients}
 										newOrderSignal={newOrderSignal}
+										pendingOrderFilter={pendingOrderFilter}
+										onPendingFilterApplied={limparFiltroPendente}
+										onSaveFilterAsShortcut={salvarFiltroComoAtalho}
 									/>
 								))}
 								{painel("stock", <StockModule stock={stock} setStock={setStock} priceTable={priceTable} />)}
