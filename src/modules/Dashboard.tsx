@@ -14,6 +14,8 @@ import { MultiSelect } from "@/components/ui/MultiSelect";
 import { StatTile } from "@/components/ui/StatTile";
 import { fetchDashboardMetrics, DashboardMetrics } from "@/services/dashboardMetrics";
 import { BreakEvenCard } from "./dashboard/BreakEvenCard";
+import { ServiceMixChart } from "./dashboard/ServiceMixChart";
+import { VolumeRevenueChart } from "./dashboard/VolumeRevenueChart";
 
 type OrderStatusFilter = "CONCLUIDA" | "ABERTA" | "CANCELADA" | "ALL";
 type PeriodPreset = "30d" | "3m" | "6m" | "12m" | "custom";
@@ -42,7 +44,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 				<div key={i} className="flex items-center gap-2 mt-1.5">
 					<span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color || p.fill }} />
 					<span className="text-slate-500 text-xs">{p.name}:</span>
-					<span className="font-bold text-slate-800 text-xs ml-auto tabular-nums">{Utils.formatCurrency(Number(p.value))}</span>
+					{/* Séries de contagem não são dinheiro — formatá-las como moeda
+					    transformaria "12 pedidos" em "R$ 12,00" na tela. */}
+					<span className="font-bold text-slate-800 text-xs ml-auto tabular-nums">
+						{p.dataKey === "volume" ? `${Number(p.value)} OS` : Utils.formatCurrency(Number(p.value))}
+					</span>
 				</div>
 			))}
 		</div>
@@ -197,14 +203,14 @@ export const DashboardModule = ({
 
 	// ── Gráfico Mensal (dinâmico baseado no período) ──────────────────────────
 	const monthlyData = useMemo(() => {
-		const months = new Map<string, { name: string; receita_concluida: number; receita_aberta: number; despesa: number; lucro: number }>();
+		const months = new Map<string, { name: string; receita_concluida: number; receita_aberta: number; despesa: number; lucro: number; volume: number }>();
 		let curr = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth(), 1);
 		const end = new Date(endDate);
 		while (curr <= end) {
 			const key = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}`;
 			const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 			const label = `${monthNames[curr.getMonth()]}/${String(curr.getFullYear()).slice(2)}`;
-			months.set(key, { name: label, receita_concluida: 0, receita_aberta: 0, despesa: 0, lucro: 0 });
+			months.set(key, { name: label, receita_concluida: 0, receita_aberta: 0, despesa: 0, lucro: 0, volume: 0 });
 			curr.setMonth(curr.getMonth() + 1);
 		}
 		orders.forEach((o) => {
@@ -216,6 +222,9 @@ export const DashboardModule = ({
 			if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return;
 			const val = (selectedServices.length === 0 || o.items.some((i) => selectedServices.includes(i.servico))) ? calcOrderTotal(o) : 0;
 			if (val <= 0) return;
+			// Conta o pedido no mesmo ponto em que a receita entra, para volume e
+			// receita do mês nunca falarem de conjuntos diferentes de OS.
+			entry.volume += 1;
 			if (o.status === "CONCLUIDA") entry.receita_concluida += val;
 			else entry.receita_aberta += val;
 		});
@@ -230,6 +239,16 @@ export const DashboardModule = ({
 			lucro: d.receita_concluida + d.receita_aberta - d.despesa,
 		}));
 	}, [orders, expenses, selectedServices, selectedPaymentStatus, orderStatusFilter, startDate, endDate]);
+
+	// ── Volume × Receita (mesmo recorte do gráfico mensal) ───────────────────
+	const volumeReceitaData = useMemo(
+		() => monthlyData.map((m) => ({
+			name: m.name,
+			receita: m.receita_concluida + m.receita_aberta,
+			volume: m.volume,
+		})),
+		[monthlyData]
+	);
 
 	// ── Sparklines dos KPIs (derivados do mesmo array do gráfico mensal) ──────
 	const sparks = useMemo(() => ({
@@ -284,15 +303,34 @@ export const DashboardModule = ({
 
 	// ── Top Serviços / Clientes ───────────────────────────────────────────────
 	const topServices = useMemo(() => {
-		const map = new Map<string, { volume: number; revenue: number }>();
+		// `volume` conta OS distintas, não quantidade de itens: um pedido com duas
+		// linhas do mesmo serviço é um pedido só, e "5000 pedidos" para 5000 folhas
+		// seria rótulo mentiroso na tela. A receita continua idêntica à de antes.
+		const map = new Map<string, { revenue: number; pedidos: Set<string> }>();
 		currentOrders.forEach((o) => o.items.forEach((i) => {
 			if (selectedServices.length === 0 || selectedServices.includes(i.servico)) {
-				const cur = map.get(i.servico) || { volume: 0, revenue: 0 };
-				map.set(i.servico, { volume: cur.volume + (i.quantidade || 1), revenue: cur.revenue + (i.total || 0) });
+				const cur = map.get(i.servico) || { revenue: 0, pedidos: new Set<string>() };
+				cur.revenue += (i.total || 0);
+				cur.pedidos.add(String(o.id ?? `${o.cliente_nome}|${o.data}`));
+				map.set(i.servico, cur);
 			}
 		}));
-		return Array.from(map.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue).slice(0, 6);
+		return Array.from(map.entries())
+			.map(([name, v]) => ({ name, revenue: v.revenue, volume: v.pedidos.size }))
+			.sort((a, b) => b.revenue - a.revenue)
+			.slice(0, 6);
 	}, [currentOrders, selectedServices]);
+
+	// Ticket médio por serviço = receita do serviço ÷ OS que o contêm.
+	const serviceMix = useMemo(
+		() => topServices.map((s) => ({
+			name: s.name,
+			revenue: s.revenue,
+			volume: s.volume,
+			ticket: s.volume > 0 ? s.revenue / s.volume : 0,
+		})),
+		[topServices]
+	);
 
 	const topClients = useMemo(() => {
 		const map = new Map<string, { volume: number; revenue: number }>();
@@ -458,18 +496,23 @@ export const DashboardModule = ({
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-amber-300 inline-block" />Abertas</span>
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-rose-400 inline-block" />Despesa</span>
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-indigo-500 inline-block" />Lucro</span>
+							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-violet-400 inline-block" />Pedidos</span>
 						</div>
 					</div>
 					<ResponsiveContainer width="100%" height={200}>
 						<ComposedChart data={monthlyData} margin={{ left: -5, right: 10 }}>
 							<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
 							<XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
-							<YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+							{/* Toda série precisa de `yAxisId`: sem isso o Recharts joga reais e
+							    contagem de pedidos na mesma escala e o gráfico muda de forma. */}
+							<YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+							<YAxis yAxisId="vol" orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#c4b5fd", fontSize: 11 }} />
 							<Tooltip content={<CustomTooltip />} />
-							<Bar dataKey="receita_concluida" name="Concluídas" stackId="receita" fill="#34d399" barSize={16} />
-							<Bar dataKey="receita_aberta" name="Abertas" stackId="receita" fill="#fbbf24" radius={[5, 5, 0, 0]} barSize={16} />
-							<Bar dataKey="despesa" name="Despesa" fill="#fb7185" radius={[5, 5, 0, 0]} barSize={16} />
-							<Line type="monotone" dataKey="lucro" name="Lucro" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
+							<Bar yAxisId="left" dataKey="receita_concluida" name="Concluídas" stackId="receita" fill="#34d399" barSize={16} />
+							<Bar yAxisId="left" dataKey="receita_aberta" name="Abertas" stackId="receita" fill="#fbbf24" radius={[5, 5, 0, 0]} barSize={16} />
+							<Bar yAxisId="left" dataKey="despesa" name="Despesa" fill="#fb7185" radius={[5, 5, 0, 0]} barSize={16} />
+							<Line yAxisId="left" type="monotone" dataKey="lucro" name="Lucro" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
+							<Line yAxisId="vol" type="monotone" dataKey="volume" name="Pedidos" stroke="#a78bfa" strokeWidth={2} strokeDasharray="4 3" dot={false} />
 						</ComposedChart>
 					</ResponsiveContainer>
 				</div>
@@ -513,28 +556,14 @@ export const DashboardModule = ({
 				</div>
 			</div>
 
-			{/* ── Top Serviços + Top Clientes ── */}
+			{/* ── Mix por serviço + Volume × Receita ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
-					<h4 className="text-base font-bold text-slate-800">Top Serviços</h4>
-					<p className="text-xs text-slate-400 mt-0.5 mb-5">Receita por tipo de serviço</p>
-					{topServices.length > 0 ? (
-						<ResponsiveContainer width="100%" height={220}>
-							<ComposedChart data={topServices} layout="vertical" margin={{ left: 0, right: 55 }}>
-								<CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-								<XAxis type="number" hide />
-								<YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={90} tick={{ fill: "#475569", fontSize: 11, fontWeight: 600 }} />
-								<Tooltip content={<CustomTooltip />} />
-								<Bar dataKey="revenue" name="Receita" fill="#6366f1" radius={[0, 6, 6, 0]} barSize={22}>
-									{/* LabelList removido pois CustomTooltip já mostra */}
-								</Bar>
-							</ComposedChart>
-						</ResponsiveContainer>
-					) : (
-						<div className="h-[220px] flex items-center justify-center text-slate-300 text-sm">Sem dados no período</div>
-					)}
-				</div>
+				<ServiceMixChart data={serviceMix} />
+				<VolumeRevenueChart data={volumeReceitaData} />
+			</div>
 
+			{/* ── Top Clientes ── */}
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
 					<h4 className="text-base font-bold text-slate-800">Top Clientes</h4>
 					<p className="text-xs text-slate-400 mt-0.5 mb-4">Ranking por receita</p>
