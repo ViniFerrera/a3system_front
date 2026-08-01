@@ -27,6 +27,9 @@ api.interceptors.response.use(
 	(err) => {
 		if (err.response?.status === 401) {
 			localStorage.removeItem("a3_token");
+			// Sinaliza o motivo para a tela de login; sem isso o usuário só vê
+			// a página recarregar sozinha no meio do trabalho.
+			sessionStorage.setItem("a3_session_expired", "1");
 			window.location.reload();
 		}
 		return Promise.reject(err);

@@ -1,5 +1,6 @@
-import React, { useMemo, useRef, useState } from "react";
-import { Calendar, FileBarChart, Printer, AlertCircle, Loader2 } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Calendar, FileBarChart, Printer, AlertCircle } from "lucide-react";
+import { Button, Field } from "@/components/ui";
 import { api } from "@/services/api";
 
 /**
@@ -27,7 +28,11 @@ const mesesAtras = (n: number) => {
 
 const maiorQuePiso = (s: string) => (s < PISO ? PISO : s);
 
-export const EstudoModule = () => {
+export const EstudoModule = ({
+	quickAction,
+}: {
+	quickAction?: { tab: string; action: string; nonce: number } | null;
+}) => {
 	const [inicio, setInicio] = useState(() => maiorQuePiso(`${new Date().getFullYear()}-01-01`));
 	const [fim, setFim] = useState(hoje);
 	const [html, setHtml] = useState<string | null>(null);
@@ -78,6 +83,15 @@ export const EstudoModule = () => {
 		}
 	};
 
+	// Ação rápida vinda da gaveta de atalhos: só seleciona o período. Gerar
+	// continua no botão, porque a chamada é cara.
+	useEffect(() => {
+		if (quickAction?.tab === "estudo" && quickAction.action === "open") {
+			setInicio(primeiroDiaDoMes());
+			setFim(hoje());
+		}
+	}, [quickAction?.nonce]);
+
 	const aplicarAtalho = (i: string, f: string) => {
 		setInicio(i);
 		setFim(f);
@@ -95,69 +109,65 @@ export const EstudoModule = () => {
 		<div className="flex flex-col space-y-4 sm:space-y-6 pb-12">
 			<div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
 				<div className="flex flex-col lg:flex-row gap-3 lg:items-end">
-					<div>
-						<label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">
-							Período
-						</label>
-						<div className="flex items-center gap-2 border border-slate-200 rounded-[10px] p-2 bg-slate-50">
-							<Calendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
+					<Field label="Período">
+						{/* Controle composto: as duas datas moram na mesma moldura. */}
+						<div className="flex items-center gap-2 border border-slate-200 rounded-[10px] p-2 bg-surface-sunken">
+							<Calendar className="w-4 h-4 text-ink-faint flex-shrink-0" />
 							<input
 								type="date"
 								min={PISO}
 								max={fim}
-								className="bg-transparent text-sm outline-none text-slate-600"
+								className="num bg-transparent text-sm outline-none text-ink-muted"
 								value={inicio}
 								onChange={(e) => setInicio(maiorQuePiso(e.target.value))}
 							/>
-							<span className="text-slate-300">|</span>
+							<span className="text-ink-faint">|</span>
 							<input
 								type="date"
 								min={inicio}
-								className="bg-transparent text-sm outline-none text-slate-600"
+								className="num bg-transparent text-sm outline-none text-ink-muted"
 								value={fim}
 								onChange={(e) => setFim(e.target.value)}
 							/>
 						</div>
-					</div>
+					</Field>
 
 					<div className="flex flex-wrap gap-1.5 flex-1">
 						{atalhos.map((a) => (
-							<button
+							<Button
 								key={a.label}
+								variant="secondary"
+								size="sm"
 								onClick={() => aplicarAtalho(a.i, a.f)}
-								className="px-3 py-1.5 text-[11px] font-semibold rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600 transition"
 							>
 								{a.label}
-							</button>
+							</Button>
 						))}
 					</div>
 
 					<div className="flex gap-2">
-						<button
+						<Button
 							onClick={() => gerar()}
-							disabled={carregando || periodoInvalido}
-							className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 font-bold text-sm shadow-md shadow-indigo-200 disabled:opacity-50 disabled:shadow-none transition"
+							loading={carregando}
+							disabled={periodoInvalido}
+							icon={<FileBarChart className="w-4 h-4" />}
 						>
-							{carregando ? (
-								<Loader2 className="w-4 h-4 animate-spin" />
-							) : (
-								<FileBarChart className="w-4 h-4" />
-							)}
 							{carregando ? "Gerando..." : "Gerar estudo"}
-						</button>
+						</Button>
 						{html && (
-							<button
+							<Button
+								variant="secondary"
 								onClick={imprimir}
-								className="flex items-center gap-2 bg-white text-slate-700 border border-slate-300 px-4 py-2.5 rounded-[10px] hover:bg-slate-50 font-bold text-sm transition"
+								icon={<Printer className="w-4 h-4" />}
 								title="Abre o diálogo de impressão — escolha 'Salvar como PDF'"
 							>
-								<Printer className="w-4 h-4" /> Exportar PDF
-							</button>
+								Exportar PDF
+							</Button>
 						)}
 					</div>
 				</div>
 
-				<p className="text-[11px] text-slate-400 flex items-start gap-1.5">
+				<p className="text-2xs text-ink-faint flex items-start gap-1.5">
 					<AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
 					O estudo começa em dez/2025. Antes disso o sistema guardava apenas
 					totais mensais agregados, que distorceriam ticket médio e contagem de
@@ -166,7 +176,7 @@ export const EstudoModule = () => {
 			</div>
 
 			{erro && (
-				<div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm flex items-start gap-2">
+				<div className="bg-danger-50 border border-danger-200 text-danger-700 rounded-xl p-4 text-sm flex items-start gap-2">
 					<AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
 					{erro}
 				</div>
@@ -180,6 +190,11 @@ export const EstudoModule = () => {
 						ref={iframeRef}
 						srcDoc={html}
 						title="Estudo Empresarial"
+						// Sem allow-scripts: o gerador produz SVG e HTML estáticos.
+						// allow-same-origin é necessário para o botão de exportar
+						// alcançar contentWindow.print(); allow-modals é o que
+						// permite o diálogo de impressão abrir.
+						sandbox="allow-same-origin allow-modals"
 						className="w-full border-0"
 						style={{ height: "calc(100vh - 260px)", minHeight: 520 }}
 					/>
@@ -187,11 +202,11 @@ export const EstudoModule = () => {
 			) : (
 				!carregando && (
 					<div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
-						<FileBarChart className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-						<p className="text-slate-500 text-sm font-medium">
+						<FileBarChart className="w-10 h-10 text-ink-faint/60 mx-auto mb-3" />
+						<p className="text-ink-muted text-sm font-medium">
 							Escolha um período e clique em <b>Gerar estudo</b>.
 						</p>
-						<p className="text-slate-400 text-xs mt-1">
+						<p className="num text-ink-faint text-xs mt-1">
 							12 capítulos com receita, volume, clientes, custos e tabela de preços.
 						</p>
 					</div>

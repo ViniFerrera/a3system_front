@@ -28,14 +28,21 @@ import {
 	CheckCircle2,
 	XCircle,
 	BarChart2,
+	Bookmark,
 } from "lucide-react";
+import { OrderFilterPayload } from "@/components/shortcuts/shortcutTypes";
 import { api } from "@/services/api";
 import { useLoading } from "@/components/ui/LoadingOverlay";
+import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Input } from "@/components/ui/Field";
+import { DataTable, TableHead, Th } from "@/components/ui/DataTable";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { ItemGrid } from "./orders/ItemGrid";
 import { PresetBar, OrderPreset } from "./orders/PresetBar";
 import { PresetManagerModal } from "./orders/PresetManagerModal";
-import { EditableItem, toEditableItem } from "./orders/itemOptions";
+import { EditableItem, toEditableItem, createEmptyItem } from "./orders/itemOptions";
 
 interface Machine {
 	id: number;
@@ -50,14 +57,19 @@ const SearchableSelect = ({
 	onChange,
 	placeholder = "Selecione...",
 	fullClients,
+	autoFocus = false,
 }: {
 	options: { id: number; label: string }[];
 	value: number;
 	onChange: (val: number) => void;
 	placeholder?: string;
 	fullClients?: Client[];
+	/** Abre a lista já na montagem — o cursor cai direto no campo de busca. */
+	autoFocus?: boolean;
 }) => {
-	const [isOpen, setIsOpen] = useState(false);
+	// O campo de busca só existe enquanto a lista está aberta; para o foco
+	// automático chegar nele, a lista precisa nascer aberta.
+	const [isOpen, setIsOpen] = useState(autoFocus);
 	const [search, setSearch] = useState("");
 	const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -184,7 +196,7 @@ const VariationIndicator = ({
 	const isPositive = val > 0;
 	if (isNeutral) {
 		return (
-			<div className='flex items-center gap-1 mt-2 text-[10px] font-bold text-slate-400'>
+			<div className='flex items-center gap-1 mt-2 text-2xs font-bold text-slate-400'>
 				<Minus className='w-3 h-3' />
 				<span>0% {label}</span>
 			</div>
@@ -192,7 +204,7 @@ const VariationIndicator = ({
 	}
 	return (
 		<div
-			className={`flex items-center gap-1 mt-2 text-[10px] font-bold ${
+			className={`flex items-center gap-1 mt-2 text-2xs font-bold ${
 				isPositive ? "text-emerald-600" : "text-red-500"
 			}`}
 		>
@@ -209,6 +221,30 @@ const VariationIndicator = ({
 	);
 };
 
+// Limite por arquivo. O servidor recusa acima disso; validar aqui evita
+// esperar um upload de 40MB só para receber erro.
+const MAX_FILE_MB = 25;
+const EXT_PERMITIDAS = [
+	"pdf", "jpg", "jpeg", "png", "gif", "webp", "svg", "ai", "cdr", "psd", "eps",
+	"doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "zip", "rar",
+];
+
+/** Estado do formulário que decide se há algo a perder ao trocar de ordem. */
+interface RascunhoState {
+	formData: Partial<Order>;
+	gridItems: EditableItem[];
+	filesToUpload: File[];
+}
+
+// Rascunho é qualquer coisa que o usuário já tenha preenchido. Fica fora do
+// componente para os dois caminhos de descarte (fechar o modal e "nova ordem"
+// vinda da topbar/paleta) usarem exatamente a mesma régua.
+const temRascunho = (estado: RascunhoState) =>
+	!!estado.formData.cliente_id ||
+	!!estado.formData.descricao ||
+	estado.gridItems.some((i) => i.servico) ||
+	estado.filesToUpload.length > 0;
+
 export const OrderModule = ({
 	clients,
 	priceTable,
@@ -217,6 +253,10 @@ export const OrderModule = ({
 	onStockUpdate,
 	machinery = [],
 	setClients,
+	newOrderSignal = 0,
+	pendingOrderFilter = null,
+	onPendingFilterApplied,
+	onSaveFilterAsShortcut,
 }: {
 	clients: Client[];
 	priceTable: PriceRule[];
@@ -225,6 +265,11 @@ export const OrderModule = ({
 	onStockUpdate: Function;
 	machinery?: Machine[];
 	setClients: Function;
+	newOrderSignal?: number;
+	/** Filtro congelado num atalho, entregue pelo App com um nonce novo a cada clique. */
+	pendingOrderFilter?: (OrderFilterPayload & { nonce: number }) | null;
+	onPendingFilterApplied?: () => void;
+	onSaveFilterAsShortcut?: (p: OrderFilterPayload) => void;
 }) => {
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -241,6 +286,8 @@ export const OrderModule = ({
 		api.get("/onedrive-web-config").then((res) => setOnedriveConfig(res.data)).catch(() => {});
 	}, []);
 	const loading = useLoading();
+	const toast = useToast();
+	const confirm = useConfirm();
 
 	// Configuração Taxa Débito
 	const [debitTaxPercent, setDebitTaxPercent] = useState(0);
@@ -317,10 +364,38 @@ export const OrderModule = ({
 	};
 
 	// --- FORM STATE ---
+	// Data em hora local (sem sufixo Z): o banco guarda hora local e
+	// toISOString() faria a ordem criada após as 21h nascer com a data de amanhã.
 	const [formData, setFormData] = useState<Partial<Order>>({
 		...DEFAULT_NEW_ORDER,
-		data: new Date().toISOString(),
+		data: Utils.localIsoNow(),
 	});
+
+	// Trava de gravação: impede o segundo clique enquanto o POST está em voo.
+	const [isSaving, setIsSaving] = useState(false);
+	const [formErrors, setFormErrors] = useState<{ cliente?: string }>({});
+
+	// Bloco Financeiro colapsável — nada some, apenas deixa de ocupar tela
+	// quando está no padrão.
+	const [financeOpen, setFinanceOpen] = useState(false);
+
+	// Resumo de uma linha do que está configurado — evita expandir só para conferir.
+	const financeSummary = useMemo(() => {
+		const status = { NAO_PAGO: "Não pago", PARCIAL: "Parcial", PAGO: "Pago" }[
+			formData.status_pagamento || "NAO_PAGO"
+		];
+		const forma = formData.forma_pagamento || "sem forma";
+		const taxa = formData.taxa_extra
+			? ` · taxa ${Utils.formatCurrency(formData.taxa_extra)}`
+			: "";
+		const nf = formData.nota_fiscal ? " · com NF" : "";
+		return `${status} · ${forma}${taxa}${nf}`;
+	}, [
+		formData.status_pagamento,
+		formData.forma_pagamento,
+		formData.taxa_extra,
+		formData.nota_fiscal,
+	]);
 
 	// Itens da ordem em edição. Fonte única da grade — substitui o antigo par
 	// "tempItem + formData.items só-leitura".
@@ -369,7 +444,7 @@ export const OrderModule = ({
 			setOrders(processed);
 		} catch (err) {
 			console.error("Erro ao atualizar ordens:", err);
-			alert("Não foi possível atualizar a lista.");
+			toast.error("Não foi possível atualizar a lista.");
 		} finally {
 			setIsRefreshing(false);
 			loading.hide();
@@ -397,15 +472,35 @@ export const OrderModule = ({
 	};
 
 	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-		if (e.target.files) {
-			const files = Array.from(e.target.files);
-			setFilesToUpload((prev) => [...prev, ...files]);
-			const newFileNames = files.map((f) => f.name);
-			setFormData((prev) => ({
-				...prev,
-				anexos: [...(prev.anexos || []), ...newFileNames],
-			}));
+		if (!e.target.files) return;
+		const escolhidos = Array.from(e.target.files);
+		const aceitos: File[] = [];
+
+		escolhidos.forEach((f) => {
+			const ext = f.name.split(".").pop()?.toLowerCase() || "";
+			if (f.size > MAX_FILE_MB * 1024 * 1024) {
+				toast.error(
+					`"${f.name}" tem ${(f.size / 1024 / 1024).toFixed(
+						1
+					)}MB — o limite é ${MAX_FILE_MB}MB.`
+				);
+			} else if (!EXT_PERMITIDAS.includes(ext)) {
+				toast.error(`"${f.name}": extensão .${ext} não é aceita.`);
+			} else {
+				aceitos.push(f);
+			}
+		});
+
+		if (aceitos.length === 0) {
+			e.target.value = "";
+			return;
 		}
+		setFilesToUpload((prev) => [...prev, ...aceitos]);
+		setFormData((prev) => ({
+			...prev,
+			anexos: [...(prev.anexos || []), ...aceitos.map((f) => f.name)],
+		}));
+		e.target.value = "";
 	};
 
 	const filteredOrders = useMemo(() => {
@@ -591,7 +686,17 @@ export const OrderModule = ({
 			.catch(console.error);
 	};
 
-	const handleSave = async () => {
+	const handleSave = async (keepOpen = false) => {
+		// Segunda guarda contra duplo envio (a primeira é o botão desabilitado).
+		if (isSaving) return;
+
+		if (!formData.cliente_id) {
+			setFormErrors({ cliente: "Selecione um cliente" });
+			toast.error("Selecione um cliente antes de salvar a ordem.");
+			return;
+		}
+		setFormErrors({});
+
 		// Linha em branco (usuário clicou "Adicionar linha" e não preencheu)
 		// não vira item da ordem.
 		const items = gridItems
@@ -634,6 +739,7 @@ export const OrderModule = ({
 		);
 		filesToUpload.forEach((file) => dataPayload.append("files", file));
 
+		setIsSaving(true);
 		loading.show(editingOrder ? "Salvando ordem..." : "Criando ordem...");
 		try {
 			let savedOrder: Order;
@@ -655,38 +761,68 @@ export const OrderModule = ({
 				savedOrder = sanitizeOrderResponse(mergedData);
 				setOrders((prev: Order[]) => [savedOrder, ...prev]);
 			}
-			setIsModalOpen(false);
+			toast.success(
+				editingOrder
+					? `Ordem #${editingOrder.id} atualizada.`
+					: `Ordem #${savedOrder.id} criada.`
+			);
+			// Limpeza comum aos dois caminhos.
 			setEditingOrder(null);
 			setFilesToUpload([]);
-			setGridItems([]);
 			setFormData({
 				...DEFAULT_NEW_ORDER,
-				data: new Date().toISOString(),
+				data: Utils.localIsoNow(),
 			});
+			if (keepOpen) {
+				// Mantém o modal aberto e já pronto para a próxima ordem do balcão.
+				setGridItems([createEmptyItem()]);
+				setFinanceOpen(false);
+			} else {
+				setGridItems([]);
+				setIsModalOpen(false);
+			}
 		} catch (err) {
 			console.error(err);
-			alert("Erro ao salvar ordem");
+			toast.error("Erro ao salvar a ordem. Nada foi gravado — tente novamente.");
 		} finally {
+			setIsSaving(false);
 			loading.hide();
 		}
 	};
 
 	const handleDelete = async (id: number) => {
-		if (confirm("Tem certeza que deseja apagar esta ordem?")) {
-			try {
-				await api.delete(`/orders/${id}`);
-				setOrders((prev: Order[]) => prev.filter((o) => o.id !== id));
-			} catch (err) {
-				alert("Erro ao apagar ordem");
-			}
+		const ok = await confirm({
+			title: `Apagar a ordem #${id}?`,
+			message: "Esta ação não pode ser desfeita.",
+			confirmLabel: "Apagar",
+			danger: true,
+		});
+		if (!ok) return;
+		try {
+			await api.delete(`/orders/${id}`);
+			setOrders((prev: Order[]) => prev.filter((o) => o.id !== id));
+			toast.success(`Ordem #${id} apagada.`);
+		} catch (err) {
+			toast.error("Erro ao apagar a ordem.");
 		}
 	};
 
 	const updateStatus = async (order: Order, updates: Partial<Order>) => {
 		if (updates.status === "CONCLUIDA" && order.status !== "CONCLUIDA") {
-			if (!confirm("Confirmar conclusão e dar baixa no estoque?")) return;
+			const ok = await confirm({
+				title: `Concluir a ordem #${order.id}?`,
+				message: "O estoque será baixado conforme os itens da ordem.",
+				confirmLabel: "Concluir",
+			});
+			if (!ok) return;
 		} else if (updates.status === "CANCELADA") {
-			if (!confirm("Confirmar cancelamento da ordem?")) return;
+			const ok = await confirm({
+				title: `Cancelar a ordem #${order.id}?`,
+				confirmLabel: "Cancelar ordem",
+				cancelLabel: "Voltar",
+				danger: true,
+			});
+			if (!ok) return;
 		}
 		const statusLabel = updates.status === "CONCLUIDA" ? "Concluindo" : updates.status === "CANCELADA" ? "Cancelando" : "Atualizando";
 		loading.show(`${statusLabel} ordem #${order.id}...`);
@@ -707,7 +843,7 @@ export const OrderModule = ({
 			);
 			if (updates.status === "CONCLUIDA") onStockUpdate(order.items);
 		} catch (err) {
-			alert("Erro ao atualizar status");
+			toast.error("Erro ao atualizar o status da ordem.");
 		} finally {
 			loading.hide();
 		}
@@ -720,16 +856,16 @@ export const OrderModule = ({
 				key: "taxa_debito",
 				value: String(debitTaxPercent),
 			});
-			alert("Taxa salva com sucesso!");
+			toast.success("Taxa salva com sucesso.");
 			setIsConfigModalOpen(false);
 		} catch (err) {
-			alert("Erro ao salvar configuração.");
+			toast.error("Erro ao salvar a configuração.");
 		}
 	};
 
 	// SALVAR NOVO CLIENTE RÁPIDO
 	const handleQuickClientSave = async () => {
-		if (!quickClientData.nome) return alert("Nome é obrigatório");
+		if (!quickClientData.nome) return toast.error("Informe o nome do cliente.");
 		try {
 			const res = await api.post("/clients", {
 				nome: quickClientData.nome,
@@ -742,7 +878,7 @@ export const OrderModule = ({
 			setIsQuickClientOpen(false);
 			setQuickClientData({ nome: "", telefone: "", email: "" });
 		} catch (e) {
-			alert("Erro ao criar cliente");
+			toast.error("Erro ao criar o cliente.");
 		}
 	};
 
@@ -763,17 +899,156 @@ export const OrderModule = ({
 						: order.anexos || [],
 				taxa_extra: order.taxa_extra || 0,
 			});
+			// Edição abre expandido: os valores gravados precisam ficar à vista.
+			setFinanceOpen(true);
 		} else {
 			setEditingOrder(null);
 			setFilesToUpload([]);
-			setGridItems([]);
+			// Uma linha já criada poupa um clique em toda ordem — e ordens de item
+			// único são 61,9% do histórico. Linha em branco não vira item: handleSave
+			// filtra por `i.servico`.
+			setGridItems([createEmptyItem()]);
 			setFormData({
 				...DEFAULT_NEW_ORDER,
-				data: new Date().toISOString(),
+				data: Utils.localIsoNow(),
 			});
+			// Ordem nova nasce no padrão — o bloco não precisa ocupar tela.
+			setFinanceOpen(false);
 		}
+		setFormErrors({});
+		setIsSaving(false);
 		setIsModalOpen(true);
 	};
+
+	// Fechar com dados preenchidos pede confirmação — hoje o preenchimento
+	// evapora sem aviso.
+	const handleCloseModal = async () => {
+		const temConteudo = temRascunho({ formData, gridItems, filesToUpload });
+		if (temConteudo && !editingOrder) {
+			const ok = await confirm({
+				title: "Descartar esta ordem?",
+				message: "O que você preencheu será perdido.",
+				confirmLabel: "Descartar",
+				cancelLabel: "Continuar editando",
+				danger: true,
+			});
+			if (!ok) return;
+		}
+		setIsModalOpen(false);
+	};
+
+	// Atalhos válidos só enquanto o formulário está aberto E é o diálogo do
+	// topo. Cliente rápido, pré-definições e taxa abrem POR CIMA do formulário
+	// (isModalOpen continua true); sem esta guarda, um Ctrl+Enter digitado
+	// dentro deles gravava a ordem e fechava o formulário por baixo, deixando o
+	// diálogo de cima órfão. O módulo nunca desmonta, então o listener precisa
+	// sair junto com o modal.
+	const atalhosAtivos =
+		isModalOpen && !isQuickClientOpen && !isPresetManagerOpen && !isConfigModalOpen;
+	useEffect(() => {
+		if (!atalhosAtivos) return;
+		const onKey = (e: KeyboardEvent) => {
+			if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+				e.preventDefault();
+				handleSave(false);
+			} else if (e.altKey && e.key.toLowerCase() === "n") {
+				e.preventDefault();
+				setGridItems((prev) => [...prev, createEmptyItem()]);
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+		// `editingOrder` e `clients` entram porque handleSave lê os dois: sem
+		// eles o listener podia gravar com o modo (criação/edição) ou o nome do
+		// cliente de um render anterior.
+	}, [
+		atalhosAtivos,
+		formData,
+		gridItems,
+		filesToUpload,
+		isSaving,
+		editingOrder,
+		clients,
+	]);
+
+	// Espelho do formulário para o efeito abaixo consultar sem depender dele.
+	// Se `formData`/`gridItems` entrassem nas dependências, o efeito re-rodaria
+	// a cada tecla digitada e perguntaria sozinho no meio do preenchimento.
+	const formStateRef = useRef({
+		isModalOpen,
+		editingOrder,
+		formData,
+		gridItems,
+		filesToUpload,
+	});
+	useEffect(() => {
+		formStateRef.current = {
+			isModalOpen,
+			editingOrder,
+			formData,
+			gridItems,
+			filesToUpload,
+		};
+	});
+
+	// Abre o formulário quando a topbar/paleta/atalho pede "nova ordem".
+	// Ignora o valor inicial 0 para não abrir sozinho no primeiro render.
+	//
+	// Com o formulário aberto e algo em jogo — rascunho novo ou edição de uma
+	// ordem existente —, pergunta antes: `openModal()` faz o reset completo e
+	// não há como voltar atrás depois dele. Recusando, nada é tocado.
+	useEffect(() => {
+		if (newOrderSignal <= 0) return;
+		// Um sinal mais novo (ou uma recusa) não pode abrir o formulário depois
+		// que este efeito já foi substituído — o módulo nunca desmonta.
+		let cancelado = false;
+		const pedirNovaOrdem = async () => {
+			const atual = formStateRef.current;
+			const emJogo =
+				atual.isModalOpen && (!!atual.editingOrder || temRascunho(atual));
+			if (emJogo) {
+				const ok = await confirm({
+					title: "Descartar e começar uma ordem nova?",
+					message: atual.editingOrder
+						? `As alterações da ordem #${atual.editingOrder.id} serão perdidas.`
+						: "O que você preencheu será perdido.",
+					confirmLabel: "Começar nova",
+					cancelLabel: "Continuar editando",
+					danger: true,
+				});
+				if (!ok) return;
+			}
+			if (cancelado) return;
+			openModal();
+		};
+		pedirNovaOrdem();
+		return () => {
+			cancelado = true;
+		};
+		// Depende só do sinal, de propósito: `confirm` é estável e o resto do
+		// estado é lido pelo ref.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [newOrderSignal]);
+
+	// Aplica o filtro que veio de um atalho. Mexe só nos estados de filtro e na
+	// paginação — nada aqui toca no formulário, então clicar num atalho salvo
+	// nunca dispara a pergunta de descartar rascunho acima.
+	//
+	// Depende do nonce: o App zera `pendingOrderFilter` no callback, então o
+	// mesmo atalho clicado duas vezes seguidas volta a passar por aqui.
+	useEffect(() => {
+		if (!pendingOrderFilter) return;
+		setFilterStart(pendingOrderFilter.filterStart);
+		setFilterEnd(pendingOrderFilter.filterEnd);
+		setFilterClient(pendingOrderFilter.filterClient);
+		setFilterServices(pendingOrderFilter.filterServices);
+		setFilterPaymentStatus(pendingOrderFilter.filterPaymentStatus);
+		setFilterOrderStatus(pendingOrderFilter.filterOrderStatus);
+		setFilterNF(pendingOrderFilter.filterNF);
+		setCurrentPage(1);
+		onPendingFilterApplied?.();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [pendingOrderFilter?.nonce]);
 
 	const clientOptions = useMemo(
 		() => [
@@ -794,10 +1069,10 @@ export const OrderModule = ({
 				<Card className='p-3 sm:p-4 flex justify-between items-center bg-slate-50 border border-slate-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-indigo-500'></div>
 					<div>
-						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
 							Total de ordens
 						</p>
-						<h3 className='text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
+						<h3 className='num text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
 							{summary.totalOrders}
 						</h3>
 						<VariationIndicator val={summary.variationTotal} />
@@ -808,10 +1083,10 @@ export const OrderModule = ({
 				<Card className='p-3 sm:p-4 flex justify-between items-center bg-amber-50/30 border border-amber-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-amber-500'></div>
 					<div>
-						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
 							Ordens abertas
 						</p>
-						<h3 className='text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
+						<h3 className='num text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
 							{summary.openOrdersSnapshot}
 						</h3>
 						<VariationIndicator val={summary.variationOpen} />
@@ -827,10 +1102,10 @@ export const OrderModule = ({
 				<Card className='p-3 sm:p-4 flex justify-between items-center bg-emerald-50/30 border border-emerald-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-emerald-500'></div>
 					<div>
-						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
 							Ordens concluídas
 						</p>
-						<h3 className='text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
+						<h3 className='num text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
 							{summary.completedOrdersSnapshot}
 						</h3>
 						<VariationIndicator val={summary.variationCompleted} />
@@ -842,13 +1117,13 @@ export const OrderModule = ({
 				<Card className='p-3 sm:p-4 flex justify-between items-center bg-blue-50/30 border border-blue-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-500'></div>
 					<div>
-						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
 							Tempo médio
 						</p>
-						<h3 className='text-lg sm:text-xl font-bold text-slate-800 mt-1'>
+						<h3 className='num text-lg sm:text-xl font-bold text-slate-800 mt-1'>
 							{summary.avgTimeDisplay}
 						</h3>
-						<div className='flex items-center gap-1 mt-2 text-[10px] text-blue-500'>
+						<div className='flex items-center gap-1 mt-2 text-2xs text-blue-500'>
 							<Clock className='w-3 h-3' /> Conclusão
 						</div>
 					</div>
@@ -897,6 +1172,19 @@ export const OrderModule = ({
 					</div>
 				</div>
 				<div className='flex items-center gap-2 justify-end'>
+					{/* Congela os filtros atuais num atalho da gaveta lateral. */}
+					<Button
+						variant="ghost"
+						size="sm"
+						className="mr-auto"
+						icon={<Bookmark className="w-3.5 h-3.5" />}
+						onClick={() => onSaveFilterAsShortcut?.({
+							filterStart, filterEnd, filterClient, filterServices,
+							filterPaymentStatus, filterOrderStatus, filterNF,
+						})}
+					>
+						Salvar como atalho
+					</Button>
 					<button
 						onClick={handleRefreshOrders}
 						disabled={isRefreshing}
@@ -941,7 +1229,7 @@ export const OrderModule = ({
 							className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-semibold text-xs transition-all duration-150 shadow-sm ${filterOrderStatus === btn.key ? btn.active + " shadow-md" : btn.inactive}`}
 						>
 							{btn.icon}{btn.label}
-							<span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${filterOrderStatus === btn.key ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{count}</span>
+							<span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-2xs font-bold ${filterOrderStatus === btn.key ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{count}</span>
 						</button>
 					);
 				})}
@@ -988,7 +1276,7 @@ export const OrderModule = ({
 							<button
 								key={tab.key}
 								onClick={() => setFilterNF(tab.key as any)}
-								className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+								className={`px-3 py-1.5 text-2xs font-bold rounded-lg transition-all ${
 									filterNF === tab.key
 										? "bg-indigo-600 text-white shadow-sm"
 										: "text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200"
@@ -1002,322 +1290,321 @@ export const OrderModule = ({
 			</div>
 
 			{/* 4. TABELA */}
-			<div className='bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden'>
-				<div className='overflow-x-auto min-h-[300px]'>
-					<table className='w-full text-left text-sm text-slate-600'>
-						<thead className='bg-slate-50 text-slate-500 font-bold uppercase text-[11px] border-b border-slate-200'>
-							<tr>
-								<th className='p-2 sm:p-4 w-14 sm:w-20'>ID</th>
-								<th className='p-2 sm:p-4'>Cliente</th>
-								<th className='p-2 sm:p-4 hidden lg:table-cell'>Criação</th>
-								<th className='p-2 sm:p-4 hidden xl:table-cell'>Conclusão</th>
-								<th className='p-2 sm:p-4 hidden md:table-cell'>Serviços</th>
-								<th className='p-2 sm:p-4'>Total</th>
-								<th className='p-2 sm:p-4 hidden sm:table-cell'>Pagamento</th>
-								<th className='p-2 sm:p-4 hidden sm:table-cell'>Status</th>
-								<th className='p-2 sm:p-4 text-right'>Ações</th>
-							</tr>
-						</thead>
-						<tbody className='divide-y divide-slate-100/60'>
-							{paginatedOrders.length > 0 ? (
-								paginatedOrders.map((order) => {
-									const isExpanded = expandedOrderId === order.id;
-									return (
-										<React.Fragment key={order.id}>
-											<tr
-												className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
-													isExpanded ? "bg-indigo-50/30" : ""
-												}`}
-												onClick={() =>
-													setExpandedOrderId(
-														isExpanded ? null : Number(order.id)
-													)
-												}
+			<div className='space-y-2'>
+				<DataTable
+					isEmpty={paginatedOrders.length === 0}
+					emptyTitle='Nenhuma ordem no período e filtros selecionados'
+					// Piso de 420px: em telas curtas (celular, notebook 768px)
+					// `100vh - 420px` deixava a janela da tabela com ~250px, bem
+					// menos do que a lista ocupava antes, quando crescia com a
+					// página. O teto por viewport continua valendo no desktop.
+					maxHeight='max(420px, calc(100vh - 420px))'
+				>
+					<TableHead>
+						<tr>
+							<Th className='w-14 sm:w-20'>ID</Th>
+							<Th>Cliente</Th>
+							<Th className='hidden lg:table-cell'>Criação</Th>
+							<Th className='hidden xl:table-cell'>Conclusão</Th>
+							<Th className='hidden md:table-cell'>Serviços</Th>
+							<Th>Total</Th>
+							<Th className='hidden sm:table-cell'>Pagamento</Th>
+							<Th className='hidden sm:table-cell'>Status</Th>
+							<Th align='right'>Ações</Th>
+						</tr>
+					</TableHead>
+					<tbody className='divide-y divide-slate-100/60 text-left text-sm text-slate-600'>
+						{paginatedOrders.map((order) => {
+							const isExpanded = expandedOrderId === order.id;
+							return (
+								<React.Fragment key={order.id}>
+									<tr
+										className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
+											isExpanded ? "bg-indigo-50/30" : ""
+										}`}
+										onClick={() =>
+											setExpandedOrderId(
+												isExpanded ? null : Number(order.id)
+											)
+										}
+									>
+										<td className='p-2 sm:p-4 font-mono text-xs text-slate-400'>
+											<span>#{order.id}</span>
+											{order.nota_fiscal && <span className='ml-1 px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px] font-bold'>NF</span>}
+										</td>
+										<td className='p-2 sm:p-4 max-w-[140px] sm:max-w-[200px]'>
+											<span className='font-bold text-slate-700 text-xs sm:text-sm block break-words leading-snug'>{order.cliente_nome}</span>
+											<span className='text-2xs text-slate-400 sm:hidden block mt-0.5'>{Utils.formatDateTime(order.data)}</span>
+										</td>
+										<td className='p-2 sm:p-4 text-xs hidden lg:table-cell'>
+											{Utils.formatDateTime(order.data)}
+										</td>
+										<td className='p-2 sm:p-4 text-xs hidden xl:table-cell'>
+											{order.data_conclusao ? (
+												<span className='text-emerald-600 font-medium'>
+													{Utils.formatDateTime(order.data_conclusao)}
+												</span>
+											) : (
+												<span className='text-slate-400 italic'>--</span>
+											)}
+										</td>
+										<td
+											className='p-2 sm:p-4 text-xs max-w-[200px] truncate hidden md:table-cell'
+											title={order.items
+												.map((i) => Utils.displayName(i.servico))
+												.join(", ")}
+										>
+											{order.items.length > 0 ? (
+												<div className='flex gap-1 overflow-hidden'>
+													{order.items.slice(0, 2).map((i, idx) => (
+														<span
+															key={idx}
+															className='inline-flex items-center px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-2xs text-slate-600 whitespace-nowrap'
+														>
+															{Utils.displayName(i.servico)}
+														</span>
+													))}
+												</div>
+											) : (
+												"Sem itens"
+											)}
+										</td>
+										<td className='num p-2 sm:p-4 font-bold text-slate-800 text-xs sm:text-sm'>
+											{Utils.formatCurrency(order.total)}
+											{(order.taxa_extra || 0) > 0 && (
+												<span className='text-[9px] text-slate-400 block'>
+													(+ juros)
+												</span>
+											)}
+										</td>
+										<td className='p-2 sm:p-4 hidden sm:table-cell'>
+											<Badge
+												status={order.status_pagamento || "NAO_PAGO"}
+											/>
+										</td>
+										<td className='p-2 sm:p-4 hidden sm:table-cell'>
+											<span
+												className={`px-2 py-1 rounded-[6px] text-2xs font-bold border uppercase tracking-wide
+											${
+												order.status === "ABERTA"
+													? "bg-blue-50 text-blue-600 border-blue-100"
+													: order.status === "CONCLUIDA"
+													? "bg-emerald-50 text-emerald-600 border-emerald-100"
+													: "bg-slate-100 text-slate-500 border-slate-200"
+											}`}
 											>
-												<td className='p-2 sm:p-4 font-mono text-xs text-slate-400'>
-													<span>#{order.id}</span>
-													{order.nota_fiscal && <span className='ml-1 px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px] font-bold'>NF</span>}
-												</td>
-												<td className='p-2 sm:p-4 max-w-[140px] sm:max-w-[200px]'>
-													<span className='font-bold text-slate-700 text-xs sm:text-sm block break-words leading-snug'>{order.cliente_nome}</span>
-													<span className='text-[10px] text-slate-400 sm:hidden block mt-0.5'>{Utils.formatDateTime(order.data)}</span>
-												</td>
-												<td className='p-2 sm:p-4 text-xs hidden lg:table-cell'>
-													{Utils.formatDateTime(order.data)}
-												</td>
-												<td className='p-2 sm:p-4 text-xs hidden xl:table-cell'>
-													{order.data_conclusao ? (
-														<span className='text-emerald-600 font-medium'>
-															{Utils.formatDateTime(order.data_conclusao)}
-														</span>
-													) : (
-														<span className='text-slate-400 italic'>--</span>
-													)}
-												</td>
-												<td
-													className='p-2 sm:p-4 text-xs max-w-[200px] truncate hidden md:table-cell'
-													title={order.items
-														.map((i) => Utils.displayName(i.servico))
-														.join(", ")}
+												{order.status}
+											</span>
+										</td>
+										<td className='p-2 sm:p-4 text-right' onClick={(e) => e.stopPropagation()}>
+											<div className='flex justify-end gap-1 sm:gap-1.5 flex-wrap'>
+												{order.status === "ABERTA" && (
+													<button
+														onClick={() => updateStatus(order, { status: "CONCLUIDA" })}
+														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-emerald-500 text-white text-2xs font-bold rounded-lg hover:bg-emerald-600 shadow-sm shadow-emerald-200 transition-all'
+													>
+														<CheckCircle2 className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Concluir</span>
+													</button>
+												)}
+												{order.status === "ABERTA" && (
+													<button
+														onClick={() => updateStatus(order, { status: "CANCELADA" })}
+														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-red-50 text-red-600 text-2xs font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all'
+													>
+														<XCircle className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Cancelar</span>
+													</button>
+												)}
+												{order.status === "CONCLUIDA" && (
+													<button
+														onClick={() => updateStatus(order, { status: "ABERTA" })}
+														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-2xs font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
+													>
+														<Clock className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Reabrir</span>
+													</button>
+												)}
+												{order.status === "CANCELADA" && (
+													<button
+														onClick={() => updateStatus(order, { status: "ABERTA" })}
+														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-2xs font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
+													>
+														<Clock className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Reabrir</span>
+													</button>
+												)}
+												<button
+													onClick={() => openModal(order)}
+													className='p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[6px] transition'
 												>
-													{order.items.length > 0 ? (
-														<div className='flex gap-1 overflow-hidden'>
-															{order.items.slice(0, 2).map((i, idx) => (
-																<span
-																	key={idx}
-																	className='inline-flex items-center px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[10px] text-slate-600 whitespace-nowrap'
-																>
-																	{Utils.displayName(i.servico)}
-																</span>
-															))}
-														</div>
-													) : (
-														"Sem itens"
-													)}
-												</td>
-												<td className='p-2 sm:p-4 font-bold text-slate-800 text-xs sm:text-sm'>
-													{Utils.formatCurrency(order.total)}
-													{(order.taxa_extra || 0) > 0 && (
-														<span className='text-[9px] text-slate-400 block'>
-															(+ juros)
-														</span>
-													)}
-												</td>
-												<td className='p-2 sm:p-4 hidden sm:table-cell'>
-													<Badge
-														status={order.status_pagamento || "NAO_PAGO"}
-													/>
-												</td>
-												<td className='p-2 sm:p-4 hidden sm:table-cell'>
-													<span
-														className={`px-2 py-1 rounded-[6px] text-[10px] font-bold border uppercase tracking-wide
-													${
-														order.status === "ABERTA"
-															? "bg-blue-50 text-blue-600 border-blue-100"
-															: order.status === "CONCLUIDA"
-															? "bg-emerald-50 text-emerald-600 border-emerald-100"
-															: "bg-slate-100 text-slate-500 border-slate-200"
-													}`}
-													>
-														{order.status}
-													</span>
-												</td>
-												<td className='p-2 sm:p-4 text-right' onClick={(e) => e.stopPropagation()}>
-													<div className='flex justify-end gap-1 sm:gap-1.5 flex-wrap'>
-														{order.status === "ABERTA" && (
-															<button
-																onClick={() => updateStatus(order, { status: "CONCLUIDA" })}
-																className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 shadow-sm shadow-emerald-200 transition-all'
-															>
-																<CheckCircle2 className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Concluir</span>
-															</button>
-														)}
-														{order.status === "ABERTA" && (
-															<button
-																onClick={() => updateStatus(order, { status: "CANCELADA" })}
-																className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-red-50 text-red-600 text-[10px] font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all'
-															>
-																<XCircle className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Cancelar</span>
-															</button>
-														)}
-														{order.status === "CONCLUIDA" && (
-															<button
-																onClick={() => updateStatus(order, { status: "ABERTA" })}
-																className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
-															>
-																<Clock className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Reabrir</span>
-															</button>
-														)}
-														{order.status === "CANCELADA" && (
-															<button
-																onClick={() => updateStatus(order, { status: "ABERTA" })}
-																className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
-															>
-																<Clock className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Reabrir</span>
-															</button>
-														)}
-														<button
-															onClick={() => openModal(order)}
-															className='p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[6px] transition'
-														>
-															<Edit2 className='w-4 h-4' />
-														</button>
-														<button
-															onClick={() => handleDelete(order.id!)}
-															className='p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-[6px] transition'
-														>
-															<Trash2 className='w-4 h-4' />
-														</button>
-														<button
-															onClick={() => setExpandedOrderId(isExpanded ? null : Number(order.id))}
-															className='p-1.5 text-slate-400 hover:text-indigo-600'
-														>
-															{isExpanded ? <ChevronUp className='w-4 h-4' /> : <ChevronDown className='w-4 h-4' />}
-														</button>
-													</div>
-												</td>
-											</tr>
-											{isExpanded && (
-												<tr className='bg-slate-50/50'>
-													<td
-														colSpan={9}
-														className='p-4 border-b border-indigo-100'
-													>
-														<div className='grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-2 duration-300 origin-top'>
-															{/* Detalhes (Item 1) */}
-															<div className='col-span-2 space-y-3'>
-																<div className='bg-white p-4 rounded-[10px] border-l-4 border-indigo-500 shadow-sm'>
-																	<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-2'>
-																		<List className='w-4 h-4 text-indigo-500' />{" "}
-																		Detalhes do Pedido
-																	</h5>
-																	<ul className='space-y-2'>
-																		{order.items.map((item, idx) => (
-																			<li
-																				key={idx}
-																				className='flex justify-between text-xs border-b border-slate-50 last:border-0 pb-2'
-																			>
-																				<span className='text-slate-700'>
-																					<strong className='text-indigo-600'>
-																						{item.quantidade}x
-																					</strong>{" "}
-																					{Utils.displayName(item.servico)}
-																					{Utils.displayName(item.material)
-																						? ` - ${Utils.displayName(item.material)}`
-																						: ""}
-																					{Utils.displayName(item.gramatura)
-																						? ` (${Utils.displayName(item.gramatura)})`
-																						: ""}
-																					{Utils.displayName(item.tamanho)
-																						? ` · ${Utils.displayName(item.tamanho)}`
-																						: ""}
-																					{Utils.displayName(item.cor) && (
-																						<span className='text-slate-400 text-[10px] ml-1'>
-																							({Utils.displayName(item.cor)})
-																						</span>
-																					)}
+													<Edit2 className='w-4 h-4' />
+												</button>
+												<button
+													onClick={() => handleDelete(order.id!)}
+													className='p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-[6px] transition'
+												>
+													<Trash2 className='w-4 h-4' />
+												</button>
+												<button
+													onClick={() => setExpandedOrderId(isExpanded ? null : Number(order.id))}
+													className='p-1.5 text-slate-400 hover:text-indigo-600'
+												>
+													{isExpanded ? <ChevronUp className='w-4 h-4' /> : <ChevronDown className='w-4 h-4' />}
+												</button>
+											</div>
+										</td>
+									</tr>
+									{isExpanded && (
+										<tr className='bg-slate-50/50'>
+											<td
+												colSpan={9}
+												className='p-4 border-b border-indigo-100'
+											>
+												<div className='grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-2 duration-300 origin-top'>
+													{/* Detalhes (Item 1) */}
+													<div className='col-span-2 space-y-3'>
+														<div className='bg-white p-4 rounded-[10px] border-l-4 border-indigo-500 shadow-sm'>
+															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2'>
+																<List className='w-4 h-4 text-indigo-500' />{" "}
+																Detalhes do Pedido
+															</h5>
+															<ul className='space-y-2'>
+																{order.items.map((item, idx) => (
+																	<li
+																		key={idx}
+																		className='flex justify-between text-xs border-b border-slate-50 last:border-0 pb-2'
+																	>
+																		<span className='text-slate-700'>
+																			<strong className='text-indigo-600'>
+																				{item.quantidade}x
+																			</strong>{" "}
+																			{Utils.displayName(item.servico)}
+																			{Utils.displayName(item.material)
+																				? ` - ${Utils.displayName(item.material)}`
+																				: ""}
+																			{Utils.displayName(item.gramatura)
+																				? ` (${Utils.displayName(item.gramatura)})`
+																				: ""}
+																			{Utils.displayName(item.tamanho)
+																				? ` · ${Utils.displayName(item.tamanho)}`
+																				: ""}
+																			{Utils.displayName(item.cor) && (
+																				<span className='text-slate-400 text-2xs ml-1'>
+																					({Utils.displayName(item.cor)})
 																				</span>
-																				<span className='font-bold text-slate-600'>
-																					{Utils.formatCurrency(item.total)}
-																				</span>
-																			</li>
-																		))}
-																	</ul>
-																	{(order.taxa_extra || 0) > 0 && (
-																		<div className='flex justify-end mt-2 pt-2 border-t border-slate-100 text-[10px] text-red-500 font-bold'>
-																			+ Juros/Taxas:{" "}
-																			{Utils.formatCurrency(
-																				order.taxa_extra || 0
 																			)}
-																		</div>
+																		</span>
+																		<span className='num font-bold text-slate-600'>
+																			{Utils.formatCurrency(item.total)}
+																		</span>
+																	</li>
+																))}
+															</ul>
+															{(order.taxa_extra || 0) > 0 && (
+																<div className='num flex justify-end mt-2 pt-2 border-t border-slate-100 text-2xs text-red-500 font-bold'>
+																	+ Juros/Taxas:{" "}
+																	{Utils.formatCurrency(
+																		order.taxa_extra || 0
 																	)}
 																</div>
-																<div className='bg-white p-4 rounded-[10px] border-l-4 border-amber-400 shadow-sm'>
-																	<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-2'>
-																		Descrição / Obs
-																	</h5>
-																	<p className='text-xs text-slate-600 italic leading-relaxed'>
-																		{order.descricao ||
-																			"Nenhuma observação registrada."}
-																	</p>
+															)}
+														</div>
+														<div className='bg-white p-4 rounded-[10px] border-l-4 border-amber-400 shadow-sm'>
+															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-2'>
+																Descrição / Obs
+															</h5>
+															<p className='text-xs text-slate-600 italic leading-relaxed'>
+																{order.descricao ||
+																	"Nenhuma observação registrada."}
+															</p>
+														</div>
+													</div>
+													{/* Coluna 2 */}
+													<div className='space-y-3'>
+														<div className='bg-white p-4 rounded-[10px] border-l-4 border-slate-400 shadow-sm'>
+															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-3'>
+																Financeiro
+															</h5>
+															<div className='space-y-2 mb-3'>
+																<div className='flex justify-between text-xs'>
+																	<span className='text-slate-500'>
+																		Forma:
+																	</span>
+																	<span className='font-bold text-slate-700'>
+																		{order.forma_pagamento || "N/D"}
+																	</span>
+																</div>
+																<div className='flex justify-between text-xs'>
+																	<span className='text-slate-500'>
+																		Total:
+																	</span>
+																	<span className='num font-bold text-indigo-600'>
+																		{Utils.formatCurrency(order.total)}
+																	</span>
 																</div>
 															</div>
-															{/* Coluna 2 */}
-															<div className='space-y-3'>
-																<div className='bg-white p-4 rounded-[10px] border-l-4 border-slate-400 shadow-sm'>
-																	<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-3'>
-																		Financeiro
-																	</h5>
-																	<div className='space-y-2 mb-3'>
-																		<div className='flex justify-between text-xs'>
-																			<span className='text-slate-500'>
-																				Forma:
-																			</span>
-																			<span className='font-bold text-slate-700'>
-																				{order.forma_pagamento || "N/D"}
-																			</span>
-																		</div>
-																		<div className='flex justify-between text-xs'>
-																			<span className='text-slate-500'>
-																				Total:
-																			</span>
-																			<span className='font-bold text-indigo-600'>
-																				{Utils.formatCurrency(order.total)}
-																			</span>
-																		</div>
-																	</div>
-																	{/* Ações */}
-																	<div className='flex flex-col gap-2 pt-2 border-t border-slate-100'>
-																		<div className='flex gap-1'>
-																			{["PAGO", "PARCIAL", "NAO_PAGO"].map(
-																				(btn) => (
-																					<button
-																						key={btn}
-																						onClick={() =>
-																							updateStatus(order, {
-																								status_pagamento: btn as any,
-																							})
-																						}
-																						className={`flex-1 text-[9px] font-bold py-1 rounded border transition-colors ${
-																							order.status_pagamento === btn
-																								? "bg-slate-800 text-white"
-																								: "text-slate-400 hover:bg-slate-100"
-																						}`}
-																					>
-																						{btn.replace("_", " ")}
-																					</button>
-																				)
-																			)}
-																		</div>
-																	</div>
-																</div>
-																<div className='bg-white p-4 rounded-[10px] border-l-4 border-blue-400 shadow-sm'>
-																	<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-2 flex items-center gap-2'>
-																		<FolderOpen className='w-4 h-4 text-blue-500' />{" "}
-																		Arquivos
-																	</h5>
-																	<div className='mb-2 bg-slate-50 p-2 rounded border border-slate-200 text-[10px] text-slate-500 font-mono break-all'>
-																		01_A3_Art_Copy/Ordens/{order.data.split("T")[0]}/OS{order.id}_{order.cliente_nome.replace(/\s+/g, "_")}
-																	</div>
-																	{onedriveConfig?.cid && (() => {
-																		const folderName = `OS${order.id}_${order.cliente_nome.replace(/\s+/g, "_")}`;
-																		const date = order.data?.split("T")[0] || "";
-																		const fullPath = `/personal/${onedriveConfig.cid}/Documents/${onedriveConfig.folderPath}/${date}/${folderName}`;
-																		const url = `https://onedrive.live.com/?id=${encodeURIComponent(fullPath)}&search=${encodeURIComponent(folderName)}&view=0`;
-																		return (
-																			<a
-																				href={url}
-																				target="_blank"
-																				rel="noopener noreferrer"
-																				className='inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors'
-																				onClick={(e) => e.stopPropagation()}
+															{/* Ações */}
+															<div className='flex flex-col gap-2 pt-2 border-t border-slate-100'>
+																<div className='flex gap-1'>
+																	{["PAGO", "PARCIAL", "NAO_PAGO"].map(
+																		(btn) => (
+																			<button
+																				key={btn}
+																				onClick={() =>
+																					updateStatus(order, {
+																						status_pagamento: btn as any,
+																					})
+																				}
+																				className={`flex-1 text-[9px] font-bold py-1 rounded border transition-colors ${
+																					order.status_pagamento === btn
+																						? "bg-slate-800 text-white"
+																						: "text-slate-400 hover:bg-slate-100"
+																				}`}
 																			>
-																				<FolderOpen className='w-3.5 h-3.5' />
-																				Abrir no OneDrive
-																			</a>
-																		);
-																	})()}
+																				{btn.replace("_", " ")}
+																			</button>
+																		)
+																	)}
 																</div>
 															</div>
 														</div>
-													</td>
-												</tr>
-											)}
-										</React.Fragment>
-									);
-								})
-							) : (
-								<tr>
-									<td colSpan={9} className='p-8 sm:p-12 text-center text-slate-400 text-sm'>
-										Nenhuma ordem encontrada.
-									</td>
-								</tr>
-							)}
-						</tbody>
-					</table>
-				</div>
-				{/* Paginação + contagem de linhas */}
-				<div className='flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-200/60 bg-slate-50/50'>
+														<div className='bg-white p-4 rounded-[10px] border-l-4 border-blue-400 shadow-sm'>
+															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-2'>
+																<FolderOpen className='w-4 h-4 text-blue-500' />{" "}
+																Arquivos
+															</h5>
+															<div className='mb-2 bg-slate-50 p-2 rounded border border-slate-200 text-2xs text-slate-500 font-mono break-all'>
+																01_A3_Art_Copy/Ordens/{order.data.split("T")[0]}/OS{order.id}_{order.cliente_nome.replace(/\s+/g, "_")}
+															</div>
+															{onedriveConfig?.cid && (() => {
+																const folderName = `OS${order.id}_${order.cliente_nome.replace(/\s+/g, "_")}`;
+																const date = order.data?.split("T")[0] || "";
+																const fullPath = `/personal/${onedriveConfig.cid}/Documents/${onedriveConfig.folderPath}/${date}/${folderName}`;
+																const url = `https://onedrive.live.com/?id=${encodeURIComponent(fullPath)}&search=${encodeURIComponent(folderName)}&view=0`;
+																return (
+																	<a
+																		href={url}
+																		target="_blank"
+																		rel="noopener noreferrer"
+																		className='inline-flex items-center gap-1.5 text-2xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors'
+																		onClick={(e) => e.stopPropagation()}
+																	>
+																		<FolderOpen className='w-3.5 h-3.5' />
+																		Abrir no OneDrive
+																	</a>
+																);
+															})()}
+														</div>
+													</div>
+												</div>
+											</td>
+										</tr>
+									)}
+								</React.Fragment>
+							);
+						})}
+					</tbody>
+				</DataTable>
+				{/* Paginação + contagem de linhas — fora da casca da tabela, que
+				    agora rola por conta própria. */}
+				<div className='flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-white border border-slate-200/70 rounded-2xl shadow-card'>
 					<div className='flex items-center gap-3 text-xs text-slate-500'>
 						<span className='font-semibold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg border border-indigo-100'>
 							{filteredOrders.length} {filteredOrders.length === 1 ? 'ordem' : 'ordens'}
@@ -1384,26 +1671,85 @@ export const OrderModule = ({
 			{/* MODAL PRINCIPAL */}
 			<Modal
 				isOpen={isModalOpen}
-				onClose={() => setIsModalOpen(false)}
+				onClose={handleCloseModal}
 				title={editingOrder ? "Editar Ordem" : "Nova Ordem"}
 				size='xl'
+				footer={
+					<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
+						<div className='flex items-center gap-3'>
+							<label className='text-2xs font-bold text-ink-muted uppercase'>
+								Desconto (%)
+							</label>
+							<Input
+								type='number'
+								// `!w-20`: o Input do kit já traz `w-full`, e no CSS gerado
+								// `.w-full` vem depois de `.w-20` — sem o `!` o campo de
+								// desconto esticava e esmagava o Total Final no rodapé.
+								className='!w-20 text-center font-bold'
+								value={formData.desconto_pontual || 0}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+										desconto_pontual: Number(e.target.value),
+									})
+								}
+							/>
+							<div className='pl-3 border-l border-slate-200'>
+								<p className='text-2xs text-ink-faint font-bold uppercase'>
+									Total Final
+								</p>
+								<p className='num text-xl font-bold text-primary-600 tracking-tight'>
+									{Utils.formatCurrency(
+										gridSubtotal *
+											(1 - (formData.desconto_pontual || 0) / 100) +
+											(formData.taxa_extra || 0)
+									)}
+								</p>
+							</div>
+						</div>
+						<div className='flex items-center gap-2 justify-end'>
+							<Button variant='ghost' onClick={handleCloseModal}>
+								Cancelar
+							</Button>
+							{!editingOrder && (
+								<Button
+									variant='secondary'
+									onClick={() => handleSave(true)}
+									loading={isSaving}
+								>
+									Salvar e nova
+								</Button>
+							)}
+							<Button onClick={() => handleSave(false)} loading={isSaving}>
+								Salvar Ordem
+							</Button>
+						</div>
+					</div>
+				}
 			>
 				<div className='space-y-6'>
 					<div className='grid grid-cols-1 md:grid-cols-12 gap-5'>
 						<div className='md:col-span-8 flex gap-2 items-end'>
 							<div className='flex-1'>
-								<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-									Cliente *
+								<label className='block text-2xs font-bold text-ink-muted uppercase mb-1.5'>
+									Cliente <span className='text-danger-500'>*</span>
 								</label>
 								<SearchableSelect
 									options={clientOptionsForForm}
 									value={formData.cliente_id || 0}
-									onChange={(val) =>
-										setFormData({ ...formData, cliente_id: val })
-									}
+									onChange={(val) => {
+										setFormData({ ...formData, cliente_id: val });
+										setFormErrors({});
+									}}
 									placeholder='Busque nome ou telefone...'
 									fullClients={clients}
+									autoFocus={!editingOrder}
 								/>
+								{formErrors.cliente && (
+									<p className='text-2xs text-danger-600 mt-1 font-medium'>
+										{formErrors.cliente}
+									</p>
+								)}
 							</div>
 							<button
 								onClick={() => setIsQuickClientOpen(true)}
@@ -1428,99 +1774,121 @@ export const OrderModule = ({
 						</div>
 					</div>
 
-					<div className='bg-slate-50 p-4 rounded-[10px] border border-slate-200'>
-						<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-2'>
-							<CreditCard className='w-4 h-4' /> Financeiro
-						</h5>
-						<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-							<div>
-								<label className='block text-xs font-bold text-slate-500 mb-1'>
-									Status
-								</label>
-								<select
-									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
-									value={formData.status_pagamento || "NAO_PAGO"}
-									onChange={(e) =>
-										setFormData({
-											...formData,
-											status_pagamento: e.target.value as any,
-										})
-									}
-								>
-									<option value='NAO_PAGO'>Não Pago</option>
-									<option value='PARCIAL'>Parcial</option>
-									<option value='PAGO'>Pago</option>
-								</select>
-							</div>
-							<div>
-								<label className='block text-xs font-bold text-slate-500 mb-1'>
-									Forma Pagamento
-								</label>
-								<select
-									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
-									value={formData.forma_pagamento || ""}
-									onChange={(e) =>
-										setFormData({
-											...formData,
-											forma_pagamento: e.target.value,
-										})
-									}
-								>
-									<option value=''>Selecione...</option>
-									<option value='DINHEIRO'>Dinheiro</option>
-									<option value='PIX'>PIX</option>
-									<option value='DEBITO'>Cartão de Débito</option>
-									<option value='CREDITO'>Cartão de Crédito</option>
-								</select>
-							</div>
-							<div>
-								<label className='block text-xs font-bold text-slate-500 mb-1'>
-									Taxa Extra / Juros (R$)
-								</label>
-								<input
-									type='number'
-									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm bg-white'
-									value={formData.taxa_extra || 0}
-									onChange={(e) =>
-										setFormData({
-											...formData,
-											taxa_extra: Number(e.target.value),
-										})
-									}
-								/>
-							</div>
-						</div>
+					<div className='bg-surface-sunken p-4 rounded-[10px] border border-slate-200'>
+						<button
+							type='button'
+							onClick={() => setFinanceOpen((v) => !v)}
+							className='w-full flex items-center gap-2 text-left'
+						>
+							<CreditCard className='w-4 h-4 text-ink-muted' />
+							<span className='text-2xs font-bold text-ink-muted uppercase'>
+								Financeiro
+							</span>
+							{!financeOpen && (
+								<span className='text-xs text-ink-muted font-medium truncate'>
+									{financeSummary}
+								</span>
+							)}
+							<ChevronDown
+								className={`w-4 h-4 text-ink-faint ml-auto transition-transform ${
+									financeOpen ? "rotate-180" : ""
+								}`}
+							/>
+						</button>
 
-						{/* Nota Fiscal */}
-						<div className='mt-3'>
-							<label className='block text-xs font-bold text-slate-500 mb-1.5'>
-								Nota Fiscal
-							</label>
-							<div className='flex gap-2'>
-								<button
-									type='button'
-									onClick={() => setFormData({ ...formData, nota_fiscal: false })}
-									className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
-										!formData.nota_fiscal
-											? "bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
-											: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
-									}`}
-								>
-									Sem NF
-								</button>
-								<button
-									type='button'
-									onClick={() => setFormData({ ...formData, nota_fiscal: true })}
-									className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
-										formData.nota_fiscal
-											? "bg-blue-50 text-blue-700 border-blue-300 shadow-sm"
-											: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
-									}`}
-								>
-									Com NF
-								</button>
+						{financeOpen && (
+							<div className='mt-3'>
+							<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+								<div>
+									<label className='block text-xs font-bold text-slate-500 mb-1'>
+										Status
+									</label>
+									<select
+										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+										value={formData.status_pagamento || "NAO_PAGO"}
+										onChange={(e) =>
+											setFormData({
+												...formData,
+												status_pagamento: e.target.value as any,
+											})
+										}
+									>
+										<option value='NAO_PAGO'>Não Pago</option>
+										<option value='PARCIAL'>Parcial</option>
+										<option value='PAGO'>Pago</option>
+									</select>
+								</div>
+								<div>
+									<label className='block text-xs font-bold text-slate-500 mb-1'>
+										Forma Pagamento
+									</label>
+									<select
+										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+										value={formData.forma_pagamento || ""}
+										onChange={(e) =>
+											setFormData({
+												...formData,
+												forma_pagamento: e.target.value,
+											})
+										}
+									>
+										<option value=''>Selecione...</option>
+										<option value='DINHEIRO'>Dinheiro</option>
+										<option value='PIX'>PIX</option>
+										<option value='DEBITO'>Cartão de Débito</option>
+										<option value='CREDITO'>Cartão de Crédito</option>
+									</select>
+								</div>
+								<div>
+									<label className='block text-xs font-bold text-slate-500 mb-1'>
+										Taxa Extra / Juros (R$)
+									</label>
+									<input
+										type='number'
+										className='w-full border border-slate-200 p-2 rounded-[8px] text-sm bg-white'
+										value={formData.taxa_extra || 0}
+										onChange={(e) =>
+											setFormData({
+												...formData,
+												taxa_extra: Number(e.target.value),
+											})
+										}
+									/>
+								</div>
 							</div>
-						</div>
+
+							{/* Nota Fiscal */}
+							<div className='mt-3'>
+								<label className='block text-xs font-bold text-slate-500 mb-1.5'>
+									Nota Fiscal
+								</label>
+								<div className='flex gap-2'>
+									<button
+										type='button'
+										onClick={() => setFormData({ ...formData, nota_fiscal: false })}
+										className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
+											!formData.nota_fiscal
+												? "bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
+												: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
+										}`}
+									>
+										Sem NF
+									</button>
+									<button
+										type='button'
+										onClick={() => setFormData({ ...formData, nota_fiscal: true })}
+										className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
+											formData.nota_fiscal
+												? "bg-blue-50 text-blue-700 border-blue-300 shadow-sm"
+												: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
+										}`}
+									>
+										Com NF
+									</button>
+								</div>
+							</div>
+							</div>
+						)}
 					</div>
 
 					{/* ... Campos Descrição e Itens ... */}
@@ -1555,49 +1923,6 @@ export const OrderModule = ({
 						onChange={setGridItems}
 					/>
 
-					<div className='pt-5 border-t border-slate-100 flex justify-between items-center'>
-						<div className='flex items-center gap-3'>
-							<label className='text-xs font-bold text-slate-500 uppercase'>
-								Desconto (%)
-							</label>
-							<input
-								type='number'
-								className='w-16 border border-slate-200 rounded-[8px] p-2 text-sm text-center font-bold text-slate-700 outline-none'
-								value={formData.desconto_pontual || 0}
-								onChange={(e) =>
-									setFormData({
-										...formData,
-										desconto_pontual: Number(e.target.value),
-									})
-								}
-							/>
-						</div>
-						<div className='text-right'>
-							<p className='text-xs text-slate-400 font-bold uppercase mb-1'>
-								Total Final
-							</p>
-							<p className='text-2xl font-bold text-indigo-600 tracking-tight'>
-								{Utils.formatCurrency(
-									gridSubtotal * (1 - (formData.desconto_pontual || 0) / 100) +
-										(formData.taxa_extra || 0)
-								)}
-							</p>
-						</div>
-					</div>
-					<div className='flex justify-end gap-3'>
-						<button
-							onClick={() => setIsModalOpen(false)}
-							className='text-slate-500 hover:text-slate-700 font-medium px-4 text-sm'
-						>
-							Cancelar
-						</button>
-						<button
-							onClick={handleSave}
-							className='bg-indigo-600 text-white px-6 py-2.5 rounded-[10px] hover:bg-indigo-700 font-bold shadow-md text-sm'
-						>
-							Salvar Ordem
-						</button>
-					</div>
 				</div>
 			</Modal>
 
@@ -1619,7 +1944,7 @@ export const OrderModule = ({
 							value={debitTaxPercent}
 							onChange={(e) => setDebitTaxPercent(Number(e.target.value))}
 						/>
-						<p className='text-[10px] text-slate-400 mt-1'>
+						<p className='text-2xs text-slate-400 mt-1'>
 							Essa porcentagem será aplicada automaticamente ao total quando a
 							forma de pagamento for "Cartão de Débito".
 						</p>

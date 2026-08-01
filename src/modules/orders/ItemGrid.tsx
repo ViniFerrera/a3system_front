@@ -16,7 +16,7 @@ interface Machine {
 }
 
 const th =
-	"p-2 text-[10px] font-bold text-slate-400 uppercase tracking-wide text-left whitespace-nowrap";
+	"p-2 text-2xs font-bold text-slate-400 uppercase tracking-wide text-left whitespace-nowrap";
 
 /**
  * Grade editável de itens da ordem.

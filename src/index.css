@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -12,7 +14,16 @@
 	}
 
 	body {
-		@apply bg-slate-50 text-slate-900;
+		@apply bg-surface-sunken text-ink;
+		font-family: theme("fontFamily.sans");
+	}
+
+	/* Dinheiro e contadores não podem "dançar" ao atualizar */
+	.num,
+	td.num,
+	.tabular {
+		font-variant-numeric: tabular-nums;
+		font-feature-settings: "tnum";
 	}
 
 	/* Selection color */
@@ -69,6 +80,18 @@
 	/* Glass effect utility */
 	.glass {
 		@apply bg-white/80 backdrop-blur-md border border-white/20;
+	}
+
+	/* Sombra que indica conteúdo rolável na horizontal (usada pelo DataTable) */
+	.scroll-shadow-x {
+		background:
+			linear-gradient(to right, white 30%, rgba(255, 255, 255, 0)) left center,
+			linear-gradient(to left, white 30%, rgba(255, 255, 255, 0)) right center,
+			linear-gradient(to right, rgba(15, 23, 42, 0.08), rgba(255, 255, 255, 0)) left center,
+			linear-gradient(to left, rgba(15, 23, 42, 0.08), rgba(255, 255, 255, 0)) right center;
+		background-repeat: no-repeat;
+		background-size: 28px 100%, 28px 100%, 12px 100%, 12px 100%;
+		background-attachment: local, local, scroll, scroll;
 	}
 }
 

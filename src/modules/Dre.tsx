@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
+import { DataTable, PageHeader, Select, TableHead, Th } from "@/components/ui";
 import { Utils } from "@/utils";
 import { Order, Expense } from "@/types";
 import {
@@ -247,93 +248,89 @@ export const DreModule = ({
 	return (
 		<div className="space-y-6">
 			{/* ── Header + Filtros ─────────────────────────────────── */}
-			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-				<div>
-					<h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-						<BarChart2 className="w-6 h-6 text-indigo-500" />
-						DRE - Demonstrativo de Resultados
-					</h2>
-					<p className="text-sm text-slate-500 mt-0.5">
-						{periodLabel}
-					</p>
-				</div>
-				<div className="flex items-center gap-2">
-					<Filter className="w-4 h-4 text-slate-400" />
-					<select
-						value={selectedYear}
-						onChange={(e) => setSelectedYear(Number(e.target.value))}
-						className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-					>
-						{availableYears.map((y) => (
-							<option key={y} value={y}>{y}</option>
-						))}
-					</select>
-					<select
-						value={selectedMonth ?? "all"}
-						onChange={(e) =>
-							setSelectedMonth(e.target.value === "all" ? null : Number(e.target.value))
-						}
-						className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-					>
-						<option value="all">Ano inteiro</option>
-						{MONTHS_PT.map((m, i) => (
-							<option key={i} value={i}>{m}</option>
-						))}
-					</select>
-				</div>
-			</div>
+			<PageHeader
+				title="DRE - Demonstrativo de Resultados"
+				subtitle={periodLabel}
+				actions={
+					<>
+						<Filter className="w-4 h-4 text-ink-faint" />
+						{/* `!` obrigatório: `w-full` do kit venceria a largura automática. */}
+						<Select
+							className="!w-auto"
+							value={selectedYear}
+							onChange={(e) => setSelectedYear(Number(e.target.value))}
+						>
+							{availableYears.map((y) => (
+								<option key={y} value={y}>{y}</option>
+							))}
+						</Select>
+						<Select
+							className="!w-auto"
+							value={selectedMonth ?? "all"}
+							onChange={(e) =>
+								setSelectedMonth(e.target.value === "all" ? null : Number(e.target.value))
+							}
+						>
+							<option value="all">Ano inteiro</option>
+							{MONTHS_PT.map((m, i) => (
+								<option key={m} value={i}>{m}</option>
+							))}
+						</Select>
+					</>
+				}
+			/>
 
 			{/* ── Cards Resumo ────────────────────────────────────── */}
 			<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 				<Card className="p-4">
 					<div className="flex items-center justify-between mb-2">
-						<span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Receita Bruta</span>
-						<div className="p-1.5 bg-emerald-50 rounded-lg">
-							<TrendingUp className="w-4 h-4 text-emerald-500" />
+						<span className="text-xs font-medium text-ink-muted uppercase tracking-wider">Receita Bruta</span>
+						<div className="p-1.5 bg-success-50 rounded-lg">
+							<TrendingUp className="w-4 h-4 text-success-500" />
 						</div>
 					</div>
-					<p className="text-xl font-bold text-emerald-600">{fmt(dre.receitaBruta)}</p>
-					<p className="text-[11px] text-slate-400 mt-1">{dre.totalOrdens} ordens no periodo</p>
+					<p className="num text-xl font-bold text-success-600">{fmt(dre.receitaBruta)}</p>
+					<p className="num text-2xs text-ink-faint mt-1">{dre.totalOrdens} ordens no periodo</p>
 				</Card>
 
 				<Card className="p-4">
 					<div className="flex items-center justify-between mb-2">
-						<span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Despesas</span>
-						<div className="p-1.5 bg-red-50 rounded-lg">
-							<TrendingDown className="w-4 h-4 text-red-500" />
+						<span className="text-xs font-medium text-ink-muted uppercase tracking-wider">Despesas</span>
+						<div className="p-1.5 bg-danger-50 rounded-lg">
+							<TrendingDown className="w-4 h-4 text-danger-500" />
 						</div>
 					</div>
-					<p className="text-xl font-bold text-red-600">{fmt(dre.despesasTotais)}</p>
-					<p className="text-[11px] text-slate-400 mt-1">{dre.totalDespesas} despesas no periodo</p>
+					<p className="num text-xl font-bold text-danger-600">{fmt(dre.despesasTotais)}</p>
+					<p className="num text-2xs text-ink-faint mt-1">{dre.totalDespesas} despesas no periodo</p>
 				</Card>
 
 				<Card className="p-4">
 					<div className="flex items-center justify-between mb-2">
-						<span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Resultado</span>
-						<div className={`p-1.5 rounded-lg ${dre.resultadoOperacional >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
+						<span className="text-xs font-medium text-ink-muted uppercase tracking-wider">Resultado</span>
+						<div className={`p-1.5 rounded-lg ${dre.resultadoOperacional >= 0 ? "bg-success-50" : "bg-danger-50"}`}>
 							{dre.resultadoOperacional >= 0
-								? <ArrowUpRight className="w-4 h-4 text-emerald-500" />
-								: <ArrowDownRight className="w-4 h-4 text-red-500" />
+								? <ArrowUpRight className="w-4 h-4 text-success-500" />
+								: <ArrowDownRight className="w-4 h-4 text-danger-500" />
 							}
 						</div>
 					</div>
-					<p className={`text-xl font-bold ${dre.resultadoOperacional >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+					<p className={`num text-xl font-bold ${dre.resultadoOperacional >= 0 ? "text-success-600" : "text-danger-600"}`}>
 						{fmt(dre.resultadoOperacional)}
 					</p>
-					<p className="text-[11px] text-slate-400 mt-1">
+					<p className="num text-2xs text-ink-faint mt-1">
 						Margem: {dre.margemLucro.toFixed(1)}%
 					</p>
 				</Card>
 
 				<Card className="p-4">
 					<div className="flex items-center justify-between mb-2">
-						<span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Saldo Pendente</span>
-						<div className="p-1.5 bg-amber-50 rounded-lg">
-							<Clock className="w-4 h-4 text-amber-500" />
+						<span className="text-xs font-medium text-ink-muted uppercase tracking-wider">Saldo Pendente</span>
+						<div className="p-1.5 bg-warning-50 rounded-lg">
+							<Clock className="w-4 h-4 text-warning-500" />
 						</div>
 					</div>
-					<p className="text-xl font-bold text-amber-600">{fmt(dre.contasReceber - dre.contasPagar)}</p>
-					<p className="text-[11px] text-slate-400 mt-1">
+					<p className="num text-xl font-bold text-warning-600">{fmt(dre.contasReceber - dre.contasPagar)}</p>
+					<p className="text-2xs text-ink-faint mt-1">
 						Receber - Pagar
 					</p>
 				</Card>
@@ -341,139 +338,138 @@ export const DreModule = ({
 
 			{/* ── Tabela DRE Formal ──────────────────────────────── */}
 			<Card className="p-6">
-				<h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-					<FileText className="w-4 h-4 text-indigo-500" />
+				<h3 className="text-sm font-bold text-ink uppercase tracking-wider mb-4 flex items-center gap-2">
+					<FileText className="w-4 h-4 text-primary-500" />
 					Demonstrativo de Resultados do Exercicio - {periodLabel}
 				</h3>
-				<div className="overflow-x-auto">
-					<table className="w-full text-sm">
-						<thead>
-							<tr className="border-b-2 border-slate-200">
-								<th className="text-left py-2 text-slate-500 font-semibold w-2/3">Descricao</th>
-								<th className="text-right py-2 text-slate-500 font-semibold">Valor (R$)</th>
-							</tr>
-						</thead>
-						<tbody>
-							{/* RECEITAS */}
-							<tr className="bg-emerald-50/50">
-								<td className="py-3 font-bold text-emerald-700 flex items-center gap-2">
-									<PlusCircle className="w-4 h-4" /> RECEITA OPERACIONAL BRUTA
-								</td>
-								<td className="py-3 text-right font-bold text-emerald-700">{fmt(dre.receitaBruta)}</td>
-							</tr>
-							<tr className="border-b border-slate-100">
-								<td className="py-2 pl-8 text-slate-600">Receita de servicos ({dre.totalOrdens} ordens)</td>
-								<td className="py-2 text-right text-slate-600">{fmt(dre.receitaBruta)}</td>
-							</tr>
+				{/* A casca já é um cartão; dentro deste Card ela perde borda e sombra. */}
+				<DataTable className="!border-0 !shadow-none !rounded-none">
+					<TableHead>
+						<tr className="border-b-2 border-slate-200">
+							<Th className="w-2/3">Descricao</Th>
+							<Th align="right">Valor (R$)</Th>
+						</tr>
+					</TableHead>
+					<tbody>
+						{/* RECEITAS */}
+						<tr className="bg-success-50/50">
+							<td className="py-3 font-bold text-success-700 flex items-center gap-2">
+								<PlusCircle className="w-4 h-4" /> RECEITA OPERACIONAL BRUTA
+							</td>
+							<td className="num py-3 text-right font-bold text-success-700">{fmt(dre.receitaBruta)}</td>
+						</tr>
+						<tr className="border-b border-slate-100">
+							<td className="py-2 pl-8 text-ink-muted">Receita de servicos ({dre.totalOrdens} ordens)</td>
+							<td className="num py-2 text-right text-ink-muted">{fmt(dre.receitaBruta)}</td>
+						</tr>
 
-							{/* DEDUÇÕES */}
-							{dre.deducoes > 0 && (
-								<>
-									<tr className="bg-orange-50/50">
-										<td className="py-3 font-bold text-orange-700 flex items-center gap-2">
-											<MinusCircle className="w-4 h-4" /> (-) DEDUCOES
-										</td>
-										<td className="py-3 text-right font-bold text-orange-700">({fmt(dre.deducoes)})</td>
-									</tr>
-									<tr className="border-b border-slate-100">
-										<td className="py-2 pl-8 text-slate-600">Ordens canceladas ({dre.ordensCanceladas})</td>
-										<td className="py-2 text-right text-slate-600">({fmt(dre.deducoes)})</td>
-									</tr>
-								</>
-							)}
-
-							{/* RECEITA LÍQUIDA */}
-							<tr className="bg-emerald-50/80 border-t-2 border-emerald-200">
-								<td className="py-3 font-bold text-emerald-800">=&nbsp; RECEITA LIQUIDA</td>
-								<td className="py-3 text-right font-bold text-emerald-800">{fmt(dre.receitaLiquida)}</td>
-							</tr>
-
-							{/* DESPESAS OPERACIONAIS */}
-							<tr className="bg-red-50/50 mt-2">
-								<td className="py-3 font-bold text-red-700 flex items-center gap-2">
-									<MinusCircle className="w-4 h-4" /> (-) DESPESAS OPERACIONAIS
-								</td>
-								<td className="py-3 text-right font-bold text-red-700">({fmt(dre.despesasTotais)})</td>
-							</tr>
-							<tr className="border-b border-slate-100">
-								<td className="py-2 pl-8 text-slate-600 flex items-center gap-1.5">
-									<CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Despesas pagas
-								</td>
-								<td className="py-2 text-right text-slate-600">({fmt(dre.despesasPagas)})</td>
-							</tr>
-							<tr className="border-b border-slate-100">
-								<td className="py-2 pl-8 text-slate-600 flex items-center gap-1.5">
-									<Clock className="w-3.5 h-3.5 text-amber-400" /> Despesas pendentes
-								</td>
-								<td className="py-2 text-right text-amber-600">({fmt(dre.despesasPendentes)})</td>
-							</tr>
-
-							{/* Composição de despesas top 5 */}
-							{expenseComposition.slice(0, 5).map((item, i) => (
-								<tr key={i} className="border-b border-slate-50">
-									<td className="py-1.5 pl-12 text-xs text-slate-400">{item.name}</td>
-									<td className="py-1.5 text-right text-xs text-slate-400">({fmt(item.value)})</td>
+						{/* DEDUÇÕES */}
+						{dre.deducoes > 0 && (
+							<>
+								<tr className="bg-orange-50/50">
+									<td className="py-3 font-bold text-orange-700 flex items-center gap-2">
+										<MinusCircle className="w-4 h-4" /> (-) DEDUCOES
+									</td>
+									<td className="num py-3 text-right font-bold text-orange-700">({fmt(dre.deducoes)})</td>
 								</tr>
-							))}
+								<tr className="border-b border-slate-100">
+									<td className="py-2 pl-8 text-ink-muted">Ordens canceladas ({dre.ordensCanceladas})</td>
+									<td className="num py-2 text-right text-ink-muted">({fmt(dre.deducoes)})</td>
+								</tr>
+							</>
+						)}
 
-							{/* RESULTADO OPERACIONAL */}
-							<tr className={`border-t-2 ${dre.resultadoOperacional >= 0 ? "bg-emerald-100/60 border-emerald-300" : "bg-red-100/60 border-red-300"}`}>
-								<td className={`py-4 font-bold text-base ${dre.resultadoOperacional >= 0 ? "text-emerald-800" : "text-red-800"}`}>
-									=&nbsp; RESULTADO OPERACIONAL
-								</td>
-								<td className={`py-4 text-right font-bold text-base ${dre.resultadoOperacional >= 0 ? "text-emerald-800" : "text-red-800"}`}>
-									{fmt(dre.resultadoOperacional)}
-								</td>
-							</tr>
+						{/* RECEITA LÍQUIDA */}
+						<tr className="bg-success-50/80 border-t-2 border-success-200">
+							<td className="py-3 font-bold text-success-700">=&nbsp; RECEITA LIQUIDA</td>
+							<td className="num py-3 text-right font-bold text-success-700">{fmt(dre.receitaLiquida)}</td>
+						</tr>
 
-							{/* MARGEM */}
-							<tr className="border-b border-slate-100">
-								<td className="py-2 pl-8 text-slate-500 text-xs">Margem de lucro operacional</td>
-								<td className={`py-2 text-right text-xs font-semibold ${dre.margemLucro >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-									{dre.margemLucro.toFixed(1)}%
-								</td>
-							</tr>
+						{/* DESPESAS OPERACIONAIS */}
+						<tr className="bg-danger-50/50 mt-2">
+							<td className="py-3 font-bold text-danger-700 flex items-center gap-2">
+								<MinusCircle className="w-4 h-4" /> (-) DESPESAS OPERACIONAIS
+							</td>
+							<td className="num py-3 text-right font-bold text-danger-700">({fmt(dre.despesasTotais)})</td>
+						</tr>
+						<tr className="border-b border-slate-100">
+							<td className="py-2 pl-8 text-ink-muted flex items-center gap-1.5">
+								<CheckCircle className="w-3.5 h-3.5 text-success-400" /> Despesas pagas
+							</td>
+							<td className="num py-2 text-right text-ink-muted">({fmt(dre.despesasPagas)})</td>
+						</tr>
+						<tr className="border-b border-slate-100">
+							<td className="py-2 pl-8 text-ink-muted flex items-center gap-1.5">
+								<Clock className="w-3.5 h-3.5 text-warning-400" /> Despesas pendentes
+							</td>
+							<td className="num py-2 text-right text-warning-600">({fmt(dre.despesasPendentes)})</td>
+						</tr>
 
-							{/* SEPARADOR */}
-							<tr><td colSpan={2} className="py-3"></td></tr>
+						{/* Composição de despesas top 5 */}
+						{expenseComposition.slice(0, 5).map((item) => (
+							<tr key={item.name} className="border-b border-slate-50">
+								<td className="py-1.5 pl-12 text-xs text-ink-faint">{item.name}</td>
+								<td className="num py-1.5 text-right text-xs text-ink-faint">({fmt(item.value)})</td>
+							</tr>
+						))}
 
-							{/* CONTAS A RECEBER / PAGAR */}
-							<tr className="bg-blue-50/50">
-								<td className="py-3 font-bold text-blue-700 flex items-center gap-2">
-									<PlusCircle className="w-4 h-4" /> CONTAS A RECEBER
-								</td>
-								<td className="py-3 text-right font-bold text-blue-700">{fmt(dre.contasReceber)}</td>
-							</tr>
-							<tr className="border-b border-slate-100">
-								<td className="py-2 pl-8 text-slate-600">Receita ja recebida (pago)</td>
-								<td className="py-2 text-right text-emerald-600">{fmt(dre.receitaRecebida)}</td>
-							</tr>
+						{/* RESULTADO OPERACIONAL */}
+						<tr className={`border-t-2 ${dre.resultadoOperacional >= 0 ? "bg-success-100/60 border-success-300" : "bg-danger-100/60 border-danger-300"}`}>
+							<td className={`py-4 font-bold text-base ${dre.resultadoOperacional >= 0 ? "text-success-700" : "text-danger-700"}`}>
+								=&nbsp; RESULTADO OPERACIONAL
+							</td>
+							<td className={`num py-4 text-right font-bold text-base ${dre.resultadoOperacional >= 0 ? "text-success-700" : "text-danger-700"}`}>
+								{fmt(dre.resultadoOperacional)}
+							</td>
+						</tr>
 
-							<tr className="bg-amber-50/50">
-								<td className="py-3 font-bold text-amber-700 flex items-center gap-2">
-									<MinusCircle className="w-4 h-4" /> CONTAS A PAGAR
-								</td>
-								<td className="py-3 text-right font-bold text-amber-700">{fmt(dre.contasPagar)}</td>
-							</tr>
+						{/* MARGEM */}
+						<tr className="border-b border-slate-100">
+							<td className="py-2 pl-8 text-ink-muted text-xs">Margem de lucro operacional</td>
+							<td className={`num py-2 text-right text-xs font-semibold ${dre.margemLucro >= 0 ? "text-success-600" : "text-danger-600"}`}>
+								{dre.margemLucro.toFixed(1)}%
+							</td>
+						</tr>
 
-							{/* BALANÇO PENDENTE */}
-							<tr className="border-t-2 border-slate-300 bg-slate-50">
-								<td className="py-3 font-bold text-slate-700">=&nbsp; BALANCO PENDENTE (Receber - Pagar)</td>
-								<td className={`py-3 text-right font-bold ${(dre.contasReceber - dre.contasPagar) >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-									{fmt(dre.contasReceber - dre.contasPagar)}
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
+						{/* SEPARADOR */}
+						<tr><td colSpan={2} className="py-3"></td></tr>
+
+						{/* CONTAS A RECEBER / PAGAR */}
+						<tr className="bg-info-50/50">
+							<td className="py-3 font-bold text-info-700 flex items-center gap-2">
+								<PlusCircle className="w-4 h-4" /> CONTAS A RECEBER
+							</td>
+							<td className="num py-3 text-right font-bold text-info-700">{fmt(dre.contasReceber)}</td>
+						</tr>
+						<tr className="border-b border-slate-100">
+							<td className="py-2 pl-8 text-ink-muted">Receita ja recebida (pago)</td>
+							<td className="num py-2 text-right text-success-600">{fmt(dre.receitaRecebida)}</td>
+						</tr>
+
+						<tr className="bg-warning-50/50">
+							<td className="py-3 font-bold text-warning-700 flex items-center gap-2">
+								<MinusCircle className="w-4 h-4" /> CONTAS A PAGAR
+							</td>
+							<td className="num py-3 text-right font-bold text-warning-700">{fmt(dre.contasPagar)}</td>
+						</tr>
+
+						{/* BALANÇO PENDENTE */}
+						<tr className="border-t-2 border-slate-300 bg-surface-sunken">
+							<td className="py-3 font-bold text-ink">=&nbsp; BALANCO PENDENTE (Receber - Pagar)</td>
+							<td className={`num py-3 text-right font-bold ${(dre.contasReceber - dre.contasPagar) >= 0 ? "text-success-700" : "text-danger-700"}`}>
+								{fmt(dre.contasReceber - dre.contasPagar)}
+							</td>
+						</tr>
+					</tbody>
+				</DataTable>
 			</Card>
 
 			{/* ── Gráficos ────────────────────────────────────────── */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				{/* Evolução Mensal */}
 				<Card className="p-5">
-					<h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-						<TrendingUp className="w-4 h-4 text-indigo-500" />
+					<h3 className="text-sm font-semibold text-ink mb-4 flex items-center gap-2">
+						<TrendingUp className="w-4 h-4 text-primary-500" />
 						Evolucao Mensal - {selectedYear}
 					</h3>
 					<ResponsiveContainer width="100%" height={280}>
@@ -496,8 +492,8 @@ export const DreModule = ({
 
 				{/* Resultado Mensal (Area) */}
 				<Card className="p-5">
-					<h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-						<BarChart2 className="w-4 h-4 text-indigo-500" />
+					<h3 className="text-sm font-semibold text-ink mb-4 flex items-center gap-2">
+						<BarChart2 className="w-4 h-4 text-primary-500" />
 						Resultado Mensal - {selectedYear}
 					</h3>
 					<ResponsiveContainer width="100%" height={280}>
@@ -528,8 +524,8 @@ export const DreModule = ({
 
 				{/* Composição de Despesas (Pie) */}
 				<Card className="p-5">
-					<h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-						<DollarSign className="w-4 h-4 text-red-500" />
+					<h3 className="text-sm font-semibold text-ink mb-4 flex items-center gap-2">
+						<DollarSign className="w-4 h-4 text-danger-500" />
 						Composicao de Despesas
 					</h3>
 					{expenseComposition.length > 0 ? (
@@ -545,8 +541,8 @@ export const DreModule = ({
 										paddingAngle={2}
 										dataKey="value"
 									>
-										{expenseComposition.map((_, i) => (
-											<Cell key={i} fill={COLORS[i % COLORS.length]} />
+										{expenseComposition.map((item, i) => (
+											<Cell key={item.name} fill={COLORS[i % COLORS.length]} />
 										))}
 									</Pie>
 									<Tooltip
@@ -557,26 +553,26 @@ export const DreModule = ({
 							</ResponsiveContainer>
 							<div className="flex-1 space-y-1.5 max-h-[240px] overflow-y-auto">
 								{expenseComposition.map((item, i) => (
-									<div key={i} className="flex items-center gap-2 text-xs">
+									<div key={item.name} className="flex items-center gap-2 text-xs">
 										<div
 											className="w-2.5 h-2.5 rounded-full flex-shrink-0"
 											style={{ backgroundColor: COLORS[i % COLORS.length] }}
 										/>
-										<span className="text-slate-600 truncate flex-1">{item.name}</span>
-										<span className="text-slate-500 font-medium whitespace-nowrap">{fmt(item.value)}</span>
+										<span className="text-ink-muted truncate flex-1">{item.name}</span>
+										<span className="num text-ink-muted font-medium whitespace-nowrap">{fmt(item.value)}</span>
 									</div>
 								))}
 							</div>
 						</div>
 					) : (
-						<p className="text-sm text-slate-400 text-center py-10">Nenhuma despesa no periodo</p>
+						<p className="text-sm text-ink-faint text-center py-10">Nenhuma despesa no periodo</p>
 					)}
 				</Card>
 
 				{/* Receita por Forma de Pagamento (Pie) */}
 				<Card className="p-5">
-					<h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-						<DollarSign className="w-4 h-4 text-emerald-500" />
+					<h3 className="text-sm font-semibold text-ink mb-4 flex items-center gap-2">
+						<DollarSign className="w-4 h-4 text-success-500" />
 						Receita por Forma de Pagamento
 					</h3>
 					{revenueByPayment.length > 0 ? (
@@ -592,8 +588,8 @@ export const DreModule = ({
 										paddingAngle={2}
 										dataKey="value"
 									>
-										{revenueByPayment.map((_, i) => (
-											<Cell key={i} fill={COLORS[i % COLORS.length]} />
+										{revenueByPayment.map((item, i) => (
+											<Cell key={item.name} fill={COLORS[i % COLORS.length]} />
 										))}
 									</Pie>
 									<Tooltip
@@ -604,19 +600,19 @@ export const DreModule = ({
 							</ResponsiveContainer>
 							<div className="flex-1 space-y-1.5 max-h-[240px] overflow-y-auto">
 								{revenueByPayment.map((item, i) => (
-									<div key={i} className="flex items-center gap-2 text-xs">
+									<div key={item.name} className="flex items-center gap-2 text-xs">
 										<div
 											className="w-2.5 h-2.5 rounded-full flex-shrink-0"
 											style={{ backgroundColor: COLORS[i % COLORS.length] }}
 										/>
-										<span className="text-slate-600 truncate flex-1">{item.name}</span>
-										<span className="text-slate-500 font-medium whitespace-nowrap">{fmt(item.value)}</span>
+										<span className="text-ink-muted truncate flex-1">{item.name}</span>
+										<span className="num text-ink-muted font-medium whitespace-nowrap">{fmt(item.value)}</span>
 									</div>
 								))}
 							</div>
 						</div>
 					) : (
-						<p className="text-sm text-slate-400 text-center py-10">Nenhuma receita no periodo</p>
+						<p className="text-sm text-ink-faint text-center py-10">Nenhuma receita no periodo</p>
 					)}
 				</Card>
 			</div>
@@ -625,35 +621,35 @@ export const DreModule = ({
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				{/* Contas a Receber */}
 				<Card className="p-5">
-					<h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-						<PlusCircle className="w-4 h-4 text-blue-500" />
+					<h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+						<PlusCircle className="w-4 h-4 text-info-500" />
 						Contas a Receber (Top 10)
 					</h3>
 					{contasReceberDetail.length > 0 ? (
 						<div className="space-y-2">
 							{contasReceberDetail.map((o) => (
-								<div key={o.id} className="flex items-center justify-between py-2 px-3 bg-blue-50/50 rounded-lg">
+								<div key={o.id} className="flex items-center justify-between py-2 px-3 bg-info-50/50 rounded-lg">
 									<div className="flex-1 min-w-0">
-										<p className="text-sm font-medium text-slate-700 truncate">
+										<p className="text-sm font-medium text-ink truncate">
 											OS#{o.id} - {o.cliente_nome}
 										</p>
-										<p className="text-[11px] text-slate-400">
+										<p className="num text-2xs text-ink-faint">
 											{o.data?.slice(0, 10)} | {o.status_pagamento === "PARCIAL" ? "Parcial" : "Nao pago"}
 										</p>
 									</div>
-									<span className="text-sm font-bold text-blue-600 ml-3 whitespace-nowrap">{fmt(o.total || 0)}</span>
+									<span className="num text-sm font-bold text-info-600 ml-3 whitespace-nowrap">{fmt(o.total || 0)}</span>
 								</div>
 							))}
 						</div>
 					) : (
-						<p className="text-sm text-slate-400 text-center py-8">Nenhuma conta a receber</p>
+						<p className="text-sm text-ink-faint text-center py-8">Nenhuma conta a receber</p>
 					)}
 				</Card>
 
 				{/* Contas a Pagar */}
 				<Card className="p-5">
-					<h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-						<MinusCircle className="w-4 h-4 text-amber-500" />
+					<h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+						<MinusCircle className="w-4 h-4 text-warning-500" />
 						Contas a Pagar (Proximas)
 					</h3>
 					{contasPagarDetail.length > 0 ? (
@@ -661,17 +657,17 @@ export const DreModule = ({
 							{contasPagarDetail.map((e) => {
 								const isOverdue = e.vencimento < new Date().toISOString().slice(0, 10);
 								return (
-									<div key={e.id} className={`flex items-center justify-between py-2 px-3 rounded-lg ${isOverdue ? "bg-red-50/50" : "bg-amber-50/50"}`}>
+									<div key={e.id} className={`flex items-center justify-between py-2 px-3 rounded-lg ${isOverdue ? "bg-danger-50/50" : "bg-warning-50/50"}`}>
 										<div className="flex-1 min-w-0">
-											<p className="text-sm font-medium text-slate-700 truncate flex items-center gap-1.5">
-												{isOverdue && <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
+											<p className="text-sm font-medium text-ink truncate flex items-center gap-1.5">
+												{isOverdue && <AlertTriangle className="w-3.5 h-3.5 text-danger-500 flex-shrink-0" />}
 												{e.produto}
 											</p>
-											<p className="text-[11px] text-slate-400">
+											<p className="num text-2xs text-ink-faint">
 												Venc: {e.vencimento} {isOverdue && "- VENCIDA"}
 											</p>
 										</div>
-										<span className={`text-sm font-bold ml-3 whitespace-nowrap ${isOverdue ? "text-red-600" : "text-amber-600"}`}>
+										<span className={`num text-sm font-bold ml-3 whitespace-nowrap ${isOverdue ? "text-danger-600" : "text-warning-600"}`}>
 											{fmt(e.valor || 0)}
 										</span>
 									</div>
@@ -679,7 +675,7 @@ export const DreModule = ({
 							})}
 						</div>
 					) : (
-						<p className="text-sm text-slate-400 text-center py-8">Nenhuma conta a pagar pendente</p>
+						<p className="text-sm text-ink-faint text-center py-8">Nenhuma conta a pagar pendente</p>
 					)}
 				</Card>
 			</div>

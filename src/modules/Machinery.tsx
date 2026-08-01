@@ -2,6 +2,16 @@ import React, { useState, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { MultiSelect } from "@/components/ui/MultiSelect";
+import {
+	Button,
+	EmptyState,
+	Field,
+	Input,
+	PageHeader,
+	Textarea,
+	useConfirm,
+	useToast,
+} from "@/components/ui";
 import { Utils } from "@/utils";
 import { StockItem } from "@/types";
 import {
@@ -42,8 +52,11 @@ export const MachineryModule = ({
 	setMachinery: Function;
 	stock: StockItem[];
 }) => {
+	const toast = useToast();
+	const confirm = useConfirm();
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
+	const [isSaving, setIsSaving] = useState(false);
 
 	const [formData, setFormData] = useState<Partial<Machine>>({
 		status: "ATIVO",
@@ -66,25 +79,25 @@ export const MachineryModule = ({
 		switch (status) {
 			case "ATIVO":
 				return {
-					color: "text-emerald-600 bg-emerald-50 border-emerald-200",
+					color: "text-success-600 bg-success-50 border-success-200",
 					icon: CheckCircle2,
 					label: "Operando",
 				};
 			case "MANUTENCAO":
 				return {
-					color: "text-amber-600 bg-amber-50 border-amber-200",
+					color: "text-warning-600 bg-warning-50 border-warning-200",
 					icon: Wrench,
 					label: "Manutenção",
 				};
 			case "INATIVO":
 				return {
-					color: "text-slate-500 bg-slate-100 border-slate-200",
+					color: "text-ink-muted bg-slate-100 border-slate-200",
 					icon: Power,
 					label: "Parada",
 				};
 			default:
 				return {
-					color: "text-slate-500 bg-slate-50",
+					color: "text-ink-muted bg-surface-sunken",
 					icon: Settings,
 					label: status || "Desconhecido",
 				};
@@ -112,7 +125,7 @@ export const MachineryModule = ({
 
 	const handleSave = async () => {
 		if (!formData.nome || !formData.tipo) {
-			alert("Nome e Tipo são obrigatórios.");
+			toast.error("Nome e Tipo são obrigatórios.");
 			return;
 		}
 
@@ -124,6 +137,7 @@ export const MachineryModule = ({
 
 		const payload = { ...formData, estoque_associado_ids: selectedIds };
 
+		setIsSaving(true);
 		try {
 			if (editingMachine && editingMachine.id) {
 				const res = await api.put(`/machinery/${editingMachine.id}`, payload);
@@ -137,19 +151,29 @@ export const MachineryModule = ({
 			setIsModalOpen(false);
 			setEditingMachine(null);
 			setEditingMachine(null);
+			toast.success("Maquinário salvo com sucesso.");
 		} catch (err) {
 			console.error(err);
-			alert("Erro ao salvar maquinário (verifique o console).");
+			toast.error("Erro ao salvar maquinário (verifique o console).");
+		} finally {
+			setIsSaving(false);
 		}
 	};
 
 	const handleDelete = async (id: number) => {
-		if (confirm("Tem certeza que deseja remover este maquinário?")) {
+		const ok = await confirm({
+			title: "Remover maquinário",
+			message: "Tem certeza que deseja remover este maquinário?",
+			confirmLabel: "Remover",
+			danger: true,
+		});
+		if (ok) {
 			try {
 				await api.delete(`/machinery/${id}`);
 				setMachinery((prev: Machine[]) => prev.filter((m) => m.id !== id));
+				toast.success("Maquinário removido.");
 			} catch (err) {
-				alert("Erro ao excluir maquinário");
+				toast.error("Erro ao excluir maquinário");
 			}
 		}
 	};
@@ -163,15 +187,15 @@ export const MachineryModule = ({
 		// Vermelho: Bateu limite ou abaixo
 		// Amarelo: 10% do limite (entre min e min * 1.1)
 		// Verde: Estoque bom
-		let colorClass = "bg-emerald-500";
-		let bgClass = "bg-emerald-50 text-emerald-700";
+		let colorClass = "bg-success-500";
+		let bgClass = "bg-success-50 text-success-700";
 
 		if (saldo <= min) {
-			colorClass = "bg-red-500";
-			bgClass = "bg-red-50 text-red-700";
+			colorClass = "bg-danger-500";
+			bgClass = "bg-danger-50 text-danger-700";
 		} else if (saldo <= min * 1.1) {
-			colorClass = "bg-amber-500";
-			bgClass = "bg-amber-50 text-amber-700";
+			colorClass = "bg-warning-500";
+			bgClass = "bg-warning-50 text-warning-700";
 		}
 
 		// Cálculo da % para a barra visual
@@ -188,11 +212,11 @@ export const MachineryModule = ({
 					<span className='font-bold truncate max-w-[120px]' title={item.nome}>
 						{item.nome}
 					</span>
-					<div className='text-[10px] font-mono'>
+					<div className='num text-2xs'>
 						<span className='font-bold'>{saldo}</span>
-						<span className='text-slate-400 mx-0.5'>/</span>
-						<span className='text-slate-500'>{min}</span>
-						<span className='text-slate-400 ml-0.5'>{item.unidade}</span>
+						<span className='text-ink-faint mx-0.5'>/</span>
+						<span className='text-ink-muted'>{min}</span>
+						<span className='text-ink-faint ml-0.5'>{item.unidade}</span>
 					</div>
 				</div>
 				<div className='h-1.5 w-full bg-slate-200/50 rounded-full overflow-hidden'>
@@ -210,37 +234,32 @@ export const MachineryModule = ({
 	return (
 		<div className='space-y-6 animate-in fade-in duration-500 pb-20 md:pb-0'>
 			{/* Header */}
-			<div className='flex flex-col md:flex-row justify-between items-center gap-4'>
-				<div>
-					<h2 className='text-2xl font-bold text-slate-800 flex items-center gap-2'>
-						<Settings className='w-6 h-6 text-indigo-600' />
-						Maquinário & Equipamentos
-					</h2>
-					<p className='text-sm text-slate-500 mt-1'>
-						Gerencie seus ativos e monitore os níveis de insumos.
-					</p>
-				</div>
-				<button
-					onClick={() => openModal()}
-					className='flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium w-full md:w-auto justify-center'
-				>
-					<Plus className='w-4 h-4' /> Novo Maquinário
-				</button>
-			</div>
+			<PageHeader
+				title='Maquinário & Equipamentos'
+				subtitle='Gerencie seus ativos e monitore os níveis de insumos.'
+				actions={
+					<Button onClick={() => openModal()} icon={<Plus className='w-4 h-4' />}>
+						Novo Maquinário
+					</Button>
+				}
+			/>
 
 			{/* Grid de Maquinas - AJUSTADO PARA MAX 3 COLUNAS */}
 			{safeMachinery.length === 0 ? (
-				<div className='text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed'>
-					<Settings className='w-12 h-12 text-slate-300 mx-auto mb-3' />
-					<p className='text-slate-500 font-medium'>
-						Nenhum maquinário cadastrado ainda.
-					</p>
-					<button
-						onClick={() => openModal()}
-						className='text-indigo-600 text-sm font-bold mt-2 hover:underline'
-					>
-						Cadastrar o primeiro item
-					</button>
+				<div className='bg-surface-sunken rounded-xl border border-slate-200 border-dashed'>
+					<EmptyState
+						icon={<Settings className='w-12 h-12' />}
+						title='Nenhum maquinário cadastrado ainda.'
+						action={
+							<Button
+								variant='subtle'
+								onClick={() => openModal()}
+								icon={<Plus className='w-4 h-4' />}
+							>
+								Cadastrar o primeiro item
+							</Button>
+						}
+					/>
 				</div>
 			) : (
 				// Ajuste 1: Removido xl:grid-cols-4 para manter cards mais largos (Max 3 colunas)
@@ -268,12 +287,12 @@ export const MachineryModule = ({
 											className='w-full h-full object-cover'
 										/>
 									) : (
-										<ImageIcon className='w-12 h-12 text-slate-300' />
+										<ImageIcon className='w-12 h-12 text-ink-faint/60' />
 									)}
 
 									{/* Badge de Status Absolute */}
 									<div
-										className={`absolute top-3 left-3 px-2.5 py-1 rounded-[8px] text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 border shadow-sm ${statusInfo.color}`}
+										className={`absolute top-3 left-3 px-2.5 py-1 rounded-[8px] text-2xs font-bold uppercase tracking-wide flex items-center gap-1.5 border shadow-sm ${statusInfo.color}`}
 									>
 										<StatusIcon className='w-3 h-3' />
 										{statusInfo.label}
@@ -282,14 +301,18 @@ export const MachineryModule = ({
 									{/* Ações (Edit/Delete) - Top Right */}
 									<div className='absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200'>
 										<button
+											type='button'
 											onClick={() => openModal(machine)}
-											className='p-2 bg-white/90 text-slate-600 hover:text-indigo-600 rounded-[8px] shadow-sm hover:shadow-card-hover transition-all backdrop-blur-sm'
+											className='p-2 bg-white/90 text-ink-muted hover:text-primary-600 rounded-[8px] shadow-sm hover:shadow-card-hover transition-all backdrop-blur-sm'
+											title='Editar maquinário'
 										>
 											<Edit2 className='w-3.5 h-3.5' />
 										</button>
 										<button
+											type='button'
 											onClick={() => handleDelete(machine.id!)}
-											className='p-2 bg-white/90 text-slate-600 hover:text-red-600 rounded-[8px] shadow-sm hover:shadow-card-hover transition-all backdrop-blur-sm'
+											className='p-2 bg-white/90 text-ink-muted hover:text-danger-600 rounded-[8px] shadow-sm hover:shadow-card-hover transition-all backdrop-blur-sm'
+											title='Excluir maquinário'
 										>
 											<Trash2 className='w-3.5 h-3.5' />
 										</button>
@@ -299,37 +322,37 @@ export const MachineryModule = ({
 								{/* Conteúdo do Card */}
 								<div className='p-5 flex-1 flex flex-col'>
 									<div className='mb-3'>
-										<h3 className='font-bold text-slate-800 text-xl leading-tight'>
+										<h3 className='font-bold text-ink text-xl leading-tight'>
 											{machine.nome}
 										</h3>
-										<p className='text-xs font-medium text-indigo-500 uppercase tracking-wider mt-1'>
+										<p className='text-xs font-medium text-primary-500 uppercase tracking-wider mt-1'>
 											{machine.subtitulo || machine.tipo}
 										</p>
 									</div>
 
-									<p className='text-sm text-slate-500 line-clamp-2 mb-4'>
+									<p className='text-sm text-ink-muted line-clamp-2 mb-4'>
 										{machine.descricao || "Sem descrição definida."}
 									</p>
 
 									{/* Dados de Manutenção */}
 									<div className='grid grid-cols-2 gap-2 mb-4'>
-										<div className='bg-slate-50 p-2 rounded-[8px] border border-slate-100'>
-											<span className='text-[10px] text-slate-400 block uppercase font-bold'>
+										<div className='bg-surface-sunken p-2 rounded-[8px] border border-slate-100'>
+											<span className='text-2xs text-ink-faint block uppercase font-bold'>
 												Última Rev.
 											</span>
-											<div className='flex items-center gap-1.5 mt-0.5 text-xs font-semibold text-slate-600'>
+											<div className='num flex items-center gap-1.5 mt-0.5 text-xs font-semibold text-ink-muted'>
 												<Calendar className='w-3 h-3' />
 												{machine.ultima_manutencao
 													? Utils.formatDate(machine.ultima_manutencao)
 													: "-"}
 											</div>
 										</div>
-										<div className='bg-slate-50 p-2 rounded-[8px] border border-slate-100'>
-											<span className='text-[10px] text-slate-400 block uppercase font-bold'>
+										<div className='bg-surface-sunken p-2 rounded-[8px] border border-slate-100'>
+											<span className='text-2xs text-ink-faint block uppercase font-bold'>
 												Próxima
 											</span>
-											<div className='flex items-center gap-1.5 mt-0.5 text-xs font-semibold text-slate-600'>
-												<AlertTriangle className='w-3 h-3 text-amber-500' />
+											<div className='num flex items-center gap-1.5 mt-0.5 text-xs font-semibold text-ink-muted'>
+												<AlertTriangle className='w-3 h-3 text-warning-500' />
 												{machine.proxima_manutencao
 													? Utils.formatDate(machine.proxima_manutencao)
 													: "-"}
@@ -339,7 +362,7 @@ export const MachineryModule = ({
 
 									{/* Ajuste 2, 3 e 4: Insumos Vinculados com Barra de Progresso */}
 									<div className='pt-3 border-t border-slate-100 mt-auto'>
-										<p className='text-[10px] font-bold text-slate-400 uppercase mb-2 flex items-center gap-1'>
+										<p className='text-2xs font-bold text-ink-faint uppercase mb-2 flex items-center gap-1'>
 											<Box className='w-3 h-3' /> Estoque de Insumos
 										</p>
 										<div className='space-y-1'>
@@ -350,13 +373,13 @@ export const MachineryModule = ({
 														.slice(0, 3)
 														.map((item) => renderStockBar(item))}
 													{linkedStockItems.length > 3 && (
-														<div className='text-center text-[10px] text-slate-400 font-medium py-1 bg-slate-50 rounded mt-1'>
+														<div className='num text-center text-2xs text-ink-faint font-medium py-1 bg-surface-sunken rounded mt-1'>
 															+ {linkedStockItems.length - 3} outros itens
 														</div>
 													)}
 												</>
 											) : (
-												<span className='text-xs text-slate-400 italic block py-2 bg-slate-50 rounded text-center'>
+												<span className='text-xs text-ink-faint italic block py-2 bg-surface-sunken rounded text-center'>
 													Nenhum insumo vinculado.
 												</span>
 											)}
@@ -378,57 +401,46 @@ export const MachineryModule = ({
 			>
 				<div className='space-y-5'>
 					<div className='grid grid-cols-1 md:grid-cols-2 gap-5'>
-						<div className='md:col-span-2'>
-							<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-								Nome do Equipamento *
-							</label>
-							<input
+						<Field
+							label='Nome do Equipamento'
+							required
+							className='md:col-span-2'
+						>
+							<Input
 								type='text'
-								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 								placeholder='Ex: Impressora Offset Heidelberg'
 								value={formData.nome || ""}
 								onChange={(e) =>
 									setFormData({ ...formData, nome: e.target.value })
 								}
 							/>
-						</div>
+						</Field>
 
-						<div>
-							<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-								Tipo / Categoria *
-							</label>
-							<input
+						<Field label='Tipo / Categoria' required>
+							<Input
 								type='text'
-								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 								placeholder='Ex: Impressão Digital'
 								value={formData.tipo || ""}
 								onChange={(e) =>
 									setFormData({ ...formData, tipo: e.target.value })
 								}
 							/>
-						</div>
+						</Field>
 
-						<div>
-							<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-								Subtítulo (Opcional)
-							</label>
-							<input
+						<Field label='Subtítulo (Opcional)'>
+							<Input
 								type='text'
-								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 								placeholder='Ex: Setor A - Térreo'
 								value={formData.subtitulo || ""}
 								onChange={(e) =>
 									setFormData({ ...formData, subtitulo: e.target.value })
 								}
 							/>
-						</div>
+						</Field>
 					</div>
 
 					{/* Status Selection */}
-					<div>
-						<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-							Status Operacional
-						</label>
+					<Field label='Status Operacional'>
 						<div className='flex gap-3'>
 							{["ATIVO", "MANUTENCAO", "INATIVO"].map((status) => {
 								const info = getStatusInfo(status);
@@ -436,13 +448,14 @@ export const MachineryModule = ({
 								return (
 									<button
 										key={status}
+										type='button'
 										onClick={() =>
 											setFormData({ ...formData, status: status as any })
 										}
 										className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border transition-all text-xs font-bold uppercase ${
 											isSelected
-												? `${info.color} ring-2 ring-offset-1 ring-indigo-200 shadow-sm`
-												: "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+												? `${info.color} ring-2 ring-offset-1 ring-primary-200 shadow-sm`
+												: "bg-white border-slate-200 text-ink-muted hover:bg-surface-sunken"
 										}`}
 									>
 										<info.icon className='w-4 h-4' />
@@ -451,18 +464,16 @@ export const MachineryModule = ({
 								);
 							})}
 						</div>
-					</div>
+					</Field>
 
-					<div>
-						<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-							URL da Imagem
-						</label>
+					<Field label='URL da Imagem'>
 						<div className='flex gap-2'>
 							<div className='flex-1 relative'>
-								<ImageIcon className='absolute left-3 top-3 w-4 h-4 text-slate-400' />
-								<input
+								<ImageIcon className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint z-10' />
+								{/* `!` obrigatório: o padding do kit vence o do uso na cascata. */}
+								<Input
 									type='text'
-									className='w-full pl-9 border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
+									className='!pl-9'
 									placeholder='https://...'
 									value={formData.imagem_url || ""}
 									onChange={(e) =>
@@ -471,31 +482,24 @@ export const MachineryModule = ({
 								/>
 							</div>
 						</div>
-					</div>
+					</Field>
 
-					<div>
-						<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-							Insumos de Estoque Vinculados
-						</label>
-						<p className='text-[10px] text-slate-400 mb-2'>
-							Selecione quais materiais do estoque esta máquina consome.
-						</p>
+					<Field
+						label='Insumos de Estoque Vinculados'
+						hint='Selecione quais materiais do estoque esta máquina consome.'
+					>
 						<MultiSelect
 							options={stockOptions}
 							selected={selectedStockNames}
 							onChange={setSelectedStockNames}
 							placeholder='Selecione materiais...'
 						/>
-					</div>
+					</Field>
 
 					<div className='grid grid-cols-2 gap-5'>
-						<div>
-							<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-								Última Manutenção
-							</label>
-							<input
+						<Field label='Última Manutenção'>
+							<Input
 								type='date'
-								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 								value={formData.ultima_manutencao || ""}
 								onChange={(e) =>
 									setFormData({
@@ -504,14 +508,10 @@ export const MachineryModule = ({
 									})
 								}
 							/>
-						</div>
-						<div>
-							<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-								Próxima Manutenção
-							</label>
-							<input
+						</Field>
+						<Field label='Próxima Manutenção'>
+							<Input
 								type='date'
-								className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none'
 								value={formData.proxima_manutencao || ""}
 								onChange={(e) =>
 									setFormData({
@@ -520,37 +520,32 @@ export const MachineryModule = ({
 									})
 								}
 							/>
-						</div>
+						</Field>
 					</div>
 
-					<div>
-						<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-							Descrição Técnica
-						</label>
-						<textarea
+					<Field label='Descrição Técnica'>
+						<Textarea
 							rows={3}
-							className='w-full border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none bg-slate-50 focus:bg-white'
+							className='resize-none'
 							placeholder='Especificações técnicas, número de série, observações...'
 							value={formData.descricao || ""}
 							onChange={(e) =>
 								setFormData({ ...formData, descricao: e.target.value })
 							}
 						/>
-					</div>
+					</Field>
 
 					<div className='flex justify-end pt-4 border-t border-slate-100 gap-3'>
-						<button
-							onClick={() => setIsModalOpen(false)}
-							className='text-slate-500 hover:text-slate-700 font-medium px-4 text-sm'
-						>
+						<Button variant='ghost' onClick={() => setIsModalOpen(false)}>
 							Cancelar
-						</button>
-						<button
+						</Button>
+						<Button
 							onClick={handleSave}
-							className='bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 font-bold shadow-md text-sm flex items-center gap-2'
+							loading={isSaving}
+							icon={<Settings className='w-4 h-4' />}
 						>
-							<Settings className='w-4 h-4' /> Salvar Máquina
-						</button>
+							Salvar Máquina
+						</Button>
 					</div>
 				</div>
 			</Modal>

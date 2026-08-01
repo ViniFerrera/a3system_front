@@ -1,40 +1,35 @@
-import React, { useState, useEffect, useMemo } from "react";
-import {
-	LayoutDashboard,
-	FileText,
-	Users,
-	Box,
-	Settings,
-	Printer,
-	DollarSign,
-	Menu,
-	X,
-	Bot,
-	ChevronRight,
-	LogOut,
-	Shield,
-	HardDrive,
-	Receipt,
-	BarChart3,
-	FileBarChart,
-} from "lucide-react";
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
+import { Printer, Menu, X } from "lucide-react";
 import { LoginPage } from "@/pages/Login";
-import { DashboardModule } from "@/modules/Dashboard";
-import { OrderModule } from "@/modules/Orders";
-import { StockModule } from "@/modules/Stock";
-import { PricingModule } from "@/modules/Pricing";
-import { ClientsModule } from "@/modules/Clients";
-import { ExpensesModule } from "@/modules/Expenses";
-import { MachineryModule } from "@/modules/Machinery";
-import { AiInsightsModule } from "@/modules/AiInsights";
-import { UsersModule } from "@/modules/Users";
-import { DatabaseSecurityModule } from "@/modules/DatabaseSecurity";
-import { NotaFiscalModule } from "@/modules/NotaFiscal";
-import { DreModule } from "@/modules/Dre";
-import { EstudoModule } from "@/modules/Estudo";
 import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
 import { api } from "@/services/api";
-import { LoadingProvider, useLoading } from "@/components/ui/LoadingOverlay";
+import { LoadingProvider } from "@/components/ui/LoadingOverlay";
+import { ToastProvider } from "@/components/ui/Toast";
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
+import { Skeleton, SkeletonTile } from "@/components/ui/Skeleton";
+import { Sidebar } from "@/components/shell/Sidebar";
+import { Topbar } from "@/components/shell/Topbar";
+import { CommandPalette } from "@/components/shell/CommandPalette";
+import { NAV_ITEMS } from "@/components/shell/navItems";
+import { ShortcutsDrawer } from "@/components/shortcuts/ShortcutsDrawer";
+import { useShortcuts } from "@/hooks/useShortcuts";
+import { ACTIONS, OrderFilterPayload, Shortcut } from "@/components/shortcuts/shortcutTypes";
+
+// ─── Módulos carregados sob demanda ──────────────────────────────────────────
+// Cada módulo vira um chunk próprio; só é baixado quando a aba é aberta.
+const DashboardModule = lazy(() => import("@/modules/Dashboard").then((m) => ({ default: m.DashboardModule })));
+const OrderModule = lazy(() => import("@/modules/Orders").then((m) => ({ default: m.OrderModule })));
+const StockModule = lazy(() => import("@/modules/Stock").then((m) => ({ default: m.StockModule })));
+const PricingModule = lazy(() => import("@/modules/Pricing").then((m) => ({ default: m.PricingModule })));
+const ClientsModule = lazy(() => import("@/modules/Clients").then((m) => ({ default: m.ClientsModule })));
+const ExpensesModule = lazy(() => import("@/modules/Expenses").then((m) => ({ default: m.ExpensesModule })));
+const MachineryModule = lazy(() => import("@/modules/Machinery").then((m) => ({ default: m.MachineryModule })));
+const AiInsightsModule = lazy(() => import("@/modules/AiInsights").then((m) => ({ default: m.AiInsightsModule })));
+const UsersModule = lazy(() => import("@/modules/Users").then((m) => ({ default: m.UsersModule })));
+const DatabaseSecurityModule = lazy(() => import("@/modules/DatabaseSecurity").then((m) => ({ default: m.DatabaseSecurityModule })));
+const NotaFiscalModule = lazy(() => import("@/modules/NotaFiscal").then((m) => ({ default: m.NotaFiscalModule })));
+const DreModule = lazy(() => import("@/modules/Dre").then((m) => ({ default: m.DreModule })));
+const EstudoModule = lazy(() => import("@/modules/Estudo").then((m) => ({ default: m.EstudoModule })));
 
 // ─── Helpers de Auth ─────────────────────────────────────────────────────────
 interface JwtUser {
@@ -60,22 +55,123 @@ const decodeToken = (token: string): JwtUser | null => {
 	}
 };
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-interface NavItem {
-	id: string;
-	icon: React.ElementType;
-	label: string;
-	group?: string;
-}
-
 // ─── App ─────────────────────────────────────────────────────────────────────
 const AppInner = () => {
-	const loading = useLoading();
 	const [user, setUser] = useState<JwtUser | null>(null);
 	const [authReady, setAuthReady] = useState(false);
 
 	const [activeTab, setActiveTab] = useState("dashboard");
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+	const [dadosCarregando, setDadosCarregando] = useState(true);
+
+	// Abas já abertas ao menos uma vez. Uma vez montado, o módulo não é
+	// desmontado — é o que preserva filtros e formulários entre trocas de aba.
+	const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(["dashboard"]));
+
+	// Ponto único de navegação. Marcar a aba como visitada no MESMO update que a
+	// ativa evita um frame com a área de conteúdo vazia (a aba nova ainda não
+	// estaria em visitedTabs se isso dependesse de um efeito pós-render).
+	// Identidade estável: a Topbar e a paleta recebem esta função como prop.
+	const goToTab = useCallback((id: string) => {
+		setActiveTab(id);
+		setVisitedTabs((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+		setIsMobileMenuOpen(false);
+	}, []);
+
+	// Rede de segurança: garante o invariante mesmo se activeTab mudar por outro
+	// caminho. Quando a aba já foi visitada o updater devolve o mesmo Set e o
+	// React descarta o update sem re-renderizar.
+	useEffect(() => {
+		setVisitedTabs((prev) => (prev.has(activeTab) ? prev : new Set(prev).add(activeTab)));
+	}, [activeTab]);
+
+	// Menu recolhido sobrevive ao recarregamento da página.
+	const [sidebarCollapsed, setSidebarCollapsed] = useState(
+		() => localStorage.getItem("a3_sidebar_collapsed") === "1"
+	);
+	const toggleSidebar = useCallback(() => setSidebarCollapsed((prev) => !prev), []);
+	// A persistência vive num efeito: updater de estado tem de ser puro (o React
+	// o executa duas vezes em StrictMode e pode reexecutá-lo em modo concorrente).
+	useEffect(() => {
+		localStorage.setItem("a3_sidebar_collapsed", sidebarCollapsed ? "1" : "0");
+	}, [sidebarCollapsed]);
+
+	// Incrementado a cada pedido externo de "nova ordem"; o módulo Ordens observa
+	// a mudança de valor e abre o modal. Evita expor a função de abrir o modal.
+	const [newOrderSignal, setNewOrderSignal] = useState(0);
+	const [paletteOpen, setPaletteOpen] = useState(false);
+
+	const abrirNovaOrdem = useCallback(() => {
+		goToTab("orders");
+		setNewOrderSignal((n) => n + 1);
+	}, [goToTab]);
+	const abrirPaleta = useCallback(() => setPaletteOpen(true), []);
+	const fecharPaleta = useCallback(() => setPaletteOpen(false), []);
+
+	// ─── Atalhos programáveis (gaveta da borda direita) ──────────────────────
+	const { shortcuts, adicionar, remover, mover, cheio } = useShortcuts(user?.email);
+
+	// Sinal genérico de ação por módulo: o módulo alvo observa o nonce e reage.
+	const [quickAction, setQuickAction] = useState<{ tab: string; action: string; nonce: number } | null>(null);
+
+	// Filtro vindo de um atalho. O módulo Ordens aplica e o App limpa.
+	const [pendingOrderFilter, setPendingOrderFilter] =
+		useState<(OrderFilterPayload & { nonce: number }) | null>(null);
+
+	const runShortcut = useCallback(
+		(s: Shortcut) => {
+			if (s.kind === "module") {
+				goToTab(s.target);
+				return;
+			}
+			if (s.kind === "action") {
+				const acao = ACTIONS.find((a) => a.id === s.target);
+				if (!acao) return;
+				goToTab(acao.tab);
+				setQuickAction({ tab: acao.tab, action: acao.action, nonce: Date.now() });
+				return;
+			}
+			// Filtro salvo: só navega e entrega o payload. Nada aqui mexe em
+			// `newOrderSignal`, então o formulário de ordem não é perturbado.
+			if (s.kind === "orderFilter" && s.payload) {
+				goToTab("orders");
+				setPendingOrderFilter({ ...s.payload, nonce: Date.now() });
+			}
+		},
+		[goToTab]
+	);
+
+	// Limpar assim que o módulo aplica é o que permite clicar duas vezes no
+	// mesmo atalho: sem isso o nonce repetido não reativaria o efeito de lá.
+	const limparFiltroPendente = useCallback(() => setPendingOrderFilter(null), []);
+
+	// `window.prompt` é o último aviso nativo do sistema, mantido de propósito:
+	// um modal só para pedir um texto curto não pagaria o código.
+	const salvarFiltroComoAtalho = useCallback(
+		(payload: OrderFilterPayload) => {
+			const rotulo = window.prompt("Nome do atalho:", "Ordens filtradas");
+			if (!rotulo) return;
+			adicionar({
+				id: `orderFilter:${Date.now()}`,
+				kind: "orderFilter",
+				label: rotulo,
+				icon: "filter",
+				color: "sky",
+				target: "orders",
+				payload,
+			});
+		},
+		[adicionar]
+	);
+
+	// A ação "nova ordem" reaproveita o canal que já existe: o módulo Ordens
+	// observa `newOrderSignal` e abre o formulário (perguntando antes se há
+	// rascunho em jogo).
+	useEffect(() => {
+		if (quickAction?.tab === "orders" && quickAction.action === "new") {
+			setNewOrderSignal((n) => n + 1);
+		}
+	}, [quickAction?.nonce]);
 
 	// Estados de dados
 	const [clients, setClients] = useState<Client[]>([]);
@@ -106,6 +202,19 @@ const AppInner = () => {
 		setAuthReady(true);
 	}, []);
 
+	// ─── Atalho global da paleta de comandos ─────────────────────────────────
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			// e.key pode vir indefinido em eventos sintéticos de autofill.
+			if ((e.ctrlKey || e.metaKey) && typeof e.key === "string" && e.key.toLowerCase() === "k") {
+				e.preventDefault();
+				setPaletteOpen((v) => !v);
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, []);
+
 	// ─── Carrega dados após autenticado ──────────────────────────────────────
 	useEffect(() => {
 		if (!user) return;
@@ -119,7 +228,7 @@ const AppInner = () => {
 			}
 		};
 
-		loading.show("Carregando dados do sistema...");
+		setDadosCarregando(true);
 		Promise.all([
 			fetchSafe("/clients", setClients),
 			fetchSafe("/stock", setStock),
@@ -127,7 +236,7 @@ const AppInner = () => {
 			fetchSafe("/expenses", setExpenses),
 			fetchSafe("/pricing", setPriceTable),
 			fetchSafe("/machinery", setMachinery),
-		]).finally(() => loading.hide());
+		]).finally(() => setDadosCarregando(false));
 	}, [user]);
 
 	const handleStockUpdate = () => {
@@ -162,40 +271,17 @@ const AppInner = () => {
 	if (!user) return <LoginPage />;
 
 	// ─── Navegação ────────────────────────────────────────────────────────────
-	const navItems: NavItem[] = [
-		{ id: "dashboard", icon: LayoutDashboard, label: "Dashboard", group: "Principal" },
-		{ id: "ai", icon: Bot, label: "Insights IA", group: "Principal" },
-		{ id: "orders", icon: FileText, label: "Ordens", group: "Operacional" },
-		{ id: "clients", icon: Users, label: "Clientes", group: "Operacional" },
-		{ id: "stock", icon: Box, label: "Estoque", group: "Operacional" },
-		{ id: "machinery", icon: Printer, label: "Maquinário", group: "Operacional" },
-		{ id: "pricing", icon: Settings, label: "Preços", group: "Configuração" },
-		{ id: "expenses", icon: DollarSign, label: "Financeiro", group: "Configuração" },
-		{ id: "dre", icon: BarChart3, label: "DRE", group: "Configuração" },
-		{ id: "estudo", icon: FileBarChart, label: "Estudo", group: "Configuração" },
-		{ id: "nota-fiscal", icon: Receipt, label: "Nota Fiscal", group: "Configuração" },
-		{ id: "users", icon: Shield, label: "Usuários", group: "Configuração" },
-		{ id: "db-security", icon: HardDrive, label: "Banco de Dados", group: "Configuração" },
-	];
+	const activeLabel = NAV_ITEMS.find((n) => n.id === activeTab)?.label ?? "";
 
-	const groups = ["Principal", "Operacional", "Configuração"];
-
-	const getBadge = (id: string) => {
-		let count = 0;
-		let color = "";
-		if (id === "orders") { count = counts.orders; color = "bg-blue-500"; }
-		else if (id === "stock") { count = counts.stock; color = "bg-amber-500"; }
-		else if (id === "expenses") { count = counts.expenses; color = "bg-red-500"; }
-		if (count > 0)
-			return (
-				<span className={`ml-auto text-[10px] font-bold min-w-[20px] text-center px-1.5 py-0.5 rounded-full ${color} text-white shadow-sm`}>
-					{count}
-				</span>
-			);
-		return null;
-	};
-
-	const activeLabel = navItems.find((n) => n.id === activeTab)?.label ?? "";
+	// Auxiliar — é uma FUNÇÃO chamada, nunca um componente <Panel>. Um componente
+	// declarado aqui dentro seria recriado a cada render e o React remontaria o
+	// módulo inteiro a cada tecla digitada, destruindo o estado das abas.
+	const painel = (id: string, conteudo: React.ReactNode) =>
+		visitedTabs.has(id) ? (
+			<div key={id} style={{ display: activeTab === id ? "block" : "none" }}>
+				{conteudo}
+			</div>
+		) : null;
 
 	return (
 		<div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -218,83 +304,16 @@ const AppInner = () => {
 			</div>
 
 			{/* ── Sidebar ── */}
-			<aside
-				className={`fixed inset-y-0 left-0 w-[260px] bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col z-40 transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:translate-x-0 shadow-2xl ${
-					isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-				} md:sticky md:top-0 md:h-screen pt-16 md:pt-0`}
-			>
-				{/* Logo */}
-				<div className="hidden md:flex items-center gap-3 px-5 py-4 border-b border-slate-800/60">
-					<div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-2.5 rounded-xl shadow-lg shadow-indigo-900/40">
-						<Printer className="w-5 h-5 text-white" />
-					</div>
-					<div>
-						<span className="font-bold text-lg text-white tracking-tight block">A3 System</span>
-						<span className="text-[11px] text-slate-500 font-medium">Gestão Gráfica</span>
-					</div>
-				</div>
-
-				{/* Nav */}
-				<nav className="flex-1 px-3 py-2 overflow-hidden space-y-2">
-					{groups.map((group) => {
-						const items = navItems.filter((n) => n.group === group);
-						return (
-							<div key={group}>
-								<p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 px-3 mb-1">
-									{group}
-								</p>
-								<div className="space-y-0.5">
-									{items.map((item) => {
-										const isActive = activeTab === item.id;
-										return (
-											<button
-												key={item.id}
-												onClick={() => {
-													setActiveTab(item.id);
-													setIsMobileMenuOpen(false);
-												}}
-												className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group ${
-													isActive
-														? "bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-900/30"
-														: "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
-												}`}
-											>
-												<item.icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"}`} />
-												<span className="flex-1 text-left">{item.label}</span>
-												{getBadge(item.id)}
-												{isActive && <ChevronRight className="w-3 h-3 opacity-40" />}
-											</button>
-										);
-									})}
-								</div>
-							</div>
-						);
-					})}
-				</nav>
-
-				{/* Rodapé — usuário + logout */}
-				<div className="px-4 py-3 border-t border-slate-800/60">
-					<div className="flex items-center gap-3 mb-2">
-						{user.picture ? (
-							<img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full border-2 border-slate-700/80 object-cover ring-2 ring-slate-800" />
-						) : (
-							<div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
-								{user.name?.charAt(0)}
-							</div>
-						)}
-						<div className="flex-1 min-w-0">
-							<p className="text-[13px] font-semibold text-slate-300 truncate">{user.name}</p>
-							<p className="text-[10px] text-slate-500 truncate">{user.email}</p>
-						</div>
-					</div>
-					<button
-						onClick={handleLogout}
-						className="w-full flex items-center gap-2 text-xs text-slate-500 hover:text-red-400 transition-colors px-3 py-2 rounded-lg hover:bg-red-500/10"
-					>
-						<LogOut className="w-3.5 h-3.5" /> Sair
-					</button>
-				</div>
-			</aside>
+			<Sidebar
+				activeTab={activeTab}
+				onSelect={goToTab}
+				collapsed={sidebarCollapsed}
+				onToggleCollapse={toggleSidebar}
+				isMobileOpen={isMobileMenuOpen}
+				counts={counts}
+				user={{ name: user.name, email: user.email, picture: user.picture }}
+				onLogout={handleLogout}
+			/>
 
 			{/* ── Overlay mobile ── */}
 			{isMobileMenuOpen && (
@@ -307,92 +326,93 @@ const AppInner = () => {
 			{/* ── Conteúdo principal ── */}
 			<div className="flex-1 flex flex-col min-h-screen overflow-hidden">
 				{/* Topbar desktop */}
-				<header className="hidden md:flex items-center justify-between px-8 py-4 bg-white/80 backdrop-blur-md border-b border-slate-200/80 flex-shrink-0 sticky top-0 z-10">
-					<div>
-						<h1 className="text-lg font-bold text-slate-800">{activeLabel}</h1>
-						<p className="text-xs text-slate-400 mt-0.5">
-							{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
-						</p>
-					</div>
-					<div className="flex items-center gap-3">
-						{counts.orders > 0 && (
-							<span className="text-xs bg-blue-50 text-blue-600 font-semibold px-3 py-1.5 rounded-full border border-blue-100 shadow-sm">
-								{counts.orders} OS abertas
-							</span>
-						)}
-						{counts.expenses > 0 && (
-							<span className="text-xs bg-red-50 text-red-600 font-semibold px-3 py-1.5 rounded-full border border-red-100 shadow-sm">
-								{counts.expenses} contas vencem em breve
-							</span>
-						)}
-						<div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
-							{user.picture && (
-								<img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border-2 border-slate-100 object-cover shadow-sm" />
-							)}
-							<span className="text-sm font-medium text-slate-700 hidden lg:block">{user.name}</span>
-						</div>
-					</div>
-				</header>
+				<Topbar
+					title={activeLabel}
+					counts={counts}
+					user={{ name: user.name, picture: user.picture, email: user.email }}
+					onLogout={handleLogout}
+					onNewOrder={abrirNovaOrdem}
+					onGoTo={goToTab}
+					onOpenPalette={abrirPaleta}
+				/>
 
 				<main className="flex-1 overflow-y-auto p-4 md:p-8 mt-14 md:mt-0">
 					<div className="max-w-7xl mx-auto">
-						<div style={{ display: activeTab === "dashboard" ? "block" : "none" }}>
-							<DashboardModule orders={orders} expenses={expenses} stock={stock} />
-						</div>
-						<div style={{ display: activeTab === "ai" ? "block" : "none" }}>
-							<AiInsightsModule />
-						</div>
-						<div style={{ display: activeTab === "orders" ? "block" : "none" }}>
-							<OrderModule
-								clients={clients}
-								priceTable={priceTable}
-								orders={orders}
-								setOrders={setOrders}
-								onStockUpdate={handleStockUpdate}
-								machinery={machinery}
-								setClients={setClients}
-							/>
-						</div>
-						<div style={{ display: activeTab === "stock" ? "block" : "none" }}>
-							<StockModule stock={stock} setStock={setStock} priceTable={priceTable} />
-						</div>
-						<div style={{ display: activeTab === "machinery" ? "block" : "none" }}>
-							<MachineryModule machinery={machinery} setMachinery={setMachinery} stock={stock} />
-						</div>
-						<div style={{ display: activeTab === "pricing" ? "block" : "none" }}>
-							<PricingModule data={priceTable} setData={setPriceTable} />
-						</div>
-						<div style={{ display: activeTab === "clients" ? "block" : "none" }}>
-							<ClientsModule clients={clients} setClients={setClients} />
-						</div>
-						<div style={{ display: activeTab === "expenses" ? "block" : "none" }}>
-							<ExpensesModule expenses={expenses} setExpenses={setExpenses} />
-						</div>
-						<div style={{ display: activeTab === "dre" ? "block" : "none" }}>
-							<DreModule orders={orders} expenses={expenses} />
-						</div>
-						<div style={{ display: activeTab === "estudo" ? "block" : "none" }}>
-							<EstudoModule />
-						</div>
-						<div style={{ display: activeTab === "nota-fiscal" ? "block" : "none" }}>
-							<NotaFiscalModule orders={orders} />
-						</div>
-						<div style={{ display: activeTab === "users" ? "block" : "none" }}>
-							<UsersModule />
-						</div>
-						<div style={{ display: activeTab === "db-security" ? "block" : "none" }}>
-							<DatabaseSecurityModule />
-						</div>
+						{dadosCarregando ? (
+							<div className="space-y-4">
+								<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+									{Array.from({ length: 6 }).map((_, i) => <SkeletonTile key={i} />)}
+								</div>
+								<Skeleton className="h-64 w-full" />
+							</div>
+						) : (
+							<Suspense
+								fallback={
+									<div className="space-y-4">
+										<Skeleton className="h-24 w-full" />
+										<Skeleton className="h-64 w-full" />
+									</div>
+								}
+							>
+								{painel("dashboard", <DashboardModule orders={orders} expenses={expenses} stock={stock} />)}
+								{painel("ai", <AiInsightsModule />)}
+								{painel("orders", (
+									<OrderModule
+										clients={clients}
+										priceTable={priceTable}
+										orders={orders}
+										setOrders={setOrders}
+										onStockUpdate={handleStockUpdate}
+										machinery={machinery}
+										setClients={setClients}
+										newOrderSignal={newOrderSignal}
+										pendingOrderFilter={pendingOrderFilter}
+										onPendingFilterApplied={limparFiltroPendente}
+										onSaveFilterAsShortcut={salvarFiltroComoAtalho}
+									/>
+								))}
+								{painel("stock", <StockModule stock={stock} setStock={setStock} priceTable={priceTable} quickAction={quickAction} />)}
+								{painel("machinery", <MachineryModule machinery={machinery} setMachinery={setMachinery} stock={stock} />)}
+								{painel("pricing", <PricingModule data={priceTable} setData={setPriceTable} />)}
+								{painel("clients", <ClientsModule clients={clients} setClients={setClients} quickAction={quickAction} />)}
+								{painel("expenses", <ExpensesModule expenses={expenses} setExpenses={setExpenses} quickAction={quickAction} />)}
+								{painel("dre", <DreModule orders={orders} expenses={expenses} />)}
+								{painel("estudo", <EstudoModule quickAction={quickAction} />)}
+								{painel("nota-fiscal", <NotaFiscalModule orders={orders} quickAction={quickAction} />)}
+								{painel("users", <UsersModule />)}
+								{painel("db-security", <DatabaseSecurityModule />)}
+							</Suspense>
+						)}
 					</div>
 				</main>
 			</div>
+
+			<CommandPalette
+				isOpen={paletteOpen}
+				onClose={fecharPaleta}
+				onGoTo={goToTab}
+				onNewOrder={abrirNovaOrdem}
+			/>
+
+			<ShortcutsDrawer
+				shortcuts={shortcuts}
+				onRun={runShortcut}
+				onAdd={adicionar}
+				onRemove={remover}
+				onMove={mover}
+				cheio={cheio}
+			/>
 		</div>
 	);
 };
 
 const App = () => (
 	<LoadingProvider>
-		<AppInner />
+		<ToastProvider>
+			<ConfirmProvider>
+				<AppInner />
+			</ConfirmProvider>
+		</ToastProvider>
 	</LoadingProvider>
 );
 

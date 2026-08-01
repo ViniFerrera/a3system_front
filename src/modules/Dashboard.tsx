@@ -4,13 +4,21 @@ import {
 	ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart,
 } from "recharts";
 import {
-	TrendingUp, Wallet, ArrowDownRight, ArrowUpRight, Filter,
+	TrendingUp, Wallet, ArrowDownRight, Filter,
 	CheckCircle2, Clock, XCircle, BarChart2, AlertTriangle, Receipt,
-	Target, Package, RefreshCw, DollarSign, ChevronDown,
+	Target, Package, RefreshCw, DollarSign,
 } from "lucide-react";
 import { Order, Expense, StockItem } from "@/types";
 import { Utils } from "@/utils";
 import { MultiSelect } from "@/components/ui/MultiSelect";
+import { StatTile } from "@/components/ui/StatTile";
+import { fetchDashboardMetrics, DashboardMetrics } from "@/services/dashboardMetrics";
+import { BreakEvenCard } from "./dashboard/BreakEvenCard";
+import { ServiceMixChart } from "./dashboard/ServiceMixChart";
+import { VolumeRevenueChart } from "./dashboard/VolumeRevenueChart";
+import { TicketBandsCard } from "./dashboard/TicketBandsCard";
+import { ConcentrationCard } from "./dashboard/ConcentrationCard";
+import { RetentionCard } from "./dashboard/RetentionCard";
 
 type OrderStatusFilter = "CONCLUIDA" | "ABERTA" | "CANCELADA" | "ALL";
 type PeriodPreset = "30d" | "3m" | "6m" | "12m" | "custom";
@@ -39,35 +47,16 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 				<div key={i} className="flex items-center gap-2 mt-1.5">
 					<span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color || p.fill }} />
 					<span className="text-slate-500 text-xs">{p.name}:</span>
-					<span className="font-bold text-slate-800 text-xs ml-auto tabular-nums">{Utils.formatCurrency(Number(p.value))}</span>
+					{/* Séries de contagem não são dinheiro — formatá-las como moeda
+					    transformaria "12 pedidos" em "R$ 12,00" na tela. */}
+					<span className="font-bold text-slate-800 text-xs ml-auto tabular-nums">
+						{p.dataKey === "volume" ? `${Number(p.value)} OS` : Utils.formatCurrency(Number(p.value))}
+					</span>
 				</div>
 			))}
 		</div>
 	);
 };
-
-interface KpiCardProps {
-	label: string; value: string; sub: string;
-	icon: React.ReactNode; gradient: string; trend?: number;
-}
-const KpiCard = ({ label, value, sub, icon, gradient, trend }: KpiCardProps) => (
-	<div className={`rounded-2xl p-3.5 sm:p-5 text-white shadow-lg ${gradient} relative overflow-hidden group hover:shadow-xl transition-shadow duration-200`}>
-		<div className="absolute right-3 top-3 opacity-[0.10] scale-[2.2] origin-center group-hover:scale-[2.4] transition-transform duration-300">{icon}</div>
-		<div className="relative z-10">
-			<p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1.5">{label}</p>
-			<p className="text-lg sm:text-2xl font-bold leading-tight tracking-tight tabular-nums">{value}</p>
-			<div className="flex items-center gap-2 mt-2 flex-wrap">
-				<p className="text-white/60 text-xs">{sub}</p>
-				{trend !== undefined && (
-					<span className={`flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${trend >= 0 ? "bg-white/20" : "bg-black/15"}`}>
-						{trend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-						{Math.abs(trend).toFixed(1)}%
-					</span>
-				)}
-			</div>
-		</div>
-	</div>
-);
 
 // ─── Local date string (YYYY-MM-DD) sem conversão UTC ────────────────────────
 const toLocalDate = (d: Date) =>
@@ -115,6 +104,25 @@ export const DashboardModule = ({
 		}
 	}, [periodPreset]);
 
+	// ── Métricas agregadas (rota do backend) ─────────────────────────────────
+	// Alimentam só os blocos novos. Enquanto `metrics` é null cada bloco mostra
+	// esqueleto; em erro, aviso discreto — o resto do Dashboard segue normal.
+	const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+	const [metricsError, setMetricsError] = useState(false);
+
+	useEffect(() => {
+		let cancelado = false;
+		setMetricsError(false);
+		// Zerar antes de buscar não é detalhe de UI: sem isso, ao trocar de
+		// período estes blocos continuariam exibindo os números do período
+		// anterior — sem rótulo de período próprio, ninguém perceberia.
+		setMetrics(null);
+		fetchDashboardMetrics(startDate, endDate)
+			.then((data) => { if (!cancelado) setMetrics(data); })
+			.catch(() => { if (!cancelado) { setMetrics(null); setMetricsError(true); } });
+		return () => { cancelado = true; };
+	}, [startDate, endDate]);
+
 	const allServices = useMemo(() => {
 		const s = new Set<string>();
 		orders.forEach((o) => o.items.forEach((i) => s.add(i.servico)));
@@ -135,30 +143,49 @@ export const DashboardModule = ({
 		return order.total;
 	};
 
-	// ── Dados filtrados (filtro principal) ───────────────────────────────────
-	// Canceladas nunca contribuem valores — apenas contam no statusCounts
-	const currentOrders = useMemo(() => orders.filter((o) => {
+	// Recorte que NÃO depende da data — o mesmo tem de valer para o período
+	// atual e para o anterior, senão a variação compara uma janela filtrada por
+	// serviço/pagamento contra outra sem filtro nenhum e o percentual mente.
+	// Canceladas nunca contribuem valores — apenas contam no statusCounts.
+	const matchesFilters = (o: Order) => {
 		if (o.status === "CANCELADA") return false;
 		if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return false;
-		if (!filterByDate(o.data_conclusao || o.data, startDate, endDate)) return false;
 		if (selectedServices.length > 0 && !o.items.some((i) => selectedServices.includes(i.servico))) return false;
 		if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return false;
 		return true;
-	}), [orders, startDate, endDate, selectedServices, selectedPaymentStatus, orderStatusFilter]);
+	};
+
+	// ── Dados filtrados (filtro principal) ───────────────────────────────────
+	const currentOrders = useMemo(() => orders.filter((o) =>
+		matchesFilters(o) && filterByDate(o.data_conclusao || o.data, startDate, endDate)
+	), [orders, startDate, endDate, selectedServices, selectedPaymentStatus, orderStatusFilter]);
 
 	const currentExpenses = useMemo(() =>
 		expenses.filter((e) => e.status === "PAGO" && filterByDate(e.vencimento, startDate, endDate)),
 		[expenses, startDate, endDate]);
 
 	// ── Dados do período anterior (tendência) ────────────────────────────────
-	const prevRevenue = useMemo(() => {
+	// A janela anterior tem a mesma duração e termina na véspera do início.
+	// `new Date("YYYY-MM-DD")` ancora em meia-noite UTC, então o recorte volta
+	// com `toISOString()`: os getters locais deslocariam um dia em UTC-3.
+	const prevRange = useMemo(() => {
 		const dur = new Date(endDate).getTime() - new Date(startDate).getTime() + 86400000;
 		const pe = new Date(new Date(startDate).getTime() - 1);
 		const ps = new Date(pe.getTime() - dur + 1);
-		return orders
-			.filter((o) => o.status !== "CANCELADA" && (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, ps.toISOString().split("T")[0], pe.toISOString().split("T")[0]))
-			.reduce((acc, o) => acc + o.total, 0);
-	}, [orders, startDate, endDate, orderStatusFilter]);
+		return { start: ps.toISOString().split("T")[0], end: pe.toISOString().split("T")[0] };
+	}, [startDate, endDate]);
+
+	// Mesmo recorte de `currentOrders`, só que na janela anterior. Sem filtro
+	// ativo o resultado é idêntico ao de antes (`matchesFilters` e
+	// `calcOrderTotal` viram identidade); com filtro, a comparação passa a ser
+	// entre iguais.
+	const prevOrders = useMemo(() => orders.filter((o) =>
+		matchesFilters(o) && filterByDate(o.data_conclusao || o.data, prevRange.start, prevRange.end)
+	), [orders, prevRange, selectedServices, selectedPaymentStatus, orderStatusFilter]);
+
+	const prevRevenue = useMemo(() =>
+		prevOrders.reduce((acc, o) => acc + calcOrderTotal(o), 0),
+		[prevOrders, selectedServices]);
 
 	// ── Status counts ─────────────────────────────────────────────────────────
 	const statusCounts = useMemo(() => ({
@@ -178,19 +205,27 @@ export const DashboardModule = ({
 			.filter((o) => o.status !== "CANCELADA" && (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, startDate, endDate) && (o.status_pagamento || "NAO_PAGO") !== "PAGO")
 			.reduce((acc, o) => acc + o.total, 0);
 		const revTrend = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : undefined;
-		return { revenue, expense, profit, margin, ticket, toReceive, revTrend };
-	}, [currentOrders, currentExpenses, prevRevenue, orders, startDate, endDate, orderStatusFilter]);
+		// Volume e ticket do período anterior, para as variações dos tiles novos.
+		const volTrend = prevOrders.length > 0
+			? ((currentOrders.length - prevOrders.length) / prevOrders.length) * 100
+			: undefined;
+		const prevTicket = prevOrders.length > 0
+			? prevOrders.reduce((a, o) => a + calcOrderTotal(o), 0) / prevOrders.length
+			: 0;
+		const ticketTrend = prevTicket > 0 ? ((ticket - prevTicket) / prevTicket) * 100 : undefined;
+		return { revenue, expense, profit, margin, ticket, toReceive, revTrend, volTrend, ticketTrend };
+	}, [currentOrders, currentExpenses, prevRevenue, prevOrders, orders, startDate, endDate, orderStatusFilter, selectedServices]);
 
 	// ── Gráfico Mensal (dinâmico baseado no período) ──────────────────────────
 	const monthlyData = useMemo(() => {
-		const months = new Map<string, { name: string; receita_concluida: number; receita_aberta: number; despesa: number; lucro: number }>();
+		const months = new Map<string, { name: string; receita_concluida: number; receita_aberta: number; despesa: number; lucro: number; volume: number }>();
 		let curr = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth(), 1);
 		const end = new Date(endDate);
 		while (curr <= end) {
 			const key = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}`;
 			const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 			const label = `${monthNames[curr.getMonth()]}/${String(curr.getFullYear()).slice(2)}`;
-			months.set(key, { name: label, receita_concluida: 0, receita_aberta: 0, despesa: 0, lucro: 0 });
+			months.set(key, { name: label, receita_concluida: 0, receita_aberta: 0, despesa: 0, lucro: 0, volume: 0 });
 			curr.setMonth(curr.getMonth() + 1);
 		}
 		orders.forEach((o) => {
@@ -202,6 +237,9 @@ export const DashboardModule = ({
 			if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return;
 			const val = (selectedServices.length === 0 || o.items.some((i) => selectedServices.includes(i.servico))) ? calcOrderTotal(o) : 0;
 			if (val <= 0) return;
+			// Conta o pedido no mesmo ponto em que a receita entra, para volume e
+			// receita do mês nunca falarem de conjuntos diferentes de OS.
+			entry.volume += 1;
 			if (o.status === "CONCLUIDA") entry.receita_concluida += val;
 			else entry.receita_aberta += val;
 		});
@@ -216,6 +254,23 @@ export const DashboardModule = ({
 			lucro: d.receita_concluida + d.receita_aberta - d.despesa,
 		}));
 	}, [orders, expenses, selectedServices, selectedPaymentStatus, orderStatusFilter, startDate, endDate]);
+
+	// ── Volume × Receita (mesmo recorte do gráfico mensal) ───────────────────
+	const volumeReceitaData = useMemo(
+		() => monthlyData.map((m) => ({
+			name: m.name,
+			receita: m.receita_concluida + m.receita_aberta,
+			volume: m.volume,
+		})),
+		[monthlyData]
+	);
+
+	// ── Sparklines dos KPIs (derivados do mesmo array do gráfico mensal) ──────
+	const sparks = useMemo(() => ({
+		receita: monthlyData.map((m) => m.receita_concluida + m.receita_aberta),
+		despesa: monthlyData.map((m) => m.despesa),
+		lucro: monthlyData.map((m) => m.lucro),
+	}), [monthlyData]);
 
 	// ── Dados do filtro inferior ──────────────────────────────────────────────
 	const bottomOrders = useMemo(() => orders.filter((o) => {
@@ -263,15 +318,34 @@ export const DashboardModule = ({
 
 	// ── Top Serviços / Clientes ───────────────────────────────────────────────
 	const topServices = useMemo(() => {
-		const map = new Map<string, { volume: number; revenue: number }>();
+		// `volume` conta OS distintas, não quantidade de itens: um pedido com duas
+		// linhas do mesmo serviço é um pedido só, e "5000 pedidos" para 5000 folhas
+		// seria rótulo mentiroso na tela. A receita continua idêntica à de antes.
+		const map = new Map<string, { revenue: number; pedidos: Set<string> }>();
 		currentOrders.forEach((o) => o.items.forEach((i) => {
 			if (selectedServices.length === 0 || selectedServices.includes(i.servico)) {
-				const cur = map.get(i.servico) || { volume: 0, revenue: 0 };
-				map.set(i.servico, { volume: cur.volume + (i.quantidade || 1), revenue: cur.revenue + (i.total || 0) });
+				const cur = map.get(i.servico) || { revenue: 0, pedidos: new Set<string>() };
+				cur.revenue += (i.total || 0);
+				cur.pedidos.add(String(o.id ?? `${o.cliente_nome}|${o.data}`));
+				map.set(i.servico, cur);
 			}
 		}));
-		return Array.from(map.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue).slice(0, 6);
+		return Array.from(map.entries())
+			.map(([name, v]) => ({ name, revenue: v.revenue, volume: v.pedidos.size }))
+			.sort((a, b) => b.revenue - a.revenue)
+			.slice(0, 6);
 	}, [currentOrders, selectedServices]);
+
+	// Ticket médio por serviço = receita do serviço ÷ OS que o contêm.
+	const serviceMix = useMemo(
+		() => topServices.map((s) => ({
+			name: s.name,
+			revenue: s.revenue,
+			volume: s.volume,
+			ticket: s.volume > 0 ? s.revenue / s.volume : 0,
+		})),
+		[topServices]
+	);
 
 	const topClients = useMemo(() => {
 		const map = new Map<string, { volume: number; revenue: number }>();
@@ -341,7 +415,7 @@ export const DashboardModule = ({
 						className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-semibold text-xs transition-all duration-150 shadow-sm ${orderStatusFilter === btn.key ? btn.active + " shadow-md" : btn.inactive}`}
 					>
 						{btn.icon}{btn.label}
-						<span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${orderStatusFilter === btn.key ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{btn.count}</span>
+						<span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-2xs font-bold ${orderStatusFilter === btn.key ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{btn.count}</span>
 					</button>
 				))}
 			</div>
@@ -364,11 +438,11 @@ export const DashboardModule = ({
 					{periodPreset === "custom" && (
 						<div className="flex flex-wrap gap-3 items-end">
 							<div className="w-full md:w-36">
-								<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Início</label>
+								<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Início</label>
 								<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
 							</div>
 							<div className="w-full md:w-36">
-								<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Fim</label>
+								<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Fim</label>
 								<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
 							</div>
 						</div>
@@ -376,11 +450,11 @@ export const DashboardModule = ({
 					{/* Filtros adicionais */}
 					<div className="flex flex-wrap gap-3 items-end">
 						<div className="w-full md:w-44">
-							<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Pagamento</label>
+							<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Pagamento</label>
 							<MultiSelect options={["PAGO", "PARCIAL", "NAO_PAGO"]} selected={selectedPaymentStatus} onChange={setSelectedPaymentStatus} placeholder="Todos" />
 						</div>
 						<div className="w-full md:w-52">
-							<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Serviços</label>
+							<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Serviços</label>
 							<MultiSelect options={allServices} selected={selectedServices} onChange={setSelectedServices} placeholder="Todos" />
 						</div>
 						<button
@@ -394,14 +468,33 @@ export const DashboardModule = ({
 			</div>
 
 			{/* ── KPI Cards ── */}
-			<div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-				<KpiCard label="Receita" value={fmt(kpis.revenue)} sub={`${currentOrders.length} ordens`} icon={<TrendingUp />} gradient="bg-gradient-to-br from-emerald-400 to-emerald-600" trend={kpis.revTrend} />
-				<KpiCard label="Despesas" value={fmt(kpis.expense)} sub="pagas no período" icon={<ArrowDownRight />} gradient="bg-gradient-to-br from-rose-400 to-rose-600" />
-				<KpiCard label="Lucro Líquido" value={fmt(kpis.profit)} sub={`Margem: ${kpis.margin.toFixed(1)}%`} icon={<Wallet />} gradient={kpis.profit >= 0 ? "bg-gradient-to-br from-indigo-500 to-violet-600" : "bg-gradient-to-br from-orange-500 to-red-600"} />
-				<KpiCard label="Ticket Médio" value={fmt(kpis.ticket)} sub="por ordem" icon={<Receipt />} gradient="bg-gradient-to-br from-sky-400 to-sky-600" />
-				<KpiCard label="Total de OS" value={String(currentOrders.length)} sub={`${statusCounts.open} em aberto`} icon={<Target />} gradient="bg-gradient-to-br from-violet-500 to-purple-600" />
-				<KpiCard label="A Receber" value={fmt(kpis.toReceive)} sub="pendente + parcial" icon={<DollarSign />} gradient={kpis.toReceive > 0 ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-slate-400 to-slate-500"} />
+			{/* Os gradientes de `accent` são literais de propósito: o Tailwind varre
+			    o código estaticamente e classe montada por concatenação não vira CSS. */}
+			<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+				<StatTile label="Receita" value={fmt(kpis.revenue)} sub="no período" icon={<TrendingUp className="w-4 h-4" />}
+					accent="from-emerald-400 to-emerald-600" sparkColor="#10b981" trend={kpis.revTrend} spark={sparks.receita} />
+				<StatTile label="Volume de OS" value={String(currentOrders.length)} sub={`${statusCounts.open} em aberto`} icon={<Target className="w-4 h-4" />}
+					accent="from-violet-500 to-purple-600" sparkColor="#8b5cf6" trend={kpis.volTrend} />
+				<StatTile label="Ticket Médio" value={fmt(kpis.ticket)} sub="por ordem" icon={<Receipt className="w-4 h-4" />}
+					accent="from-sky-400 to-sky-600" sparkColor="#0ea5e9" trend={kpis.ticketTrend} />
+				<StatTile label="Despesas" value={fmt(kpis.expense)} sub="pagas no período" icon={<ArrowDownRight className="w-4 h-4" />}
+					accent="from-rose-400 to-rose-600" sparkColor="#f43f5e" spark={sparks.despesa} />
+				<StatTile label="Lucro Líquido" value={fmt(kpis.profit)} sub={`Margem: ${kpis.margin.toFixed(1)}%`} icon={<Wallet className="w-4 h-4" />}
+					accent={kpis.profit >= 0 ? "from-primary-500 to-violet-600" : "from-orange-500 to-red-600"} sparkColor="#6366f1" spark={sparks.lucro} />
+				<StatTile label="A Receber" value={fmt(kpis.toReceive)} sub="pendente + parcial" icon={<DollarSign className="w-4 h-4" />}
+					accent={kpis.toReceive > 0 ? "from-amber-400 to-orange-500" : "from-slate-400 to-slate-500"} sparkColor="#f59e0b" />
 			</div>
+
+			{/* ── Aviso discreto: só os blocos de métricas agregadas dependem da rota ── */}
+			{metricsError && (
+				<div className="flex items-center gap-2 text-2xs text-warning-700 bg-warning-50 border border-warning-200 rounded-xl px-3 py-2">
+					<AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+					Não foi possível carregar as análises agregadas (equilíbrio, faixas, concentração e retenção). O restante do painel segue atualizado.
+				</div>
+			)}
+
+			{/* ── Ponto de Equilíbrio do mês ── */}
+			<BreakEvenCard metrics={metrics} />
 
 			{/* ── Fluxo Mensal + Distribuição Pagamento ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -409,27 +502,32 @@ export const DashboardModule = ({
 					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-5 gap-2">
 						<div>
 							<h4 className="text-sm sm:text-base font-bold text-slate-800">Fluxo de Caixa Mensal</h4>
-							<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">
+							<p className="text-2xs sm:text-xs text-slate-400 mt-0.5">
 								{Utils.formatDate(startDate)} → {Utils.formatDate(endDate)}
 							</p>
 						</div>
-						<div className="flex flex-wrap gap-2 sm:gap-3 text-[10px] sm:text-[11px] font-semibold text-slate-500">
+						<div className="flex flex-wrap gap-2 sm:gap-3 text-2xs sm:text-2xs font-semibold text-slate-500">
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-emerald-400 inline-block" />Concluídas</span>
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-amber-300 inline-block" />Abertas</span>
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-rose-400 inline-block" />Despesa</span>
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-indigo-500 inline-block" />Lucro</span>
+							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-violet-400 inline-block" />Pedidos</span>
 						</div>
 					</div>
 					<ResponsiveContainer width="100%" height={200}>
 						<ComposedChart data={monthlyData} margin={{ left: -5, right: 10 }}>
 							<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
 							<XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
-							<YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+							{/* Toda série precisa de `yAxisId`: sem isso o Recharts joga reais e
+							    contagem de pedidos na mesma escala e o gráfico muda de forma. */}
+							<YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+							<YAxis yAxisId="vol" orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#c4b5fd", fontSize: 11 }} />
 							<Tooltip content={<CustomTooltip />} />
-							<Bar dataKey="receita_concluida" name="Concluídas" stackId="receita" fill="#34d399" barSize={16} />
-							<Bar dataKey="receita_aberta" name="Abertas" stackId="receita" fill="#fbbf24" radius={[5, 5, 0, 0]} barSize={16} />
-							<Bar dataKey="despesa" name="Despesa" fill="#fb7185" radius={[5, 5, 0, 0]} barSize={16} />
-							<Line type="monotone" dataKey="lucro" name="Lucro" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
+							<Bar yAxisId="left" dataKey="receita_concluida" name="Concluídas" stackId="receita" fill="#34d399" barSize={16} />
+							<Bar yAxisId="left" dataKey="receita_aberta" name="Abertas" stackId="receita" fill="#fbbf24" radius={[5, 5, 0, 0]} barSize={16} />
+							<Bar yAxisId="left" dataKey="despesa" name="Despesa" fill="#fb7185" radius={[5, 5, 0, 0]} barSize={16} />
+							<Line yAxisId="left" type="monotone" dataKey="lucro" name="Lucro" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
+							<Line yAxisId="vol" type="monotone" dataKey="volume" name="Pedidos" stroke="#a78bfa" strokeWidth={2} strokeDasharray="4 3" dot={false} />
 						</ComposedChart>
 					</ResponsiveContainer>
 				</div>
@@ -456,10 +554,10 @@ export const DashboardModule = ({
 											<div className="flex items-center gap-2">
 												<span className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[d.name] }} />
 												<span className="text-xs font-semibold text-slate-600">{paymentLabel[d.name]}</span>
-												<span className="text-[10px] text-slate-400">{count} OS</span>
+												<span className="text-2xs text-slate-400">{count} OS</span>
 											</div>
 											<div className="flex items-center gap-2">
-												<span className="text-[10px] text-slate-400">{pct}%</span>
+												<span className="text-2xs text-slate-400">{pct}%</span>
 												<span className="text-xs font-bold text-slate-700">{fmt(d.value)}</span>
 											</div>
 										</div>
@@ -473,27 +571,21 @@ export const DashboardModule = ({
 				</div>
 			</div>
 
-			{/* ── Top Serviços + Top Clientes ── */}
+			{/* ── Mix por serviço + Volume × Receita ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
-					<h4 className="text-base font-bold text-slate-800">Top Serviços</h4>
-					<p className="text-xs text-slate-400 mt-0.5 mb-5">Receita por tipo de serviço</p>
-					{topServices.length > 0 ? (
-						<ResponsiveContainer width="100%" height={220}>
-							<ComposedChart data={topServices} layout="vertical" margin={{ left: 0, right: 55 }}>
-								<CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-								<XAxis type="number" hide />
-								<YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={90} tick={{ fill: "#475569", fontSize: 11, fontWeight: 600 }} />
-								<Tooltip content={<CustomTooltip />} />
-								<Bar dataKey="revenue" name="Receita" fill="#6366f1" radius={[0, 6, 6, 0]} barSize={22}>
-									{/* LabelList removido pois CustomTooltip já mostra */}
-								</Bar>
-							</ComposedChart>
-						</ResponsiveContainer>
-					) : (
-						<div className="h-[220px] flex items-center justify-center text-slate-300 text-sm">Sem dados no período</div>
-					)}
-				</div>
+				<ServiceMixChart data={serviceMix} />
+				<VolumeRevenueChart data={volumeReceitaData} />
+			</div>
+
+			{/* ── Faixas de ticket + Concentração de clientes ── */}
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+				<TicketBandsCard metrics={metrics} />
+				<ConcentrationCard metrics={metrics} />
+			</div>
+
+			{/* ── Retenção + Top Clientes ── */}
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+				<RetentionCard metrics={metrics} />
 
 				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
 					<h4 className="text-base font-bold text-slate-800">Top Clientes</h4>
@@ -506,12 +598,15 @@ export const DashboardModule = ({
 									<div className="flex-1 min-w-0">
 										<div className="flex items-center justify-between mb-1">
 											<span className="text-xs font-semibold text-slate-700 truncate pr-2">{c.name}</span>
-											<span className="text-xs font-bold text-slate-800 flex-shrink-0">{fmt(c.revenue)}</span>
+											{/* Volume ao lado da receita: o ranking passa a mostrar os dois. */}
+											<span className="flex items-baseline gap-2 flex-shrink-0">
+												<span className="num text-2xs text-ink-faint">{c.volume} OS</span>
+												<span className="text-xs font-bold text-slate-800">{fmt(c.revenue)}</span>
+											</span>
 										</div>
 										<div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
 											<div className="h-full bg-gradient-to-r from-indigo-400 to-violet-500 rounded-full" style={{ width: `${(c.revenue / maxClientRevenue) * 100}%` }} />
 										</div>
-										<p className="text-[10px] text-slate-400 mt-0.5">{c.volume} pedido{c.volume !== 1 ? "s" : ""}</p>
 									</div>
 								</div>
 							))}
@@ -540,7 +635,7 @@ export const DashboardModule = ({
 			{/* ── Evolução Diária ── */}
 			<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 				<h4 className="text-sm sm:text-base font-bold text-slate-800">Evolução Diária de Receita</h4>
-				<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-4 sm:mb-5">Faturamento dia a dia nos últimos {bottomPeriod === "7d" ? "7 dias" : bottomPeriod === "30d" ? "30 dias" : bottomPeriod === "3m" ? "3 meses" : "6 meses"}</p>
+				<p className="text-2xs sm:text-xs text-slate-400 mt-0.5 mb-4 sm:mb-5">Faturamento dia a dia nos últimos {bottomPeriod === "7d" ? "7 dias" : bottomPeriod === "30d" ? "30 dias" : bottomPeriod === "3m" ? "3 meses" : "6 meses"}</p>
 				<ResponsiveContainer width="100%" height={180}>
 					<AreaChart data={dailyData} margin={{ left: -10, right: 10 }}>
 						<defs>
@@ -562,7 +657,7 @@ export const DashboardModule = ({
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
 				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 					<h4 className="text-sm sm:text-base font-bold text-slate-800">Receita por Dia da Semana</h4>
-					<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">
+					<p className="text-2xs sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">
 						Melhor dia:{" "}
 						<span className="text-indigo-600 font-bold">
 							{dayOfWeekData.reduce((best, d) => d.revenue > best.revenue ? d : best, dayOfWeekData[0])?.name || "—"}
@@ -581,13 +676,24 @@ export const DashboardModule = ({
 							</Bar>
 						</BarChart>
 					</ResponsiveContainer>
+					{/* O gráfico segue igual — só ganhou a contagem ao lado do valor. */}
+					<div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+						{dayOfWeekData.map((d) => (
+							<div key={d.name} className="flex items-center justify-between text-xs">
+								<span className="font-semibold text-ink-muted">{d.name}</span>
+								<span className="num text-2xs text-ink-faint">
+									{d.count} OS · {fmt(d.revenue)}
+								</span>
+							</div>
+						))}
+					</div>
 				</div>
 
 				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 					<h4 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
 						<AlertTriangle className="w-4 h-4 text-amber-500" /> Alertas
 					</h4>
-					<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">Contas e estoque que precisam de atenção</p>
+					<p className="text-2xs sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">Contas e estoque que precisam de atenção</p>
 					<div className="space-y-2">
 						{upcomingExpenses.length === 0 && stockAlerts.length === 0 ? (
 							<div className="flex flex-col items-center justify-center py-6 text-slate-300">
@@ -604,7 +710,7 @@ export const DashboardModule = ({
 												<Receipt className={`w-3.5 h-3.5 flex-shrink-0 ${overdue ? "text-red-500" : "text-amber-500"}`} />
 												<div className="min-w-0">
 													<p className="text-xs font-semibold text-slate-700 truncate">{e.produto}</p>
-													<p className={`text-[10px] ${overdue ? "text-red-500 font-bold" : "text-amber-600"}`}>{overdue ? "⚠ Vencida" : "Vence"} {Utils.formatDate(e.vencimento)}</p>
+													<p className={`text-2xs ${overdue ? "text-red-500 font-bold" : "text-amber-600"}`}>{overdue ? "⚠ Vencida" : "Vence"} {Utils.formatDate(e.vencimento)}</p>
 												</div>
 											</div>
 											<span className={`text-xs font-bold ml-2 flex-shrink-0 ${overdue ? "text-red-600" : "text-amber-700"}`}>{fmt(e.valor)}</span>
@@ -617,10 +723,10 @@ export const DashboardModule = ({
 											<Package className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
 											<div>
 												<p className="text-xs font-semibold text-slate-700 truncate">{s.nome}</p>
-												<p className="text-[10px] text-rose-500">Saldo: {s.saldo} {s.unidade} (mín: {s.minimo})</p>
+												<p className="text-2xs text-rose-500">Saldo: {s.saldo} {s.unidade} (mín: {s.minimo})</p>
 											</div>
 										</div>
-										<span className="text-[10px] font-bold text-rose-500 bg-rose-100 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">Crítico</span>
+										<span className="text-2xs font-bold text-rose-500 bg-rose-100 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">Crítico</span>
 									</div>
 								))}
 							</>
@@ -636,7 +742,7 @@ export const DashboardModule = ({
 						<h4 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
 							<Clock className="w-4 h-4 text-blue-500" /> Ordens em Aberto
 						</h4>
-						<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{openOrders.length} OS pendentes de conclusão</p>
+						<p className="text-2xs sm:text-xs text-slate-400 mt-0.5">{openOrders.length} OS pendentes de conclusão</p>
 					</div>
 				</div>
 				{openOrders.length === 0 ? (
@@ -649,12 +755,12 @@ export const DashboardModule = ({
 						<table className="w-full text-sm">
 							<thead>
 								<tr className="border-b border-slate-200/60">
-									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">#OS</th>
-									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Cliente</th>
-									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden md:table-cell">Data</th>
-									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden lg:table-cell">Serviços</th>
-									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Pagamento</th>
-									<th className="text-right text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5">Valor</th>
+									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">#OS</th>
+									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Cliente</th>
+									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden md:table-cell">Data</th>
+									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden lg:table-cell">Serviços</th>
+									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Pagamento</th>
+									<th className="text-right text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5">Valor</th>
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-slate-50">
@@ -677,7 +783,7 @@ export const DashboardModule = ({
 													</span>
 												</td>
 												<td className="py-2.5 pr-4">
-													<span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${paymentBadge[o.status_pagamento || "NAO_PAGO"]}`}>
+													<span className={`inline-block text-2xs font-bold px-2 py-0.5 rounded-full ${paymentBadge[o.status_pagamento || "NAO_PAGO"]}`}>
 														{paymentLabel[o.status_pagamento || "NAO_PAGO"]}
 													</span>
 												</td>
@@ -688,7 +794,7 @@ export const DashboardModule = ({
 													<td colSpan={6} className="px-4 py-3">
 														<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
 															<div className="space-y-1.5">
-																<p className="font-bold text-slate-600 text-[10px] uppercase tracking-wide mb-1">Itens do Pedido</p>
+																<p className="font-bold text-slate-600 text-2xs uppercase tracking-wide mb-1">Itens do Pedido</p>
 																{o.items.map((item, idx) => (
 																	<div key={idx} className="flex justify-between bg-white p-2 rounded-lg border border-slate-100">
 																		<span className="text-slate-600"><strong className="text-indigo-600">{item.quantidade}x</strong> {item.servico} - {item.material}</span>
@@ -699,14 +805,14 @@ export const DashboardModule = ({
 															</div>
 															<div className="space-y-2">
 																<div className="bg-white p-3 rounded-lg border border-slate-100 space-y-1.5">
-																	<p className="font-bold text-slate-600 text-[10px] uppercase tracking-wide">Financeiro</p>
+																	<p className="font-bold text-slate-600 text-2xs uppercase tracking-wide">Financeiro</p>
 																	<div className="flex justify-between"><span className="text-slate-500">Forma:</span><span className="font-bold">{o.forma_pagamento || "N/D"}</span></div>
 																	<div className="flex justify-between"><span className="text-slate-500">Total:</span><span className="font-bold text-indigo-600">{fmt(o.total)}</span></div>
-																	<div className="flex justify-between"><span className="text-slate-500">Pagamento:</span><span className={`font-bold ${paymentBadge[o.status_pagamento || "NAO_PAGO"]} px-2 py-0.5 rounded-full text-[10px]`}>{paymentLabel[o.status_pagamento || "NAO_PAGO"]}</span></div>
+																	<div className="flex justify-between"><span className="text-slate-500">Pagamento:</span><span className={`font-bold ${paymentBadge[o.status_pagamento || "NAO_PAGO"]} px-2 py-0.5 rounded-full text-2xs`}>{paymentLabel[o.status_pagamento || "NAO_PAGO"]}</span></div>
 																</div>
 																<div className="bg-white p-3 rounded-lg border border-slate-100">
-																	<p className="font-bold text-slate-600 text-[10px] uppercase tracking-wide mb-1">Pasta OneDrive</p>
-																	<p className="text-slate-500 font-mono text-[10px] break-all bg-slate-50 p-2 rounded border border-slate-200">01_A3_Art_Copy/Ordens/{dateStr}/OS{o.id}_{safeClient}</p>
+																	<p className="font-bold text-slate-600 text-2xs uppercase tracking-wide mb-1">Pasta OneDrive</p>
+																	<p className="text-slate-500 font-mono text-2xs break-all bg-slate-50 p-2 rounded border border-slate-200">01_A3_Art_Copy/Ordens/{dateStr}/OS{o.id}_{safeClient}</p>
 																</div>
 															</div>
 														</div>
