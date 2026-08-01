@@ -86,12 +86,12 @@ const AppInner = () => {
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(
 		() => localStorage.getItem("a3_sidebar_collapsed") === "1"
 	);
-	const toggleSidebar = () => {
-		setSidebarCollapsed((prev) => {
-			localStorage.setItem("a3_sidebar_collapsed", prev ? "0" : "1");
-			return !prev;
-		});
-	};
+	const toggleSidebar = useCallback(() => setSidebarCollapsed((prev) => !prev), []);
+	// A persistência vive num efeito: updater de estado tem de ser puro (o React
+	// o executa duas vezes em StrictMode e pode reexecutá-lo em modo concorrente).
+	useEffect(() => {
+		localStorage.setItem("a3_sidebar_collapsed", sidebarCollapsed ? "1" : "0");
+	}, [sidebarCollapsed]);
 
 	// Incrementado a cada pedido externo de "nova ordem"; o módulo Ordens observa
 	// a mudança de valor e abre o modal. Evita expor a função de abrir o modal.
