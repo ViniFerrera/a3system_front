@@ -16,6 +16,7 @@ import {
 	HardDrive,
 	Receipt,
 	BarChart3,
+	FileBarChart,
 } from "lucide-react";
 import { LoginPage } from "@/pages/Login";
 import { DashboardModule } from "@/modules/Dashboard";
@@ -30,6 +31,7 @@ import { UsersModule } from "@/modules/Users";
 import { DatabaseSecurityModule } from "@/modules/DatabaseSecurity";
 import { NotaFiscalModule } from "@/modules/NotaFiscal";
 import { DreModule } from "@/modules/Dre";
+import { EstudoModule } from "@/modules/Estudo";
 import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
 import { api } from "@/services/api";
 import { LoadingProvider, useLoading } from "@/components/ui/LoadingOverlay";
@@ -170,6 +172,7 @@ const AppInner = () => {
 		{ id: "pricing", icon: Settings, label: "Preços", group: "Configuração" },
 		{ id: "expenses", icon: DollarSign, label: "Financeiro", group: "Configuração" },
 		{ id: "dre", icon: BarChart3, label: "DRE", group: "Configuração" },
+		{ id: "estudo", icon: FileBarChart, label: "Estudo", group: "Configuração" },
 		{ id: "nota-fiscal", icon: Receipt, label: "Nota Fiscal", group: "Configuração" },
 		{ id: "users", icon: Shield, label: "Usuários", group: "Configuração" },
 		{ id: "db-security", icon: HardDrive, label: "Banco de Dados", group: "Configuração" },
@@ -367,6 +370,9 @@ const AppInner = () => {
 						</div>
 						<div style={{ display: activeTab === "dre" ? "block" : "none" }}>
 							<DreModule orders={orders} expenses={expenses} />
+						</div>
+						<div style={{ display: activeTab === "estudo" ? "block" : "none" }}>
+							<EstudoModule />
 						</div>
 						<div style={{ display: activeTab === "nota-fiscal" ? "block" : "none" }}>
 							<NotaFiscalModule orders={orders} />
