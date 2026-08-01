@@ -38,11 +38,15 @@ export const Button = ({
 	...rest
 }: ButtonProps) => (
 	<button
+		// Padrão seguro: <button> sem type dentro de <form> envia o formulário.
+		// Continua sobrescrevível por quem passar type="submit".
+		type="button"
 		{...rest}
 		disabled={disabled || loading}
+		aria-busy={loading || undefined}
 		className={`inline-flex items-center justify-center rounded-[10px] font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
 	>
-		{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : icon}
+		{loading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : icon}
 		{children}
 	</button>
 );
