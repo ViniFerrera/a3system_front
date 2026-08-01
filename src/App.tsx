@@ -9,6 +9,7 @@ import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { Skeleton, SkeletonTile } from "@/components/ui/Skeleton";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
+import { CommandPalette } from "@/components/shell/CommandPalette";
 import { NAV_ITEMS } from "@/components/shell/navItems";
 
 // ─── Módulos carregados sob demanda ──────────────────────────────────────────
@@ -111,6 +112,18 @@ const AppInner = () => {
 			}
 		}
 		setAuthReady(true);
+	}, []);
+
+	// ─── Atalho global da paleta de comandos ─────────────────────────────────
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+				e.preventDefault();
+				setPaletteOpen((v) => !v);
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
 	}, []);
 
 	// ─── Carrega dados após autenticado ──────────────────────────────────────
@@ -281,6 +294,13 @@ const AppInner = () => {
 					</div>
 				</main>
 			</div>
+
+			<CommandPalette
+				isOpen={paletteOpen}
+				onClose={() => setPaletteOpen(false)}
+				onGoTo={setActiveTab}
+				onNewOrder={() => { setActiveTab("orders"); setNewOrderSignal((n) => n + 1); }}
+			/>
 		</div>
 	);
 };
