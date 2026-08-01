@@ -217,6 +217,7 @@ export const OrderModule = ({
 	onStockUpdate,
 	machinery = [],
 	setClients,
+	newOrderSignal = 0,
 }: {
 	clients: Client[];
 	priceTable: PriceRule[];
@@ -225,6 +226,7 @@ export const OrderModule = ({
 	onStockUpdate: Function;
 	machinery?: Machine[];
 	setClients: Function;
+	newOrderSignal?: number;
 }) => {
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -774,6 +776,12 @@ export const OrderModule = ({
 		}
 		setIsModalOpen(true);
 	};
+
+	// Abre o formulário quando a topbar/paleta/atalho pede "nova ordem".
+	// Ignora o valor inicial 0 para não abrir sozinho no primeiro render.
+	useEffect(() => {
+		if (newOrderSignal > 0) openModal();
+	}, [newOrderSignal]);
 
 	const clientOptions = useMemo(
 		() => [

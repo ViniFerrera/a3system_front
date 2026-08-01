@@ -20,6 +20,7 @@ import { LoadingProvider, useLoading } from "@/components/ui/LoadingOverlay";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { Sidebar } from "@/components/shell/Sidebar";
+import { Topbar } from "@/components/shell/Topbar";
 import { NAV_ITEMS } from "@/components/shell/navItems";
 
 // ─── Helpers de Auth ─────────────────────────────────────────────────────────
@@ -65,6 +66,11 @@ const AppInner = () => {
 			return !prev;
 		});
 	};
+
+	// Incrementado a cada pedido externo de "nova ordem"; o módulo Ordens observa
+	// a mudança de valor e abre o modal. Evita expor a função de abrir o modal.
+	const [newOrderSignal, setNewOrderSignal] = useState(0);
+	const [paletteOpen, setPaletteOpen] = useState(false);
 
 	// Estados de dados
 	const [clients, setClients] = useState<Client[]>([]);
@@ -196,32 +202,15 @@ const AppInner = () => {
 			{/* ── Conteúdo principal ── */}
 			<div className="flex-1 flex flex-col min-h-screen overflow-hidden">
 				{/* Topbar desktop */}
-				<header className="hidden md:flex items-center justify-between px-8 py-4 bg-white/80 backdrop-blur-md border-b border-slate-200/80 flex-shrink-0 sticky top-0 z-10">
-					<div>
-						<h1 className="text-lg font-bold text-slate-800">{activeLabel}</h1>
-						<p className="text-xs text-slate-400 mt-0.5">
-							{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
-						</p>
-					</div>
-					<div className="flex items-center gap-3">
-						{counts.orders > 0 && (
-							<span className="text-xs bg-blue-50 text-blue-600 font-semibold px-3 py-1.5 rounded-full border border-blue-100 shadow-sm">
-								{counts.orders} OS abertas
-							</span>
-						)}
-						{counts.expenses > 0 && (
-							<span className="text-xs bg-red-50 text-red-600 font-semibold px-3 py-1.5 rounded-full border border-red-100 shadow-sm">
-								{counts.expenses} contas vencem em breve
-							</span>
-						)}
-						<div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
-							{user.picture && (
-								<img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border-2 border-slate-100 object-cover shadow-sm" />
-							)}
-							<span className="text-sm font-medium text-slate-700 hidden lg:block">{user.name}</span>
-						</div>
-					</div>
-				</header>
+				<Topbar
+					title={activeLabel}
+					counts={counts}
+					user={{ name: user.name, picture: user.picture, email: user.email }}
+					onLogout={handleLogout}
+					onNewOrder={() => { setActiveTab("orders"); setNewOrderSignal((n) => n + 1); }}
+					onGoTo={setActiveTab}
+					onOpenPalette={() => setPaletteOpen(true)}
+				/>
 
 				<main className="flex-1 overflow-y-auto p-4 md:p-8 mt-14 md:mt-0">
 					<div className="max-w-7xl mx-auto">
@@ -240,6 +229,7 @@ const AppInner = () => {
 								onStockUpdate={handleStockUpdate}
 								machinery={machinery}
 								setClients={setClients}
+								newOrderSignal={newOrderSignal}
 							/>
 						</div>
 						<div style={{ display: activeTab === "stock" ? "block" : "none" }}>
