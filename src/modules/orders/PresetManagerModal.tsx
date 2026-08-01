@@ -145,7 +145,7 @@ export const PresetManagerModal = ({
 										<p className="text-sm font-bold text-slate-800">
 											{preset.nome}
 										</p>
-										<p className="text-[11px] text-slate-500 mt-0.5">
+										<p className="text-2xs text-slate-500 mt-0.5">
 											{preset.itens.length}{" "}
 											{preset.itens.length === 1 ? "item" : "itens"}
 										</p>

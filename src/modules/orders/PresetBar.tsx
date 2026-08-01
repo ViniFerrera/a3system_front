@@ -73,14 +73,14 @@ export const PresetBar = ({
 		<div className="space-y-3">
 			<div>
 				<div className="flex items-center justify-between mb-2">
-					<label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+					<label className="text-2xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
 						<Sparkles className="w-3.5 h-3.5 text-indigo-500" />
 						Pré-definições
 					</label>
 					<button
 						type="button"
 						onClick={onManage}
-						className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-indigo-600 transition"
+						className="flex items-center gap-1 text-2xs font-semibold text-slate-500 hover:text-indigo-600 transition"
 					>
 						<Settings2 className="w-3.5 h-3.5" /> Gerenciar
 					</button>
@@ -104,7 +104,7 @@ export const PresetBar = ({
 								</p>
 								<div className="mt-1 space-y-0.5">
 									{preset.itens.map((item, idx) => (
-										<p key={idx} className="text-[10px] text-slate-500 leading-snug">
+										<p key={idx} className="text-2xs text-slate-500 leading-snug">
 											{descreveItem(item)}
 										</p>
 									))}
@@ -121,7 +121,7 @@ export const PresetBar = ({
 
 			{recentes.length > 0 && (
 				<div>
-					<label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+					<label className="text-2xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5 mb-2">
 						<History className="w-3.5 h-3.5 text-emerald-500" />
 						{clienteNome ? `${clienteNome} costuma pedir` : "Costuma pedir"}
 					</label>
@@ -131,7 +131,7 @@ export const PresetBar = ({
 								key={idx}
 								type="button"
 								onClick={() => onAddItems([item])}
-								className="px-3 py-1.5 rounded-full border border-emerald-200 bg-emerald-50/50 text-[11px] text-slate-700 hover:border-emerald-400 hover:bg-emerald-50 transition"
+								className="px-3 py-1.5 rounded-full border border-emerald-200 bg-emerald-50/50 text-2xs text-slate-700 hover:border-emerald-400 hover:bg-emerald-50 transition"
 							>
 								{descreveItem(item)}
 								<span className="text-slate-400 ml-1.5">

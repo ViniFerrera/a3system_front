@@ -11,7 +11,7 @@ export const Badge = ({ status }: { status: string }) => {
 		'PARCIAL': 'bg-amber-50 text-amber-700 border border-amber-200/60 ring-1 ring-amber-500/10'
 	};
 	return (
-		<span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${styles[status] || 'bg-gray-100 text-gray-600'}`}>
+		<span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-2xs font-bold uppercase tracking-wider ${styles[status] || 'bg-gray-100 text-gray-600'}`}>
 			{status.replace('_', ' ')}
 		</span>
 	);

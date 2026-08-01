@@ -415,7 +415,7 @@ export const DashboardModule = ({
 						className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-semibold text-xs transition-all duration-150 shadow-sm ${orderStatusFilter === btn.key ? btn.active + " shadow-md" : btn.inactive}`}
 					>
 						{btn.icon}{btn.label}
-						<span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${orderStatusFilter === btn.key ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{btn.count}</span>
+						<span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-2xs font-bold ${orderStatusFilter === btn.key ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{btn.count}</span>
 					</button>
 				))}
 			</div>
@@ -438,11 +438,11 @@ export const DashboardModule = ({
 					{periodPreset === "custom" && (
 						<div className="flex flex-wrap gap-3 items-end">
 							<div className="w-full md:w-36">
-								<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Início</label>
+								<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Início</label>
 								<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
 							</div>
 							<div className="w-full md:w-36">
-								<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Fim</label>
+								<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Fim</label>
 								<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
 							</div>
 						</div>
@@ -450,11 +450,11 @@ export const DashboardModule = ({
 					{/* Filtros adicionais */}
 					<div className="flex flex-wrap gap-3 items-end">
 						<div className="w-full md:w-44">
-							<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Pagamento</label>
+							<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Pagamento</label>
 							<MultiSelect options={["PAGO", "PARCIAL", "NAO_PAGO"]} selected={selectedPaymentStatus} onChange={setSelectedPaymentStatus} placeholder="Todos" />
 						</div>
 						<div className="w-full md:w-52">
-							<label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Serviços</label>
+							<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Serviços</label>
 							<MultiSelect options={allServices} selected={selectedServices} onChange={setSelectedServices} placeholder="Todos" />
 						</div>
 						<button
@@ -502,11 +502,11 @@ export const DashboardModule = ({
 					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-5 gap-2">
 						<div>
 							<h4 className="text-sm sm:text-base font-bold text-slate-800">Fluxo de Caixa Mensal</h4>
-							<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">
+							<p className="text-2xs sm:text-xs text-slate-400 mt-0.5">
 								{Utils.formatDate(startDate)} → {Utils.formatDate(endDate)}
 							</p>
 						</div>
-						<div className="flex flex-wrap gap-2 sm:gap-3 text-[10px] sm:text-[11px] font-semibold text-slate-500">
+						<div className="flex flex-wrap gap-2 sm:gap-3 text-2xs sm:text-2xs font-semibold text-slate-500">
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-emerald-400 inline-block" />Concluídas</span>
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-amber-300 inline-block" />Abertas</span>
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-rose-400 inline-block" />Despesa</span>
@@ -554,10 +554,10 @@ export const DashboardModule = ({
 											<div className="flex items-center gap-2">
 												<span className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[d.name] }} />
 												<span className="text-xs font-semibold text-slate-600">{paymentLabel[d.name]}</span>
-												<span className="text-[10px] text-slate-400">{count} OS</span>
+												<span className="text-2xs text-slate-400">{count} OS</span>
 											</div>
 											<div className="flex items-center gap-2">
-												<span className="text-[10px] text-slate-400">{pct}%</span>
+												<span className="text-2xs text-slate-400">{pct}%</span>
 												<span className="text-xs font-bold text-slate-700">{fmt(d.value)}</span>
 											</div>
 										</div>
@@ -635,7 +635,7 @@ export const DashboardModule = ({
 			{/* ── Evolução Diária ── */}
 			<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 				<h4 className="text-sm sm:text-base font-bold text-slate-800">Evolução Diária de Receita</h4>
-				<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-4 sm:mb-5">Faturamento dia a dia nos últimos {bottomPeriod === "7d" ? "7 dias" : bottomPeriod === "30d" ? "30 dias" : bottomPeriod === "3m" ? "3 meses" : "6 meses"}</p>
+				<p className="text-2xs sm:text-xs text-slate-400 mt-0.5 mb-4 sm:mb-5">Faturamento dia a dia nos últimos {bottomPeriod === "7d" ? "7 dias" : bottomPeriod === "30d" ? "30 dias" : bottomPeriod === "3m" ? "3 meses" : "6 meses"}</p>
 				<ResponsiveContainer width="100%" height={180}>
 					<AreaChart data={dailyData} margin={{ left: -10, right: 10 }}>
 						<defs>
@@ -657,7 +657,7 @@ export const DashboardModule = ({
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
 				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 					<h4 className="text-sm sm:text-base font-bold text-slate-800">Receita por Dia da Semana</h4>
-					<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">
+					<p className="text-2xs sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">
 						Melhor dia:{" "}
 						<span className="text-indigo-600 font-bold">
 							{dayOfWeekData.reduce((best, d) => d.revenue > best.revenue ? d : best, dayOfWeekData[0])?.name || "—"}
@@ -693,7 +693,7 @@ export const DashboardModule = ({
 					<h4 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
 						<AlertTriangle className="w-4 h-4 text-amber-500" /> Alertas
 					</h4>
-					<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">Contas e estoque que precisam de atenção</p>
+					<p className="text-2xs sm:text-xs text-slate-400 mt-0.5 mb-3 sm:mb-4">Contas e estoque que precisam de atenção</p>
 					<div className="space-y-2">
 						{upcomingExpenses.length === 0 && stockAlerts.length === 0 ? (
 							<div className="flex flex-col items-center justify-center py-6 text-slate-300">
@@ -710,7 +710,7 @@ export const DashboardModule = ({
 												<Receipt className={`w-3.5 h-3.5 flex-shrink-0 ${overdue ? "text-red-500" : "text-amber-500"}`} />
 												<div className="min-w-0">
 													<p className="text-xs font-semibold text-slate-700 truncate">{e.produto}</p>
-													<p className={`text-[10px] ${overdue ? "text-red-500 font-bold" : "text-amber-600"}`}>{overdue ? "⚠ Vencida" : "Vence"} {Utils.formatDate(e.vencimento)}</p>
+													<p className={`text-2xs ${overdue ? "text-red-500 font-bold" : "text-amber-600"}`}>{overdue ? "⚠ Vencida" : "Vence"} {Utils.formatDate(e.vencimento)}</p>
 												</div>
 											</div>
 											<span className={`text-xs font-bold ml-2 flex-shrink-0 ${overdue ? "text-red-600" : "text-amber-700"}`}>{fmt(e.valor)}</span>
@@ -723,10 +723,10 @@ export const DashboardModule = ({
 											<Package className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
 											<div>
 												<p className="text-xs font-semibold text-slate-700 truncate">{s.nome}</p>
-												<p className="text-[10px] text-rose-500">Saldo: {s.saldo} {s.unidade} (mín: {s.minimo})</p>
+												<p className="text-2xs text-rose-500">Saldo: {s.saldo} {s.unidade} (mín: {s.minimo})</p>
 											</div>
 										</div>
-										<span className="text-[10px] font-bold text-rose-500 bg-rose-100 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">Crítico</span>
+										<span className="text-2xs font-bold text-rose-500 bg-rose-100 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">Crítico</span>
 									</div>
 								))}
 							</>
@@ -742,7 +742,7 @@ export const DashboardModule = ({
 						<h4 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
 							<Clock className="w-4 h-4 text-blue-500" /> Ordens em Aberto
 						</h4>
-						<p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{openOrders.length} OS pendentes de conclusão</p>
+						<p className="text-2xs sm:text-xs text-slate-400 mt-0.5">{openOrders.length} OS pendentes de conclusão</p>
 					</div>
 				</div>
 				{openOrders.length === 0 ? (
@@ -755,12 +755,12 @@ export const DashboardModule = ({
 						<table className="w-full text-sm">
 							<thead>
 								<tr className="border-b border-slate-200/60">
-									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">#OS</th>
-									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Cliente</th>
-									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden md:table-cell">Data</th>
-									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden lg:table-cell">Serviços</th>
-									<th className="text-left text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Pagamento</th>
-									<th className="text-right text-[10px] font-bold text-slate-500 uppercase tracking-wide pb-2.5">Valor</th>
+									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">#OS</th>
+									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Cliente</th>
+									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden md:table-cell">Data</th>
+									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden lg:table-cell">Serviços</th>
+									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Pagamento</th>
+									<th className="text-right text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5">Valor</th>
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-slate-50">
@@ -783,7 +783,7 @@ export const DashboardModule = ({
 													</span>
 												</td>
 												<td className="py-2.5 pr-4">
-													<span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${paymentBadge[o.status_pagamento || "NAO_PAGO"]}`}>
+													<span className={`inline-block text-2xs font-bold px-2 py-0.5 rounded-full ${paymentBadge[o.status_pagamento || "NAO_PAGO"]}`}>
 														{paymentLabel[o.status_pagamento || "NAO_PAGO"]}
 													</span>
 												</td>
@@ -794,7 +794,7 @@ export const DashboardModule = ({
 													<td colSpan={6} className="px-4 py-3">
 														<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
 															<div className="space-y-1.5">
-																<p className="font-bold text-slate-600 text-[10px] uppercase tracking-wide mb-1">Itens do Pedido</p>
+																<p className="font-bold text-slate-600 text-2xs uppercase tracking-wide mb-1">Itens do Pedido</p>
 																{o.items.map((item, idx) => (
 																	<div key={idx} className="flex justify-between bg-white p-2 rounded-lg border border-slate-100">
 																		<span className="text-slate-600"><strong className="text-indigo-600">{item.quantidade}x</strong> {item.servico} - {item.material}</span>
@@ -805,14 +805,14 @@ export const DashboardModule = ({
 															</div>
 															<div className="space-y-2">
 																<div className="bg-white p-3 rounded-lg border border-slate-100 space-y-1.5">
-																	<p className="font-bold text-slate-600 text-[10px] uppercase tracking-wide">Financeiro</p>
+																	<p className="font-bold text-slate-600 text-2xs uppercase tracking-wide">Financeiro</p>
 																	<div className="flex justify-between"><span className="text-slate-500">Forma:</span><span className="font-bold">{o.forma_pagamento || "N/D"}</span></div>
 																	<div className="flex justify-between"><span className="text-slate-500">Total:</span><span className="font-bold text-indigo-600">{fmt(o.total)}</span></div>
-																	<div className="flex justify-between"><span className="text-slate-500">Pagamento:</span><span className={`font-bold ${paymentBadge[o.status_pagamento || "NAO_PAGO"]} px-2 py-0.5 rounded-full text-[10px]`}>{paymentLabel[o.status_pagamento || "NAO_PAGO"]}</span></div>
+																	<div className="flex justify-between"><span className="text-slate-500">Pagamento:</span><span className={`font-bold ${paymentBadge[o.status_pagamento || "NAO_PAGO"]} px-2 py-0.5 rounded-full text-2xs`}>{paymentLabel[o.status_pagamento || "NAO_PAGO"]}</span></div>
 																</div>
 																<div className="bg-white p-3 rounded-lg border border-slate-100">
-																	<p className="font-bold text-slate-600 text-[10px] uppercase tracking-wide mb-1">Pasta OneDrive</p>
-																	<p className="text-slate-500 font-mono text-[10px] break-all bg-slate-50 p-2 rounded border border-slate-200">01_A3_Art_Copy/Ordens/{dateStr}/OS{o.id}_{safeClient}</p>
+																	<p className="font-bold text-slate-600 text-2xs uppercase tracking-wide mb-1">Pasta OneDrive</p>
+																	<p className="text-slate-500 font-mono text-2xs break-all bg-slate-50 p-2 rounded border border-slate-200">01_A3_Art_Copy/Ordens/{dateStr}/OS{o.id}_{safeClient}</p>
 																</div>
 															</div>
 														</div>

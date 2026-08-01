@@ -196,7 +196,7 @@ const VariationIndicator = ({
 	const isPositive = val > 0;
 	if (isNeutral) {
 		return (
-			<div className='flex items-center gap-1 mt-2 text-[10px] font-bold text-slate-400'>
+			<div className='flex items-center gap-1 mt-2 text-2xs font-bold text-slate-400'>
 				<Minus className='w-3 h-3' />
 				<span>0% {label}</span>
 			</div>
@@ -204,7 +204,7 @@ const VariationIndicator = ({
 	}
 	return (
 		<div
-			className={`flex items-center gap-1 mt-2 text-[10px] font-bold ${
+			className={`flex items-center gap-1 mt-2 text-2xs font-bold ${
 				isPositive ? "text-emerald-600" : "text-red-500"
 			}`}
 		>
@@ -1069,7 +1069,7 @@ export const OrderModule = ({
 				<Card className='p-3 sm:p-4 flex justify-between items-center bg-slate-50 border border-slate-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-indigo-500'></div>
 					<div>
-						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
 							Total de ordens
 						</p>
 						<h3 className='num text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
@@ -1083,7 +1083,7 @@ export const OrderModule = ({
 				<Card className='p-3 sm:p-4 flex justify-between items-center bg-amber-50/30 border border-amber-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-amber-500'></div>
 					<div>
-						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
 							Ordens abertas
 						</p>
 						<h3 className='num text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
@@ -1102,7 +1102,7 @@ export const OrderModule = ({
 				<Card className='p-3 sm:p-4 flex justify-between items-center bg-emerald-50/30 border border-emerald-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-emerald-500'></div>
 					<div>
-						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
 							Ordens concluídas
 						</p>
 						<h3 className='num text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
@@ -1117,13 +1117,13 @@ export const OrderModule = ({
 				<Card className='p-3 sm:p-4 flex justify-between items-center bg-blue-50/30 border border-blue-100 shadow-sm relative overflow-hidden group'>
 					<div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-500'></div>
 					<div>
-						<p className='text-[10px] sm:text-xs text-slate-500 font-medium capitalize'>
+						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
 							Tempo médio
 						</p>
 						<h3 className='num text-lg sm:text-xl font-bold text-slate-800 mt-1'>
 							{summary.avgTimeDisplay}
 						</h3>
-						<div className='flex items-center gap-1 mt-2 text-[10px] text-blue-500'>
+						<div className='flex items-center gap-1 mt-2 text-2xs text-blue-500'>
 							<Clock className='w-3 h-3' /> Conclusão
 						</div>
 					</div>
@@ -1229,7 +1229,7 @@ export const OrderModule = ({
 							className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-semibold text-xs transition-all duration-150 shadow-sm ${filterOrderStatus === btn.key ? btn.active + " shadow-md" : btn.inactive}`}
 						>
 							{btn.icon}{btn.label}
-							<span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${filterOrderStatus === btn.key ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{count}</span>
+							<span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-2xs font-bold ${filterOrderStatus === btn.key ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{count}</span>
 						</button>
 					);
 				})}
@@ -1276,7 +1276,7 @@ export const OrderModule = ({
 							<button
 								key={tab.key}
 								onClick={() => setFilterNF(tab.key as any)}
-								className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+								className={`px-3 py-1.5 text-2xs font-bold rounded-lg transition-all ${
 									filterNF === tab.key
 										? "bg-indigo-600 text-white shadow-sm"
 										: "text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200"
@@ -1334,7 +1334,7 @@ export const OrderModule = ({
 										</td>
 										<td className='p-2 sm:p-4 max-w-[140px] sm:max-w-[200px]'>
 											<span className='font-bold text-slate-700 text-xs sm:text-sm block break-words leading-snug'>{order.cliente_nome}</span>
-											<span className='text-[10px] text-slate-400 sm:hidden block mt-0.5'>{Utils.formatDateTime(order.data)}</span>
+											<span className='text-2xs text-slate-400 sm:hidden block mt-0.5'>{Utils.formatDateTime(order.data)}</span>
 										</td>
 										<td className='p-2 sm:p-4 text-xs hidden lg:table-cell'>
 											{Utils.formatDateTime(order.data)}
@@ -1359,7 +1359,7 @@ export const OrderModule = ({
 													{order.items.slice(0, 2).map((i, idx) => (
 														<span
 															key={idx}
-															className='inline-flex items-center px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[10px] text-slate-600 whitespace-nowrap'
+															className='inline-flex items-center px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-2xs text-slate-600 whitespace-nowrap'
 														>
 															{Utils.displayName(i.servico)}
 														</span>
@@ -1384,7 +1384,7 @@ export const OrderModule = ({
 										</td>
 										<td className='p-2 sm:p-4 hidden sm:table-cell'>
 											<span
-												className={`px-2 py-1 rounded-[6px] text-[10px] font-bold border uppercase tracking-wide
+												className={`px-2 py-1 rounded-[6px] text-2xs font-bold border uppercase tracking-wide
 											${
 												order.status === "ABERTA"
 													? "bg-blue-50 text-blue-600 border-blue-100"
@@ -1401,7 +1401,7 @@ export const OrderModule = ({
 												{order.status === "ABERTA" && (
 													<button
 														onClick={() => updateStatus(order, { status: "CONCLUIDA" })}
-														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 shadow-sm shadow-emerald-200 transition-all'
+														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-emerald-500 text-white text-2xs font-bold rounded-lg hover:bg-emerald-600 shadow-sm shadow-emerald-200 transition-all'
 													>
 														<CheckCircle2 className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Concluir</span>
 													</button>
@@ -1409,7 +1409,7 @@ export const OrderModule = ({
 												{order.status === "ABERTA" && (
 													<button
 														onClick={() => updateStatus(order, { status: "CANCELADA" })}
-														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-red-50 text-red-600 text-[10px] font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all'
+														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-red-50 text-red-600 text-2xs font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all'
 													>
 														<XCircle className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Cancelar</span>
 													</button>
@@ -1417,7 +1417,7 @@ export const OrderModule = ({
 												{order.status === "CONCLUIDA" && (
 													<button
 														onClick={() => updateStatus(order, { status: "ABERTA" })}
-														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
+														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-2xs font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
 													>
 														<Clock className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Reabrir</span>
 													</button>
@@ -1425,7 +1425,7 @@ export const OrderModule = ({
 												{order.status === "CANCELADA" && (
 													<button
 														onClick={() => updateStatus(order, { status: "ABERTA" })}
-														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
+														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-2xs font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
 													>
 														<Clock className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Reabrir</span>
 													</button>
@@ -1461,7 +1461,7 @@ export const OrderModule = ({
 													{/* Detalhes (Item 1) */}
 													<div className='col-span-2 space-y-3'>
 														<div className='bg-white p-4 rounded-[10px] border-l-4 border-indigo-500 shadow-sm'>
-															<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-2'>
+															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2'>
 																<List className='w-4 h-4 text-indigo-500' />{" "}
 																Detalhes do Pedido
 															</h5>
@@ -1486,7 +1486,7 @@ export const OrderModule = ({
 																				? ` · ${Utils.displayName(item.tamanho)}`
 																				: ""}
 																			{Utils.displayName(item.cor) && (
-																				<span className='text-slate-400 text-[10px] ml-1'>
+																				<span className='text-slate-400 text-2xs ml-1'>
 																					({Utils.displayName(item.cor)})
 																				</span>
 																			)}
@@ -1498,7 +1498,7 @@ export const OrderModule = ({
 																))}
 															</ul>
 															{(order.taxa_extra || 0) > 0 && (
-																<div className='num flex justify-end mt-2 pt-2 border-t border-slate-100 text-[10px] text-red-500 font-bold'>
+																<div className='num flex justify-end mt-2 pt-2 border-t border-slate-100 text-2xs text-red-500 font-bold'>
 																	+ Juros/Taxas:{" "}
 																	{Utils.formatCurrency(
 																		order.taxa_extra || 0
@@ -1507,7 +1507,7 @@ export const OrderModule = ({
 															)}
 														</div>
 														<div className='bg-white p-4 rounded-[10px] border-l-4 border-amber-400 shadow-sm'>
-															<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-2'>
+															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-2'>
 																Descrição / Obs
 															</h5>
 															<p className='text-xs text-slate-600 italic leading-relaxed'>
@@ -1519,7 +1519,7 @@ export const OrderModule = ({
 													{/* Coluna 2 */}
 													<div className='space-y-3'>
 														<div className='bg-white p-4 rounded-[10px] border-l-4 border-slate-400 shadow-sm'>
-															<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-3'>
+															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-3'>
 																Financeiro
 															</h5>
 															<div className='space-y-2 mb-3'>
@@ -1566,11 +1566,11 @@ export const OrderModule = ({
 															</div>
 														</div>
 														<div className='bg-white p-4 rounded-[10px] border-l-4 border-blue-400 shadow-sm'>
-															<h5 className='text-[10px] font-bold text-slate-500 uppercase mb-2 flex items-center gap-2'>
+															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-2'>
 																<FolderOpen className='w-4 h-4 text-blue-500' />{" "}
 																Arquivos
 															</h5>
-															<div className='mb-2 bg-slate-50 p-2 rounded border border-slate-200 text-[10px] text-slate-500 font-mono break-all'>
+															<div className='mb-2 bg-slate-50 p-2 rounded border border-slate-200 text-2xs text-slate-500 font-mono break-all'>
 																01_A3_Art_Copy/Ordens/{order.data.split("T")[0]}/OS{order.id}_{order.cliente_nome.replace(/\s+/g, "_")}
 															</div>
 															{onedriveConfig?.cid && (() => {
@@ -1583,7 +1583,7 @@ export const OrderModule = ({
 																		href={url}
 																		target="_blank"
 																		rel="noopener noreferrer"
-																		className='inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors'
+																		className='inline-flex items-center gap-1.5 text-2xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors'
 																		onClick={(e) => e.stopPropagation()}
 																	>
 																		<FolderOpen className='w-3.5 h-3.5' />
@@ -1944,7 +1944,7 @@ export const OrderModule = ({
 							value={debitTaxPercent}
 							onChange={(e) => setDebitTaxPercent(Number(e.target.value))}
 						/>
-						<p className='text-[10px] text-slate-400 mt-1'>
+						<p className='text-2xs text-slate-400 mt-1'>
 							Essa porcentagem será aplicada automaticamente ao total quando a
 							forma de pagamento for "Cartão de Débito".
 						</p>
