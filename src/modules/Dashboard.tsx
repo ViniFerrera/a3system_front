@@ -113,6 +113,10 @@ export const DashboardModule = ({
 	useEffect(() => {
 		let cancelado = false;
 		setMetricsError(false);
+		// Zerar antes de buscar não é detalhe de UI: sem isso, ao trocar de
+		// período estes blocos continuariam exibindo os números do período
+		// anterior — sem rótulo de período próprio, ninguém perceberia.
+		setMetrics(null);
 		fetchDashboardMetrics(startDate, endDate)
 			.then((data) => { if (!cancelado) setMetrics(data); })
 			.catch(() => { if (!cancelado) { setMetrics(null); setMetricsError(true); } });
