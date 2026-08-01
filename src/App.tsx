@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { Printer, Menu, X } from "lucide-react";
 import { LoginPage } from "@/pages/Login";
 import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
@@ -65,6 +65,19 @@ const AppInner = () => {
 	// desmontado — é o que preserva filtros e formulários entre trocas de aba.
 	const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(["dashboard"]));
 
+	// Ponto único de navegação. Marcar a aba como visitada no MESMO update que a
+	// ativa evita um frame com a área de conteúdo vazia (a aba nova ainda não
+	// estaria em visitedTabs se isso dependesse de um efeito pós-render).
+	// Identidade estável: a Topbar e a paleta recebem esta função como prop.
+	const goToTab = useCallback((id: string) => {
+		setActiveTab(id);
+		setVisitedTabs((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+		setIsMobileMenuOpen(false);
+	}, []);
+
+	// Rede de segurança: garante o invariante mesmo se activeTab mudar por outro
+	// caminho. Quando a aba já foi visitada o updater devolve o mesmo Set e o
+	// React descarta o update sem re-renderizar.
 	useEffect(() => {
 		setVisitedTabs((prev) => (prev.has(activeTab) ? prev : new Set(prev).add(activeTab)));
 	}, [activeTab]);
@@ -84,6 +97,13 @@ const AppInner = () => {
 	// a mudança de valor e abre o modal. Evita expor a função de abrir o modal.
 	const [newOrderSignal, setNewOrderSignal] = useState(0);
 	const [paletteOpen, setPaletteOpen] = useState(false);
+
+	const abrirNovaOrdem = useCallback(() => {
+		goToTab("orders");
+		setNewOrderSignal((n) => n + 1);
+	}, [goToTab]);
+	const abrirPaleta = useCallback(() => setPaletteOpen(true), []);
+	const fecharPaleta = useCallback(() => setPaletteOpen(false), []);
 
 	// Estados de dados
 	const [clients, setClients] = useState<Client[]>([]);
@@ -117,7 +137,8 @@ const AppInner = () => {
 	// ─── Atalho global da paleta de comandos ─────────────────────────────────
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+			// e.key pode vir indefinido em eventos sintéticos de autofill.
+			if ((e.ctrlKey || e.metaKey) && typeof e.key === "string" && e.key.toLowerCase() === "k") {
 				e.preventDefault();
 				setPaletteOpen((v) => !v);
 			}
@@ -217,7 +238,7 @@ const AppInner = () => {
 			{/* ── Sidebar ── */}
 			<Sidebar
 				activeTab={activeTab}
-				onSelect={(id) => { setActiveTab(id); setIsMobileMenuOpen(false); }}
+				onSelect={goToTab}
 				collapsed={sidebarCollapsed}
 				onToggleCollapse={toggleSidebar}
 				isMobileOpen={isMobileMenuOpen}
@@ -242,9 +263,9 @@ const AppInner = () => {
 					counts={counts}
 					user={{ name: user.name, picture: user.picture, email: user.email }}
 					onLogout={handleLogout}
-					onNewOrder={() => { setActiveTab("orders"); setNewOrderSignal((n) => n + 1); }}
-					onGoTo={setActiveTab}
-					onOpenPalette={() => setPaletteOpen(true)}
+					onNewOrder={abrirNovaOrdem}
+					onGoTo={goToTab}
+					onOpenPalette={abrirPaleta}
 				/>
 
 				<main className="flex-1 overflow-y-auto p-4 md:p-8 mt-14 md:mt-0">
@@ -297,9 +318,9 @@ const AppInner = () => {
 
 			<CommandPalette
 				isOpen={paletteOpen}
-				onClose={() => setPaletteOpen(false)}
-				onGoTo={setActiveTab}
-				onNewOrder={() => { setActiveTab("orders"); setNewOrderSignal((n) => n + 1); }}
+				onClose={fecharPaleta}
+				onGoTo={goToTab}
+				onNewOrder={abrirNovaOrdem}
 			/>
 		</div>
 	);
