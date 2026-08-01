@@ -1,5 +1,16 @@
 import React, { useRef, useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
+import {
+	Button,
+	DataTable,
+	Field,
+	Input,
+	PageHeader,
+	Select,
+	TableHead,
+	Th,
+	useToast,
+} from "@/components/ui";
 import { Utils } from "@/utils";
 import { PriceRule } from "@/types";
 import { Upload, Download, Filter, Save, FileSpreadsheet } from "lucide-react";
@@ -14,7 +25,10 @@ export const PricingModule = ({
 	setData: React.Dispatch<React.SetStateAction<PriceRule[]>>;
 }) => {
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const toast = useToast();
 	const [hasChanges, setHasChanges] = useState(false);
+	const [isImporting, setIsImporting] = useState(false);
+	const [isSaving, setIsSaving] = useState(false);
 	const [filters, setFilters] = useState({
 		servico: "",
 		material: "",
@@ -79,7 +93,13 @@ export const PricingModule = ({
 		const file = e.target.files?.[0];
 		if (!file) return;
 
+		setIsImporting(true);
 		const reader = new FileReader();
+		// Falha de leitura também precisa devolver o botão ao estado normal.
+		reader.onerror = () => {
+			setIsImporting(false);
+			toast.error("Não foi possível ler o arquivo selecionado.");
+		};
 		reader.onload = async (evt) => {
 			const bstr = evt.target?.result;
 			const wb = XLSX.read(bstr, { type: "binary" });
@@ -115,14 +135,18 @@ export const PricingModule = ({
 			try {
 				await api.post("/pricing/import", parsed);
 				setData(parsed);
-				alert(`${parsed.length} regras de preço importadas com sucesso.`);
+				toast.success(
+					`${parsed.length} regras de preço importadas com sucesso.`
+				);
 				setHasChanges(false);
 				if (fileInputRef.current) fileInputRef.current.value = "";
 			} catch (error) {
 				console.error(error);
-				alert(
+				toast.error(
 					"Erro ao importar a tabela de preços. Verifique o formato do arquivo."
 				);
+			} finally {
+				setIsImporting(false);
 			}
 		};
 		reader.readAsBinaryString(file);
@@ -168,12 +192,15 @@ export const PricingModule = ({
 	};
 
 	const handleSaveChanges = async () => {
+		setIsSaving(true);
 		try {
 			await api.post("/pricing/import", data);
 			setHasChanges(false);
-			alert("Alterações salvas com sucesso!");
+			toast.success("Alterações salvas com sucesso!");
 		} catch (error) {
-			alert("Erro ao salvar alterações.");
+			toast.error("Erro ao salvar alterações.");
+		} finally {
+			setIsSaving(false);
 		}
 	};
 
@@ -199,64 +226,61 @@ export const PricingModule = ({
 
 	return (
 		<div className='space-y-6'>
-			<div className='flex flex-col md:flex-row justify-between items-center gap-4'>
-				<div>
-					<h2 className='text-2xl font-bold text-slate-800'>
-						Tabela de Preços
-					</h2>
-					<p className='text-xs text-slate-500 mt-1'>
-						Gerencie as regras de cobrança por serviço, material e cor.
-					</p>
-				</div>
-
-				<div className='flex gap-2 w-full md:w-auto'>
-					{/* Botão de Exportar Tabela */}
-					<button
-						onClick={handleExportTable}
-						className='flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-50 transition shadow-sm text-sm font-medium w-full md:w-auto'
-					>
-						<FileSpreadsheet className='w-4 h-4 text-emerald-600' /> Exportar
-						tabela
-					</button>
-
-					<input
-						type='file'
-						ref={fileInputRef}
-						onChange={handleFileUpload}
-						className='hidden'
-						accept='.xlsx, .xls'
-					/>
-
-					<button
-						onClick={() => fileInputRef.current?.click()}
-						className='flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-xl hover:bg-slate-900 transition shadow-sm text-sm font-medium w-full md:w-auto'
-					>
-						<Upload className='w-4 h-4' /> Importar Excel
-					</button>
-
-					{hasChanges && (
-						<button
-							onClick={handleSaveChanges}
-							className='flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 transition shadow-sm text-sm font-bold animate-in fade-in zoom-in w-full md:w-auto'
+			<PageHeader
+				title='Tabela de Preços'
+				subtitle='Gerencie as regras de cobrança por serviço, material e cor.'
+				actions={
+					<>
+						{/* Botão de Exportar Tabela */}
+						<Button
+							variant='secondary'
+							onClick={handleExportTable}
+							icon={<FileSpreadsheet className='w-4 h-4 text-success-600' />}
 						>
-							<Save className='w-4 h-4' /> Salvar
-						</button>
-					)}
-				</div>
-			</div>
+							Exportar tabela
+						</Button>
+
+						<input
+							type='file'
+							ref={fileInputRef}
+							onChange={handleFileUpload}
+							className='hidden'
+							accept='.xlsx, .xls'
+						/>
+
+						<Button
+							variant='secondary'
+							onClick={() => fileInputRef.current?.click()}
+							loading={isImporting}
+							icon={<Upload className='w-4 h-4' />}
+						>
+							Importar Excel
+						</Button>
+
+						{hasChanges && (
+							<Button
+								onClick={handleSaveChanges}
+								loading={isSaving}
+								icon={<Save className='w-4 h-4' />}
+								className='animate-in fade-in zoom-in'
+							>
+								Salvar
+							</Button>
+						)}
+					</>
+				}
+			/>
 
 			<Card className='p-5'>
-				<div className='flex items-center gap-2 mb-4 text-slate-500 font-bold text-xs uppercase tracking-wider'>
+				<div className='flex items-center gap-2 mb-4 text-ink-muted font-bold text-xs uppercase tracking-wider'>
 					<Filter className='w-4 h-4' /> Filtros
 				</div>
 				<div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
 					{["servico", "material", "papel", "cor"].map((key) => (
-						<div key={key}>
-							<label className='block text-[10px] font-bold text-slate-400 uppercase mb-1'>
-								{key}
-							</label>
-							<select
-								className='border border-slate-200 p-2.5 rounded-xl text-sm w-full bg-slate-50 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-colors'
+						<Field key={key} label={key}>
+							{/* `!` obrigatório: `bg-white` do kit vence `bg-surface-sunken` na cascata. */}
+							<Select
+								className='!bg-surface-sunken focus:!bg-white'
 								value={(filters as any)[key]}
 								onChange={(e) =>
 									setFilters((prev) => ({ ...prev, [key]: e.target.value }))
@@ -268,121 +292,121 @@ export const PricingModule = ({
 										{o}
 									</option>
 								))}
-							</select>
-						</div>
+							</Select>
+						</Field>
 					))}
 				</div>
 				{Object.values(filters).some(Boolean) && (
 					<div className='flex justify-end mt-4'>
-						<button
+						<Button
+							variant='ghost'
+							size='sm'
 							onClick={() =>
 								setFilters({ servico: "", material: "", papel: "", cor: "" })
 							}
-							className='text-xs font-bold text-red-500 hover:text-red-700 uppercase tracking-wide border border-red-100 bg-red-50 px-3 py-1.5 rounded-[8px]'
+							className='!text-danger-600 hover:!text-danger-700 hover:!bg-danger-50 border !border-danger-100 !bg-danger-50 uppercase tracking-wide'
 						>
 							Limpar Filtros
-						</button>
+						</Button>
 					</div>
 				)}
 			</Card>
 
-			<Card className='overflow-hidden border border-slate-200'>
-				<div className='overflow-x-auto max-h-[600px] custom-scrollbar'>
-					<table className='w-full text-left text-sm text-slate-600 min-w-[1000px]'>
-						<thead className='bg-slate-50 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10 text-[11px] uppercase tracking-wider'>
-							<tr>
-								<th className='p-4'>Serviço</th>
-								<th className='p-4'>Material</th>
-								<th className='p-4'>Papel</th>
-								<th className='p-4'>Especificação</th>
-								<th className='p-4'>Cor</th>
-								<th className='p-4 w-24 text-center'>Min (Qtd)</th>
-								<th className='p-4 w-24 text-center'>Max (Qtd)</th>
-								<th className='p-4 w-32'>Margem (%)</th>
-								<th className='p-4 text-right'>Preço Final</th>
-							</tr>
-						</thead>
-						<tbody className='divide-y divide-slate-100'>
-							{filteredData.map((row) => (
-								<tr
-									key={row.id}
-									className='hover:bg-indigo-50/30 transition duration-150 group'
-								>
-									<td className='p-4 font-bold text-slate-800'>
-										{row.Servico}
-									</td>
-									<td className='p-4'>{row.Material}</td>
-									<td className='p-4'>
-										<span className='bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-medium'>
-											{row.Papel}
+			<DataTable
+				isEmpty={filteredData.length === 0}
+				emptyTitle='Nenhuma regra de preço encontrada'
+				emptyDescription='Importe a planilha de preços ou ajuste os filtros acima.'
+				emptyIcon={<Download className='w-10 h-10' />}
+				maxHeight='600px'
+			>
+				<TableHead>
+					<tr>
+						{/* Larguras mínimas por coluna substituem o antigo min-w-[1000px] da <table>. */}
+						<Th className='min-w-[150px]'>Serviço</Th>
+						<Th className='min-w-[130px]'>Material</Th>
+						<Th className='min-w-[110px]'>Papel</Th>
+						<Th className='min-w-[120px]'>Especificação</Th>
+						<Th className='min-w-[90px]'>Cor</Th>
+						<Th align='center' className='w-24 min-w-[96px]'>
+							Min (Qtd)
+						</Th>
+						<Th align='center' className='w-24 min-w-[96px]'>
+							Max (Qtd)
+						</Th>
+						<Th className='w-32 min-w-[110px]'>Margem (%)</Th>
+						<Th align='right' className='min-w-[120px]'>
+							Preço Final
+						</Th>
+					</tr>
+				</TableHead>
+				<tbody className='divide-y divide-slate-100 text-ink-muted'>
+					{filteredData.map((row) => (
+						<tr
+							key={row.id}
+							className='hover:bg-primary-50/30 transition duration-150 group'
+						>
+							<td className='p-4 font-bold text-ink'>{row.Servico}</td>
+							<td className='p-4'>{row.Material}</td>
+							<td className='p-4'>
+								<span className='bg-slate-100 text-ink-muted px-2 py-0.5 rounded text-xs font-medium'>
+									{row.Papel}
+								</span>
+							</td>
+							<td className='p-4 text-xs'>{row.Gramatura || "-"}</td>
+							<td className='p-4'>{row.Cor}</td>
+							<td className='p-4 text-center'>
+								{/* `!` obrigatório: `w-full`/`h-9` do kit venceriam a largura de célula. */}
+								<Input
+									type='number'
+									className='!w-16 !h-8 !px-1 text-center !text-xs num'
+									value={row._min}
+									onChange={(e) =>
+										row.id &&
+										handleFieldChange(row.id, "_min", Number(e.target.value))
+									}
+								/>
+							</td>
+							<td className='p-4 text-center'>
+								<Input
+									type='number'
+									className='!w-16 !h-8 !px-1 text-center !text-xs num'
+									value={row._max}
+									onChange={(e) =>
+										row.id &&
+										handleFieldChange(row.id, "_max", Number(e.target.value))
+									}
+								/>
+							</td>
+							<td className='p-4'>
+								<div className='flex items-center gap-1 group'>
+									<Input
+										type='number'
+										min='0'
+										className='!w-16 !h-8 !px-1 text-center !text-xs font-bold num'
+										value={row.lucroPct}
+										onChange={(e) =>
+											row.id && handleProfitChange(row.id, e.target.value)
+										}
+									/>
+									<span className='text-ink-faint text-xs font-medium'>%</span>
+								</div>
+							</td>
+							<td className='p-4 text-right'>
+								<div className='flex flex-col items-end'>
+									<span className='num font-bold text-ink text-base'>
+										{Utils.formatCurrency(row.Valor_Cliente)}
+									</span>
+									{(row.lucroPct || 0) > 0 && (
+										<span className='num text-2xs text-ink-faint line-through'>
+											{Utils.formatCurrency(row.valorOriginal || 0)}
 										</span>
-									</td>
-									<td className='p-4 text-xs'>{row.Gramatura || "-"}</td>
-									<td className='p-4'>{row.Cor}</td>
-									<td className='p-4 text-center'>
-										<input
-											type='number'
-											className='w-16 border border-slate-200 rounded-[6px] px-1 py-1 text-center bg-white text-xs focus:ring-1 focus:ring-indigo-500 outline-none'
-											value={row._min}
-											onChange={(e) =>
-												row.id &&
-												handleFieldChange(
-													row.id,
-													"_min",
-													Number(e.target.value)
-												)
-											}
-										/>
-									</td>
-									<td className='p-4 text-center'>
-										<input
-											type='number'
-											className='w-16 border border-slate-200 rounded-[6px] px-1 py-1 text-center bg-white text-xs focus:ring-1 focus:ring-indigo-500 outline-none'
-											value={row._max}
-											onChange={(e) =>
-												row.id &&
-												handleFieldChange(
-													row.id,
-													"_max",
-													Number(e.target.value)
-												)
-											}
-										/>
-									</td>
-									<td className='p-4'>
-										<div className='flex items-center gap-1 group'>
-											<input
-												type='number'
-												min='0'
-												className='w-16 border border-slate-200 rounded-[6px] p-1.5 text-center bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-bold text-slate-700'
-												value={row.lucroPct}
-												onChange={(e) =>
-													row.id && handleProfitChange(row.id, e.target.value)
-												}
-											/>
-											<span className='text-slate-400 text-xs font-medium'>
-												%
-											</span>
-										</div>
-									</td>
-									<td className='p-4 text-right'>
-										<div className='flex flex-col items-end'>
-											<span className='font-bold text-slate-800 text-base'>
-												{Utils.formatCurrency(row.Valor_Cliente)}
-											</span>
-											{(row.lucroPct || 0) > 0 && (
-												<span className='text-[10px] text-slate-400 line-through'>
-													{Utils.formatCurrency(row.valorOriginal || 0)}
-												</span>
-											)}
-										</div>
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			</Card>
+									)}
+								</div>
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</DataTable>
 		</div>
 	);
 };
