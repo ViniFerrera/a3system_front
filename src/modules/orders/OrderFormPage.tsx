@@ -500,8 +500,19 @@ export const OrderFormPage = ({
 	const rotulo = "block text-2xs font-bold text-ink-muted uppercase tracking-wide mb-1.5";
 
 	return (
-		<div className='flex flex-col gap-3'>
-			<div className='flex items-center gap-2'>
+		// `lg:h-[calc(100dvh-2rem)]` trava a caixa inteira (cabeçalho + trilha +
+		// formulário + rodapé) numa altura amarrada à viewport, não ao conteúdo —
+		// só assim a coluna do formulário abaixo tem uma altura definida para
+		// `overflow-y-auto` valer e o resto (trilha, rodapé) parar de se mexer.
+		// `dvh` em vez de `vh`: acompanha a barra de endereço sumindo no mobile;
+		// e se o navegador não suportar a unidade, o calc() inteiro é descartado
+		// e a caixa volta a crescer com o conteúdo — degrada para o comportamento
+		// de antes, não quebra. `lg:sticky lg:top-4` é o que resta grudado à
+		// viewport nos ~16px de rolagem antes da caixa alcançar essa altura.
+		// Abaixo de `lg` nada disto atua: a página inteira rola como sempre, e a
+		// trilha vira a faixa horizontal de chips (ver ProgressRail).
+		<div className='flex flex-col gap-3 lg:sticky lg:top-4 lg:h-[calc(100dvh_-_2rem)]'>
+			<div className='flex items-center gap-2 flex-shrink-0'>
 				<Button
 					variant='ghost'
 					size='sm'
@@ -515,23 +526,18 @@ export const OrderFormPage = ({
 				</h2>
 			</div>
 
-			{/* Sem `items-start`: com ele a coluna da trilha encolhe até a altura do
-			    próprio conteúdo, e um `sticky` dentro de uma caixa da sua própria
-			    altura não tem por onde deslizar — a trilha rolava junto do
-			    formulário. Esticada (padrão do grid), ela gruda de verdade. */}
-			<div className='grid grid-cols-1 lg:grid-cols-[168px_1fr] gap-x-6 gap-y-3'>
-				{/* A coluna externa estica com a linha do grid; o `sticky` é o filho.
-				    É a altura sobrando na coluna que dá curso ao deslizamento.
-				    O `pt` mora aqui, e não no filho, para alinhar o primeiro passo
-				    com o primeiro rótulo do cartão ao lado (p-4 do cartão menos o
-				    py-1.5 do passo) sem viajar junto na barra grudada. */}
+			<div className='grid grid-cols-1 lg:grid-cols-[168px_1fr] gap-x-6 gap-y-3 lg:flex-1 lg:min-h-0'>
+				{/* Sem rolagem própria: a grade estica esta coluna (align-content:
+				    stretch, o padrão) até a altura da linha, e o conteúdo da trilha
+				    é curto demais para preenchê-la — ela só fica parada ali. */}
 				<div className='lg:pt-2.5'>
-					<div className='lg:sticky lg:top-4'>
-						<ProgressRail etapas={etapas} onIr={irParaSecao} />
-					</div>
+					<ProgressRail etapas={etapas} onIr={irParaSecao} />
 				</div>
 
-				<div className='space-y-3 min-w-0'>
+				{/* Única coluna que rola: `min-h-0` cancela o piso de altura que um
+				    item de grid herda do próprio conteúdo — sem ele o overflow-y-auto
+				    nunca entraria em ação, a coluna só cresceria além da linha. */}
+				<div className='space-y-3 min-w-0 lg:overflow-y-auto lg:min-h-0 lg:pr-1'>
 					{/* CLIENTE E DATA */}
 					<section ref={refCliente} className={secao}>
 						<div className='grid grid-cols-1 md:grid-cols-12 gap-3'>
@@ -720,14 +726,14 @@ export const OrderFormPage = ({
 				</div>
 			</div>
 
-			{/* RODAPÉ GRUDADO: desconto, total e ações.
-			    `sticky` em vez de `fixed`: a barra acompanha a coluna de conteúdo
-			    sozinha. A versão anterior partia de `lg:left-[220px]`, a largura
-			    da sidebar aberta — com o menu recolhido (64px) sobrava uma faixa
-			    de conteúdo rolando a descoberto à esquerda da barra.
+			{/* RODAPÉ GRUDADO: desconto, total e ações. `flex-shrink-0`: dentro da
+			    caixa travada (lg+) é só mais uma linha do flex column, sempre
+			    visível por definição — não precisa de `sticky` para isso. O
+			    `sticky bottom-0` continua a fazer o trabalho pesado abaixo de
+			    `lg`, onde a caixa não tem altura amarrada e a página inteira rola.
 			    As margens negativas cancelam o padding do <main> para a barra
 			    sangrar de ponta a ponta da área de conteúdo. */}
-			<div className='sticky bottom-0 z-20 -mx-4 md:-mx-8 px-4 md:px-8 py-2.5 bg-white/95 backdrop-blur border-t border-slate-200'>
+			<div className='flex-shrink-0 sticky bottom-0 z-20 -mx-4 md:-mx-8 px-4 md:px-8 py-2.5 bg-white/95 backdrop-blur border-t border-slate-200'>
 				<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 					<div className='flex items-center gap-3'>
 						{/* `htmlFor`: sem ele o leitor de tela anunciava só "campo

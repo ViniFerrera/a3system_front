@@ -145,25 +145,6 @@ const AppInner = () => {
 	// mesmo atalho: sem isso o nonce repetido não reativaria o efeito de lá.
 	const limparFiltroPendente = useCallback(() => setPendingOrderFilter(null), []);
 
-	// `window.prompt` é o último aviso nativo do sistema, mantido de propósito:
-	// um modal só para pedir um texto curto não pagaria o código.
-	const salvarFiltroComoAtalho = useCallback(
-		(payload: OrderFilterPayload) => {
-			const rotulo = window.prompt("Nome do atalho:", "Ordens filtradas");
-			if (!rotulo) return;
-			adicionar({
-				id: `orderFilter:${Date.now()}`,
-				kind: "orderFilter",
-				label: rotulo,
-				icon: "filter",
-				color: "sky",
-				target: "orders",
-				payload,
-			});
-		},
-		[adicionar]
-	);
-
 	// A ação "nova ordem" reaproveita o canal que já existe: o módulo Ordens
 	// observa `newOrderSignal` e abre o formulário (perguntando antes se há
 	// rascunho em jogo).
@@ -364,13 +345,12 @@ const AppInner = () => {
 										newOrderSignal={newOrderSignal}
 										pendingOrderFilter={pendingOrderFilter}
 										onPendingFilterApplied={limparFiltroPendente}
-										onSaveFilterAsShortcut={salvarFiltroComoAtalho}
 									/>
 								))}
 								{painel("stock", <StockModule stock={stock} setStock={setStock} priceTable={priceTable} quickAction={quickAction} />)}
 								{painel("machinery", <MachineryModule machinery={machinery} setMachinery={setMachinery} stock={stock} />)}
 								{painel("pricing", <PricingModule data={priceTable} setData={setPriceTable} />)}
-								{painel("clients", <ClientsModule clients={clients} setClients={setClients} quickAction={quickAction} />)}
+								{painel("clients", <ClientsModule clients={clients} setClients={setClients} orders={orders} quickAction={quickAction} />)}
 								{painel("expenses", <ExpensesModule expenses={expenses} setExpenses={setExpenses} quickAction={quickAction} />)}
 								{painel("dre", <DreModule orders={orders} expenses={expenses} />)}
 								{painel("estudo", <EstudoModule quickAction={quickAction} />)}

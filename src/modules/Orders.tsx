@@ -34,7 +34,6 @@ export const OrderModule = ({
 	newOrderSignal = 0,
 	pendingOrderFilter = null,
 	onPendingFilterApplied,
-	onSaveFilterAsShortcut,
 }: {
 	clients: Client[];
 	priceTable: PriceRule[];
@@ -47,7 +46,6 @@ export const OrderModule = ({
 	/** Filtro congelado num atalho, entregue pelo App com um nonce novo a cada clique. */
 	pendingOrderFilter?: (OrderFilterPayload & { nonce: number }) | null;
 	onPendingFilterApplied?: () => void;
-	onSaveFilterAsShortcut?: (p: OrderFilterPayload) => void;
 }) => {
 	// Vista atual do módulo. O formulário é página, não modal — foi assim que a
 	// digitação parou de re-renderizar a lista inteira.
@@ -90,10 +88,11 @@ export const OrderModule = ({
 		nonce: number;
 	} | null>(null);
 
-	// Filtros de Data
+	// Filtros de Data — últimos 30 dias por padrão.
 	const [filterStart, setFilterStart] = useState(() => {
 		const d = new Date();
-		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+		d.setDate(d.getDate() - 30);
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 	});
 	const [filterEnd, setFilterEnd] = useState(() => {
 		const d = new Date();
@@ -646,7 +645,6 @@ export const OrderModule = ({
 					onUpdateStatus={updateStatus}
 					onRefresh={handleRefreshOrders}
 					onOpenConfig={handleOpenConfig}
-					onSaveFilterAsShortcut={onSaveFilterAsShortcut}
 					onedriveConfig={onedriveConfig}
 					isRefreshing={isRefreshing}
 				/>

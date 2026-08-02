@@ -1,18 +1,20 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import {
 	Button,
-	EmptyState,
+	DataTable,
 	Field,
 	Input,
 	PageHeader,
 	SegmentedControl,
+	TableHead,
 	Textarea,
+	Th,
 	useConfirm,
 	useToast,
 } from "@/components/ui";
-import { Client } from "@/types";
+import { Client, Order } from "@/types";
+import { Utils } from "@/utils";
 import * as XLSX from "xlsx";
 import {
 	Plus,
@@ -21,22 +23,59 @@ import {
 	Trash2,
 	Mail,
 	Phone,
-	MapPin,
-	User,
+	Copy,
 	Building2,
 	Download,
 	Upload,
 	Users,
+	ArrowUpDown,
+	ArrowUp,
+	ArrowDown,
 } from "lucide-react";
 import { api } from "@/services/api";
+
+type SortKey = "nome" | "ordens" | "receita";
+
+/** Cabeçalho de coluna clicável, com seta indicando a ordenação ativa. */
+const SortButton = ({
+	label,
+	active,
+	dir,
+	onClick,
+	align = "left",
+}: {
+	label: string;
+	active: boolean;
+	dir: "asc" | "desc";
+	onClick: () => void;
+	align?: "left" | "right";
+}) => (
+	<button
+		type='button'
+		onClick={onClick}
+		className={`inline-flex items-center gap-1 hover:text-ink transition-colors ${
+			align === "right" ? "flex-row-reverse" : ""
+		} ${active ? "text-ink" : ""}`}
+	>
+		{label}
+		{active ? (
+			dir === "asc" ? <ArrowUp className='w-3 h-3' /> : <ArrowDown className='w-3 h-3' />
+		) : (
+			<ArrowUpDown className='w-3 h-3 opacity-40' />
+		)}
+	</button>
+);
 
 export const ClientsModule = ({
 	clients,
 	setClients,
+	orders,
 	quickAction,
 }: {
 	clients: Client[];
 	setClients: Function;
+	/** Só para as colunas informativas (nº de ordens, receita) — não é editado aqui. */
+	orders: Order[];
 	quickAction?: { tab: string; action: string; nonce: number } | null;
 }) => {
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +87,8 @@ export const ClientsModule = ({
 	const [formData, setFormData] = useState<Partial<Client>>({ tipo: "PF" });
 	const [isSaving, setIsSaving] = useState(false);
 	const [isImporting, setIsImporting] = useState(false);
+	const [sortKey, setSortKey] = useState<SortKey>("nome");
+	const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
 	// CORREÇÃO (BUG TELA BRANCA): Tratamento seguro para strings nulas
 	const filteredClients = useMemo(() => {
@@ -61,6 +102,53 @@ export const ClientsModule = ({
 				String(c.id).includes(term) // Pesquisa por ID
 		);
 	}, [clients, searchTerm]);
+
+	// Nº de ordens e receita por cliente — informativo, não editável aqui.
+	// Canceladas ficam fora de propósito: mesmo critério que o Dashboard usa
+	// para "volume" e "receita" real, senão os dois números soariam inflados.
+	const clientStats = useMemo(() => {
+		const map = new Map<number, { ordens: number; receita: number }>();
+		orders.forEach((o) => {
+			if (o.status === "CANCELADA") return;
+			const cur = map.get(o.cliente_id) || { ordens: 0, receita: 0 };
+			cur.ordens += 1;
+			cur.receita += o.total || 0;
+			map.set(o.cliente_id, cur);
+		});
+		return map;
+	}, [orders]);
+
+	const sortedClients = useMemo(() => {
+		const withStats = filteredClients.map((c) => ({
+			client: c,
+			stats: clientStats.get(Number(c.id)) || { ordens: 0, receita: 0 },
+		}));
+		const dir = sortDir === "asc" ? 1 : -1;
+		withStats.sort((a, b) => {
+			if (sortKey === "nome") return (a.client.nome || "").localeCompare(b.client.nome || "") * dir;
+			if (sortKey === "ordens") return (a.stats.ordens - b.stats.ordens) * dir;
+			return (a.stats.receita - b.stats.receita) * dir;
+		});
+		return withStats;
+	}, [filteredClients, clientStats, sortKey, sortDir]);
+
+	const alternarOrdenacao = (key: SortKey) => {
+		if (sortKey === key) {
+			setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+		} else {
+			setSortKey(key);
+			setSortDir(key === "nome" ? "asc" : "desc");
+		}
+	};
+
+	const copiarEmail = async (email: string) => {
+		try {
+			await navigator.clipboard.writeText(email);
+			toast.success("E-mail copiado.");
+		} catch {
+			toast.error("Não foi possível copiar.");
+		}
+	};
 
 	const normalizeKey = (key: string) =>
 		key
@@ -259,61 +347,94 @@ export const ClientsModule = ({
 					onChange={(e) => setSearchTerm(e.target.value)}
 				/>
 			</div>
-			{filteredClients.length === 0 ? (
-				<Card>
-					<EmptyState
-						icon={<Users className='w-10 h-10' />}
-						title='Nenhum cliente encontrado'
-						description={
-							searchTerm
-								? "Nenhum cliente corresponde à busca."
-								: "Cadastre o primeiro cliente para começar."
-						}
-					/>
-				</Card>
-			) : (
-				<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6'>
-					{filteredClients.map((client) => (
-						<Card
-							key={client.id}
-							className='p-4 sm:p-6 hover:shadow-lg sm:hover:-translate-y-1 relative group'
-						>
-							<div className='flex justify-between items-start mb-4'>
-								<div className='flex items-center gap-3'>
+			<DataTable
+				isEmpty={sortedClients.length === 0}
+				emptyIcon={<Users className='w-10 h-10' />}
+				emptyTitle='Nenhum cliente encontrado'
+				emptyDescription={
+					searchTerm
+						? "Nenhum cliente corresponde à busca."
+						: "Cadastre o primeiro cliente para começar."
+				}
+				maxHeight='max(420px, calc(100vh - 420px))'
+			>
+				<TableHead>
+					<tr>
+						<Th>
+							<SortButton label='Cliente' active={sortKey === "nome"} dir={sortDir} onClick={() => alternarOrdenacao("nome")} />
+						</Th>
+						<Th className='hidden sm:table-cell'>Contato</Th>
+						<Th align='right'>
+							<SortButton label='Ordens' active={sortKey === "ordens"} dir={sortDir} onClick={() => alternarOrdenacao("ordens")} align='right' />
+						</Th>
+						<Th align='right' className='hidden md:table-cell'>
+							<SortButton label='Receita' active={sortKey === "receita"} dir={sortDir} onClick={() => alternarOrdenacao("receita")} align='right' />
+						</Th>
+						<Th align='right'>Ação</Th>
+					</tr>
+				</TableHead>
+				<tbody className='divide-y divide-slate-100/60'>
+					{sortedClients.map(({ client, stats }) => (
+						<tr key={client.id} className='hover:bg-slate-50/60 transition-colors'>
+							<td className='px-3 py-3'>
+								<div className='flex items-center gap-2.5'>
 									<div
-										className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner ${
+										className={`w-9 h-9 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
 											client.tipo === "PJ"
 												? "bg-purple-50 text-purple-600"
 												: "bg-primary-50 text-primary-600"
 										}`}
 									>
-										{client.tipo === "PJ" ? (
-											<Building2 className='w-6 h-6' />
-										) : (
-											<User className='w-6 h-6' />
-										)}
+										{client.tipo === "PJ" ? <Building2 className='w-4 h-4' /> : client.nome?.charAt(0)?.toUpperCase()}
 									</div>
-									<div>
-										<h4 className='font-bold text-ink text-lg leading-tight'>
-											{client.nome}
-										</h4>
-										<div className='flex items-center gap-2 mt-1'>
-											<span
-												className={`text-2xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-[5px] ${
-													client.tipo === "PJ"
-														? "bg-purple-100 text-purple-700"
-														: "bg-primary-100 text-primary-700"
-												}`}
-											>
-												{client.tipo}
-											</span>
-											<p className='num text-xs text-ink-faint'>
-												{client.cpf_cnpj || "---"}
-											</p>
-										</div>
+									<div className='min-w-0'>
+										<p className='font-semibold text-ink text-sm truncate max-w-[220px]'>{client.nome}</p>
+										<p className='num text-2xs text-ink-faint'>
+											{client.tipo} · {client.cpf_cnpj || "sem documento"}
+										</p>
 									</div>
 								</div>
-								<div className='flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200 sm:translate-x-2 sm:group-hover:translate-x-0'>
+								{/* Contato empilhado aqui abaixo do nome só no mobile, onde a
+								    coluna própria (`hidden sm:table-cell`) está escondida. */}
+								<div className='sm:hidden mt-2 space-y-1 pl-[46px]'>
+									<p className='text-xs text-ink-muted truncate'>{client.email || "—"}</p>
+									<p className='num text-xs text-ink-muted'>{client.telefone || "—"}</p>
+								</div>
+							</td>
+							<td className='px-3 py-3 hidden sm:table-cell'>
+								<div className='flex items-center gap-1.5 text-xs text-ink-muted'>
+									<Mail className='w-3.5 h-3.5 text-ink-faint flex-shrink-0' />
+									{client.email ? (
+										<>
+											<span className='truncate max-w-[160px]'>{client.email}</span>
+											<button
+												onClick={() => copiarEmail(client.email!)}
+												className='text-ink-faint hover:text-primary-600 transition-colors flex-shrink-0'
+												title='Copiar e-mail'
+												aria-label='Copiar e-mail'
+											>
+												<Copy className='w-3 h-3' />
+											</button>
+										</>
+									) : (
+										<span className='text-ink-faint italic'>Não informado</span>
+									)}
+								</div>
+								<div className='flex items-center gap-1.5 text-xs text-ink-muted mt-1'>
+									<Phone className='w-3.5 h-3.5 text-ink-faint flex-shrink-0' />
+									<span className='num'>{client.telefone || "N/A"}</span>
+								</div>
+							</td>
+							<td className='px-3 py-3 text-right'>
+								<span className='num text-sm font-semibold text-ink'>{stats.ordens}</span>
+							</td>
+							<td className='px-3 py-3 text-right hidden md:table-cell'>
+								<span className='num text-sm font-bold text-ink'>
+									{stats.receita > 0 ? Utils.formatCurrency(stats.receita) : "—"}
+								</span>
+							</td>
+							<td className='px-3 py-3'>
+								<div className='flex items-center justify-end gap-1'>
 									<button
 										onClick={() => openModal(client)}
 										className='p-2 text-ink-faint hover:text-primary-600 hover:bg-surface-sunken rounded-[10px] transition-colors'
@@ -329,37 +450,11 @@ export const ClientsModule = ({
 										<Trash2 className='w-4 h-4' />
 									</button>
 								</div>
-							</div>
-							<div className='space-y-3 text-sm text-ink-muted border-t border-slate-200/60 pt-4'>
-								<div className='flex items-center gap-3'>
-									<div className='p-1.5 bg-surface-sunken rounded-[5px] text-ink-faint'>
-										<Mail className='w-3.5 h-3.5' />
-									</div>
-									<span className='truncate font-medium'>
-										{client.email || "Não informado"}
-									</span>
-								</div>
-								<div className='flex items-center gap-3'>
-									<div className='p-1.5 bg-surface-sunken rounded-[5px] text-ink-faint'>
-										<Phone className='w-3.5 h-3.5' />
-									</div>
-									<span className='num font-medium'>{client.telefone || "N/A"}</span>
-								</div>
-								{client.endereco && (
-									<div className='flex items-start gap-3'>
-										<div className='p-1.5 bg-surface-sunken rounded-[5px] text-ink-faint mt-0.5'>
-											<MapPin className='w-3.5 h-3.5' />
-										</div>
-										<span className='text-xs leading-relaxed text-ink-muted'>
-											{client.endereco}, {client.numero}
-										</span>
-									</div>
-								)}
-							</div>
-						</Card>
+							</td>
+						</tr>
 					))}
-				</div>
-			)}
+				</tbody>
+			</DataTable>
 			<Modal
 				isOpen={isModalOpen}
 				onClose={() => setIsModalOpen(false)}

@@ -15,10 +15,7 @@ import {
 	CheckCircle2,
 	XCircle,
 	BarChart2,
-	Bookmark,
 } from "lucide-react";
-import { OrderFilterPayload } from "@/components/shortcuts/shortcutTypes";
-import { Button } from "@/components/ui/Button";
 import { DataTable, TableHead, Th } from "@/components/ui/DataTable";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { OrderRow } from "./OrderRow";
@@ -135,7 +132,6 @@ interface OrdersListProps {
 	onUpdateStatus: (order: Order, updates: Partial<Order>) => void;
 	onRefresh: () => void;
 	onOpenConfig: () => void;
-	onSaveFilterAsShortcut?: (p: OrderFilterPayload) => void;
 	onedriveConfig: { cid: string; folderPath: string } | null;
 	isRefreshing: boolean;
 }
@@ -178,7 +174,6 @@ export const OrdersList = ({
 	onUpdateStatus,
 	onRefresh,
 	onOpenConfig,
-	onSaveFilterAsShortcut,
 	onedriveConfig,
 	isRefreshing,
 }: OrdersListProps) => {
@@ -263,58 +258,44 @@ export const OrdersList = ({
 				</Card>
 			</div>
 
-			{/* 2. FILTROS */}
-			<div className='bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3 sm:gap-4'>
-				<div className='flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end'>
-					<div className='flex items-center gap-2 border border-slate-200 rounded-[10px] p-2 bg-slate-50 w-full sm:w-auto hover:border-indigo-200 transition-colors'>
-						<Calendar className='w-4 h-4 text-slate-400 flex-shrink-0' />
-						<input
-							type='date'
-							className='bg-transparent text-xs sm:text-sm outline-none text-slate-600 min-w-0 flex-1'
-							value={filterStart}
-							onChange={(e) => setFilterStart(e.target.value)}
-						/>
-						<span className='text-slate-300'>|</span>
-						<input
-							type='date'
-							className='bg-transparent text-xs sm:text-sm outline-none text-slate-600 min-w-0 flex-1'
-							value={filterEnd}
-							onChange={(e) => setFilterEnd(e.target.value)}
-						/>
-					</div>
-					<div className='w-full sm:w-64'>
-						<MultiSelect
-							options={uniqueServices}
-							selected={filterServices}
-							onChange={setFilterServices}
-							placeholder='Filtrar Serviços'
-							formatLabel={Utils.displayName}
-						/>
-					</div>
-					<div className='w-full sm:w-64'>
-						<SearchableSelect
-							options={clientOptions}
-							value={filterClient}
-							onChange={setFilterClient}
-							placeholder='Filtrar por Cliente'
-							fullClients={clients}
-						/>
-					</div>
+			{/* 2. FILTROS — filtro e ações na mesma faixa; `flex-wrap` só entra em
+			    jogo abaixo do ponto onde tudo deixa de caber numa linha. */}
+			<div className='bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-end gap-3'>
+				<div className='flex items-center gap-2 border border-slate-200 rounded-[10px] p-2 bg-slate-50 w-full sm:w-auto hover:border-indigo-200 transition-colors'>
+					<Calendar className='w-4 h-4 text-slate-400 flex-shrink-0' />
+					<input
+						type='date'
+						className='bg-transparent text-xs sm:text-sm outline-none text-slate-600 min-w-0 flex-1'
+						value={filterStart}
+						onChange={(e) => setFilterStart(e.target.value)}
+					/>
+					<span className='text-slate-300'>|</span>
+					<input
+						type='date'
+						className='bg-transparent text-xs sm:text-sm outline-none text-slate-600 min-w-0 flex-1'
+						value={filterEnd}
+						onChange={(e) => setFilterEnd(e.target.value)}
+					/>
 				</div>
-				<div className='flex items-center gap-2 justify-end'>
-					{/* Congela os filtros atuais num atalho da gaveta lateral. */}
-					<Button
-						variant="ghost"
-						size="sm"
-						className="mr-auto"
-						icon={<Bookmark className="w-3.5 h-3.5" />}
-						onClick={() => onSaveFilterAsShortcut?.({
-							filterStart, filterEnd, filterClient, filterServices,
-							filterPaymentStatus, filterOrderStatus, filterNF,
-						})}
-					>
-						Salvar como atalho
-					</Button>
+				<div className='w-full sm:w-64'>
+					<MultiSelect
+						options={uniqueServices}
+						selected={filterServices}
+						onChange={setFilterServices}
+						placeholder='Filtrar Serviços'
+						formatLabel={Utils.displayName}
+					/>
+				</div>
+				<div className='w-full sm:w-64'>
+					<SearchableSelect
+						options={clientOptions}
+						value={filterClient}
+						onChange={setFilterClient}
+						placeholder='Filtrar por Cliente'
+						fullClients={clients}
+					/>
+				</div>
+				<div className='flex items-center gap-2 sm:ml-auto'>
 					<button
 						onClick={onRefresh}
 						disabled={isRefreshing}

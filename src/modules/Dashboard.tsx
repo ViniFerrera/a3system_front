@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import {
 	ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
 	ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart,
@@ -82,9 +82,9 @@ export const DashboardModule = ({
 	const now = new Date();
 
 	// ── Filtros principais ───────────────────────────────────────────────────
-	const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("12m");
-	const [startDate, setStartDate] = useState(() => periodToDates("12m").start);
-	const [endDate, setEndDate] = useState(() => periodToDates("12m").end);
+	const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("30d");
+	const [startDate, setStartDate] = useState(() => periodToDates("30d").start);
+	const [endDate, setEndDate] = useState(() => periodToDates("30d").end);
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 	const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string[]>([]);
 	const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("ALL");
@@ -215,12 +215,14 @@ export const DashboardModule = ({
 		return { revenue, expense, profit, margin, ticket, toReceive, revTrend, volTrend, ticketTrend };
 	}, [currentOrders, currentExpenses, prevRevenue, prevOrders, orders, startDate, endDate, orderStatusFilter, selectedServices]);
 
-	// ── Gráfico Mensal (dinâmico baseado no período) ──────────────────────────
-	const monthlyData = useMemo(() => {
+	// ── Gráfico Mensal — fábrica reaproveitada por dois recortes de tempo:
+	// o do filtro superior (`monthlyData`, base dos KPIs/sparklines) e o fixo
+	// de 12 meses do card "Fluxo de Caixa Mensal" (`historicoData`, abaixo). ──
+	const buildMonthlyData = useCallback((start: string, end: string) => {
 		const months = new Map<string, { name: string; receita_concluida: number; receita_aberta: number; despesa: number; lucro: number; volume: number }>();
-		let curr = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth(), 1);
-		const end = new Date(endDate);
-		while (curr <= end) {
+		let curr = new Date(new Date(start).getFullYear(), new Date(start).getMonth(), 1);
+		const endD = new Date(end);
+		while (curr <= endD) {
 			const key = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}`;
 			const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 			const label = `${monthNames[curr.getMonth()]}/${String(curr.getFullYear()).slice(2)}`;
@@ -252,7 +254,22 @@ export const DashboardModule = ({
 			receita: d.receita_concluida + d.receita_aberta,
 			lucro: d.receita_concluida + d.receita_aberta - d.despesa,
 		}));
-	}, [orders, expenses, selectedServices, selectedPaymentStatus, orderStatusFilter, startDate, endDate]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [orders, expenses, selectedServices, selectedPaymentStatus, orderStatusFilter]);
+
+	const monthlyData = useMemo(
+		() => buildMonthlyData(startDate, endDate),
+		[buildMonthlyData, startDate, endDate]
+	);
+
+	// Recorte fixo dos últimos 12 meses, calculado uma vez (não depende do
+	// filtro de período acima) — é o que trava o card "Fluxo de Caixa Mensal"
+	// num histórico estável mesmo com o padrão de tela mudado para 30 dias.
+	const last12Range = useMemo(() => periodToDates("12m"), []);
+	const historicoData = useMemo(
+		() => buildMonthlyData(last12Range.start, last12Range.end),
+		[buildMonthlyData, last12Range]
+	);
 
 	// ── Volume × Receita (mesmo recorte do gráfico mensal) ───────────────────
 	const volumeReceitaData = useMemo(
@@ -442,7 +459,7 @@ export const DashboardModule = ({
 						<MultiSelect options={allServices} selected={selectedServices} onChange={setSelectedServices} placeholder="Todos" />
 					</div>
 					<button
-						onClick={() => { setPeriodPreset("12m"); setSelectedServices([]); setSelectedPaymentStatus([]); setOrderStatusFilter("ALL"); }}
+						onClick={() => { setPeriodPreset("30d"); setSelectedServices([]); setSelectedPaymentStatus([]); setOrderStatusFilter("ALL"); }}
 						className="flex items-center gap-1.5 text-xs font-semibold text-ink-faint hover:text-danger-500 px-3 py-2 rounded-xl hover:bg-danger-50 transition-all"
 					>
 						<RefreshCw className="w-3 h-3" /> Limpar
@@ -494,7 +511,9 @@ export const DashboardModule = ({
 						<div>
 							<h4 className="text-sm sm:text-base font-bold text-slate-800">Fluxo de Caixa Mensal</h4>
 							<p className="text-2xs sm:text-xs text-slate-400 mt-0.5">
-								{Utils.formatDate(startDate)} → {Utils.formatDate(endDate)}
+								{/* Fixo nos últimos 12 meses — não segue o filtro de período
+								    acima, que agora nasce em "30 dias". */}
+								{Utils.formatDate(last12Range.start)} → {Utils.formatDate(last12Range.end)}
 							</p>
 						</div>
 						<div className="flex flex-wrap gap-2 sm:gap-3 text-2xs sm:text-2xs font-semibold text-slate-500">
@@ -506,7 +525,7 @@ export const DashboardModule = ({
 						</div>
 					</div>
 					<ResponsiveContainer width="100%" height={200}>
-						<ComposedChart data={monthlyData} margin={{ left: -5, right: 10 }}>
+						<ComposedChart data={historicoData} margin={{ left: -5, right: 10 }}>
 							<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
 							<XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
 							{/* Toda série precisa de `yAxisId`: sem isso o Recharts joga reais e
