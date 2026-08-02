@@ -1,35 +1,8 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Card } from "@/components/ui/Card";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { Badge } from "@/components/ui/Badge";
 import { Utils } from "@/utils";
 import { Order, Client, PriceRule } from "@/types";
-import { MultiSelect } from "@/components/ui/MultiSelect";
-import {
-	Plus,
-	Edit2,
-	CheckCircle,
-	Trash2,
-	Clock,
-	X,
-	ChevronDown,
-	ChevronUp,
-	Search,
-	Calendar,
-	List,
-	TrendingUp,
-	TrendingDown,
-	AlertCircle,
-	FolderOpen,
-	Minus,
-	CreditCard,
-	Settings,
-	RefreshCcw,
-	CheckCircle2,
-	XCircle,
-	BarChart2,
-	Bookmark,
-} from "lucide-react";
+import { Plus, ChevronDown, CreditCard } from "lucide-react";
 import { OrderFilterPayload } from "@/components/shortcuts/shortcutTypes";
 import { api } from "@/services/api";
 import { useLoading } from "@/components/ui/LoadingOverlay";
@@ -37,189 +10,18 @@ import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Field";
-import { DataTable, TableHead, Th } from "@/components/ui/DataTable";
-import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { ItemGrid } from "./orders/ItemGrid";
 import { PresetBar, OrderPreset } from "./orders/PresetBar";
 import { PresetManagerModal } from "./orders/PresetManagerModal";
 import { EditableItem, toEditableItem, createEmptyItem } from "./orders/itemOptions";
+import { SearchableSelect } from "./orders/SearchableSelect";
+import { OrdersList } from "./orders/OrdersList";
 
 interface Machine {
 	id: number;
 	nome: string;
 	tipo: string;
 }
-
-// COMPONENTE SEARCHABLE SELECT (MANTIDO IGUAL)
-const SearchableSelect = ({
-	options,
-	value,
-	onChange,
-	placeholder = "Selecione...",
-	fullClients,
-	autoFocus = false,
-}: {
-	options: { id: number; label: string }[];
-	value: number;
-	onChange: (val: number) => void;
-	placeholder?: string;
-	fullClients?: Client[];
-	/** Abre a lista já na montagem — o cursor cai direto no campo de busca. */
-	autoFocus?: boolean;
-}) => {
-	// O campo de busca só existe enquanto a lista está aberta; para o foco
-	// automático chegar nele, a lista precisa nascer aberta.
-	const [isOpen, setIsOpen] = useState(autoFocus);
-	const [search, setSearch] = useState("");
-	const wrapperRef = useRef<HTMLDivElement>(null);
-
-	const selectedOption = options.find((o) => o.id === value);
-
-	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
-			if (
-				wrapperRef.current &&
-				!wrapperRef.current.contains(event.target as Node)
-			) {
-				setIsOpen(false);
-			}
-		};
-		document.addEventListener("mousedown", handleClickOutside);
-		return () => document.removeEventListener("mousedown", handleClickOutside);
-	}, []);
-
-	const filteredOptions = useMemo(() => {
-		const term = search.toLowerCase();
-		if (fullClients) {
-			return fullClients
-				.filter(
-					(c) =>
-						c.nome.toLowerCase().includes(term) ||
-						(c.telefone || "").includes(term)
-				)
-				.map((c) => ({ id: Number(c.id), label: c.nome }));
-		}
-		return options.filter((o) => o.label.toLowerCase().includes(term));
-	}, [search, options, fullClients]);
-
-	return (
-		<div className='relative w-full' ref={wrapperRef}>
-			<div
-				className='w-full border border-slate-200 rounded-[10px] p-2.5 bg-white text-sm flex justify-between items-center cursor-pointer hover:border-indigo-300 transition-colors shadow-sm'
-				onClick={() => setIsOpen(!isOpen)}
-			>
-				<span
-					className={
-						selectedOption ? "text-slate-800 font-medium" : "text-slate-400"
-					}
-				>
-					{selectedOption ? selectedOption.label : placeholder}
-				</span>
-				<ChevronDown className='w-4 h-4 text-slate-400' />
-			</div>
-			{isOpen && (
-				<div className='absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-[10px] shadow-xl max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100'>
-					<div className='p-2 border-b border-slate-200/60 bg-slate-50 sticky top-0'>
-						<div className='flex items-center gap-2 bg-white border border-slate-200 rounded-[6px] px-2 py-1.5'>
-							<Search className='w-3.5 h-3.5 text-slate-400' />
-							<input
-								type='text'
-								className='w-full text-xs outline-none py-0.5 text-slate-700'
-								placeholder='Buscar nome ou telefone...'
-								value={search}
-								onChange={(e) => setSearch(e.target.value)}
-								autoFocus
-							/>
-						</div>
-					</div>
-					<div className='overflow-y-auto flex-1 custom-scrollbar'>
-						{filteredOptions.length > 0 ? (
-							filteredOptions.map((opt) => (
-								<div
-									key={opt.id}
-									className={`px-3 py-2.5 text-sm cursor-pointer border-l-2 border-transparent hover:bg-indigo-50 hover:border-indigo-500 transition-all ${
-										opt.id === value
-											? "bg-indigo-50 text-indigo-700 font-bold border-indigo-500"
-											: "text-slate-600"
-									}`}
-									onClick={() => {
-										onChange(opt.id);
-										setIsOpen(false);
-										setSearch("");
-									}}
-								>
-									{opt.label}
-								</div>
-							))
-						) : (
-							<div className='p-4 text-xs text-slate-400 text-center flex flex-col items-center gap-1'>
-								<AlertCircle className='w-4 h-4' />
-								Nenhum cliente encontrado.
-							</div>
-						)}
-					</div>
-				</div>
-			)}
-		</div>
-	);
-};
-
-// COMPONENTES AUXILIARES VISUAIS (MANTIDOS IGUAIS)
-const MiniSparkline = ({ data, color }: { data: number[]; color: string }) => {
-	const chartData = data.map((val, i) => ({ i, val }));
-	return (
-		<div className='h-[40px] w-[80px]'>
-			<ResponsiveContainer width='100%' height='100%'>
-				<LineChart data={chartData}>
-					<Line
-						type='monotone'
-						dataKey='val'
-						stroke={color}
-						strokeWidth={2}
-						dot={false}
-						isAnimationActive={false}
-					/>
-				</LineChart>
-			</ResponsiveContainer>
-		</div>
-	);
-};
-
-const VariationIndicator = ({
-	val,
-	label = "mês",
-}: {
-	val: number;
-	label?: string;
-}) => {
-	const isNeutral = val === 0;
-	const isPositive = val > 0;
-	if (isNeutral) {
-		return (
-			<div className='flex items-center gap-1 mt-2 text-2xs font-bold text-slate-400'>
-				<Minus className='w-3 h-3' />
-				<span>0% {label}</span>
-			</div>
-		);
-	}
-	return (
-		<div
-			className={`flex items-center gap-1 mt-2 text-2xs font-bold ${
-				isPositive ? "text-emerald-600" : "text-red-500"
-			}`}
-		>
-			{isPositive ? (
-				<TrendingUp className='w-3 h-3' />
-			) : (
-				<TrendingDown className='w-3 h-3' />
-			)}
-			<span>
-				{isPositive ? "+" : ""}
-				{val.toFixed(0)}% {label}
-			</span>
-		</div>
-	);
-};
 
 // Limite por arquivo. O servidor recusa acima disso; validar aqui evita
 // esperar um upload de 40MB só para receber erro.
@@ -244,6 +46,22 @@ const temRascunho = (estado: RascunhoState) =>
 	!!estado.formData.descricao ||
 	estado.gridItems.some((i) => i.servico) ||
 	estado.filesToUpload.length > 0;
+
+// Defaults de ordem nova: 99,5% das ordens são PAGO e 63,2% em PIX.
+// Aplicam-se só à criação — edição preserva o que está gravado.
+// Fica fora do componente para ter identidade estável nas dependências dos
+// `useCallback` que reabrem o formulário.
+const DEFAULT_NEW_ORDER: Partial<Order> = {
+	cliente_id: 0,
+	descricao: "",
+	items: [],
+	anexos: [],
+	status_pagamento: "PAGO",
+	forma_pagamento: "PIX",
+	taxa_extra: 0,
+	desconto_pontual: 0,
+	nota_fiscal: false,
+};
 
 export const OrderModule = ({
 	clients,
@@ -348,20 +166,6 @@ export const OrderModule = ({
 			})
 			.catch(console.error);
 	}, []);
-
-	// Defaults de ordem nova: 99,5% das ordens são PAGO e 63,2% em PIX.
-	// Aplicam-se só à criação — edição preserva o que está gravado.
-	const DEFAULT_NEW_ORDER: Partial<Order> = {
-		cliente_id: 0,
-		descricao: "",
-		items: [],
-		anexos: [],
-		status_pagamento: "PAGO",
-		forma_pagamento: "PIX",
-		taxa_extra: 0,
-		desconto_pontual: 0,
-		nota_fiscal: false,
-	};
 
 	// --- FORM STATE ---
 	// Data em hora local (sem sufixo Z): o banco guarda hora local e
@@ -790,7 +594,9 @@ export const OrderModule = ({
 		}
 	};
 
-	const handleDelete = async (id: number) => {
+	// Os quatro handlers abaixo descem até `OrderRow`, que é memoizado: sem
+	// identidade estável, memoizar a linha não serviria de nada.
+	const handleDelete = useCallback(async (id: number) => {
 		const ok = await confirm({
 			title: `Apagar a ordem #${id}?`,
 			message: "Esta ação não pode ser desfeita.",
@@ -805,9 +611,15 @@ export const OrderModule = ({
 		} catch (err) {
 			toast.error("Erro ao apagar a ordem.");
 		}
-	};
+	}, [confirm, setOrders, toast]);
 
-	const updateStatus = async (order: Order, updates: Partial<Order>) => {
+	// Alterna a linha expandida. A regra é a mesma de antes — clicar na linha
+	// já aberta fecha —, só que resolvida pelo estado anterior.
+	const handleToggleExpand = useCallback((id: number) => {
+		setExpandedOrderId((prev) => (prev === id ? null : id));
+	}, []);
+
+	const updateStatus = useCallback(async (order: Order, updates: Partial<Order>) => {
 		if (updates.status === "CONCLUIDA" && order.status !== "CONCLUIDA") {
 			const ok = await confirm({
 				title: `Concluir a ordem #${order.id}?`,
@@ -847,7 +659,7 @@ export const OrderModule = ({
 		} finally {
 			loading.hide();
 		}
-	};
+	}, [confirm, loading, toast, setOrders, onStockUpdate]);
 
 	// SALVAR CONFIG DE TAXA
 	const handleSaveConfig = async () => {
@@ -882,7 +694,7 @@ export const OrderModule = ({
 		}
 	};
 
-	const openModal = (order?: Order) => {
+	const openModal = useCallback((order?: Order) => {
 		if (order) {
 			setEditingOrder(order);
 			const rawItems =
@@ -918,7 +730,11 @@ export const OrderModule = ({
 		setFormErrors({});
 		setIsSaving(false);
 		setIsModalOpen(true);
-	};
+	}, [priceTable]);
+
+	// "Nova Ordem" na barra de filtros — abre o formulário sem ordem em edição.
+	const handleNewOrder = useCallback(() => openModal(), [openModal]);
+	const handleOpenConfig = useCallback(() => setIsConfigModalOpen(true), []);
 
 	// Fechar com dados preenchidos pede confirmação — hoje o preenchimento
 	// evapora sem aviso.
@@ -1050,13 +866,6 @@ export const OrderModule = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [pendingOrderFilter?.nonce]);
 
-	const clientOptions = useMemo(
-		() => [
-			{ id: 0, label: "Todos Clientes" },
-			...clients.map((c) => ({ id: Number(c.id), label: c.nome })),
-		],
-		[clients]
-	);
 	const clientOptionsForForm = useMemo(
 		() => clients.map((c) => ({ id: Number(c.id), label: c.nome })),
 		[clients]
@@ -1064,609 +873,45 @@ export const OrderModule = ({
 
 	return (
 		<div className='flex flex-col space-y-4 sm:space-y-6 pb-12'>
-			{/* 1. CARDS RESUMO */}
-			<div className='grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4'>
-				<Card className='p-3 sm:p-4 flex justify-between items-center bg-slate-50 border border-slate-100 shadow-sm relative overflow-hidden group'>
-					<div className='absolute left-0 top-0 bottom-0 w-1 bg-indigo-500'></div>
-					<div>
-						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
-							Total de ordens
-						</p>
-						<h3 className='num text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
-							{summary.totalOrders}
-						</h3>
-						<VariationIndicator val={summary.variationTotal} />
-					</div>
-					<div className='hidden sm:block'><MiniSparkline data={summary.sparklineData} color='#6366f1' /></div>
-				</Card>
-
-				<Card className='p-3 sm:p-4 flex justify-between items-center bg-amber-50/30 border border-amber-100 shadow-sm relative overflow-hidden group'>
-					<div className='absolute left-0 top-0 bottom-0 w-1 bg-amber-500'></div>
-					<div>
-						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
-							Ordens abertas
-						</p>
-						<h3 className='num text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
-							{summary.openOrdersSnapshot}
-						</h3>
-						<VariationIndicator val={summary.variationOpen} />
-					</div>
-					<div className='opacity-50'>
-						<MiniSparkline
-							data={[2, 4, 1, 5, 2, 1, summary.openOrdersSnapshot]}
-							color='#f59e0b'
-						/>
-					</div>
-				</Card>
-
-				<Card className='p-3 sm:p-4 flex justify-between items-center bg-emerald-50/30 border border-emerald-100 shadow-sm relative overflow-hidden group'>
-					<div className='absolute left-0 top-0 bottom-0 w-1 bg-emerald-500'></div>
-					<div>
-						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
-							Ordens concluídas
-						</p>
-						<h3 className='num text-xl sm:text-2xl font-bold text-slate-800 mt-1'>
-							{summary.completedOrdersSnapshot}
-						</h3>
-						<VariationIndicator val={summary.variationCompleted} />
-					</div>
-					<div className='opacity-50'>
-						<MiniSparkline data={[1, 2, 3, 4, 3, 5, 6]} color='#10b981' />
-					</div>
-				</Card>
-				<Card className='p-3 sm:p-4 flex justify-between items-center bg-blue-50/30 border border-blue-100 shadow-sm relative overflow-hidden group'>
-					<div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-500'></div>
-					<div>
-						<p className='text-2xs sm:text-xs text-slate-500 font-medium capitalize'>
-							Tempo médio
-						</p>
-						<h3 className='num text-lg sm:text-xl font-bold text-slate-800 mt-1'>
-							{summary.avgTimeDisplay}
-						</h3>
-						<div className='flex items-center gap-1 mt-2 text-2xs text-blue-500'>
-							<Clock className='w-3 h-3' /> Conclusão
-						</div>
-					</div>
-					<div className='opacity-50'>
-						<MiniSparkline data={[10, 12, 11, 10, 9, 8, 10]} color='#3b82f6' />
-					</div>
-				</Card>
-			</div>
-
-			{/* 2. FILTROS */}
-			<div className='bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3 sm:gap-4'>
-				<div className='flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end'>
-					<div className='flex items-center gap-2 border border-slate-200 rounded-[10px] p-2 bg-slate-50 w-full sm:w-auto hover:border-indigo-200 transition-colors'>
-						<Calendar className='w-4 h-4 text-slate-400 flex-shrink-0' />
-						<input
-							type='date'
-							className='bg-transparent text-xs sm:text-sm outline-none text-slate-600 min-w-0 flex-1'
-							value={filterStart}
-							onChange={(e) => setFilterStart(e.target.value)}
-						/>
-						<span className='text-slate-300'>|</span>
-						<input
-							type='date'
-							className='bg-transparent text-xs sm:text-sm outline-none text-slate-600 min-w-0 flex-1'
-							value={filterEnd}
-							onChange={(e) => setFilterEnd(e.target.value)}
-						/>
-					</div>
-					<div className='w-full sm:w-64'>
-						<MultiSelect
-							options={uniqueServices}
-							selected={filterServices}
-							onChange={setFilterServices}
-							placeholder='Filtrar Serviços'
-							formatLabel={Utils.displayName}
-						/>
-					</div>
-					<div className='w-full sm:w-64'>
-						<SearchableSelect
-							options={clientOptions}
-							value={filterClient}
-							onChange={setFilterClient}
-							placeholder='Filtrar por Cliente'
-							fullClients={clients}
-						/>
-					</div>
-				</div>
-				<div className='flex items-center gap-2 justify-end'>
-					{/* Congela os filtros atuais num atalho da gaveta lateral. */}
-					<Button
-						variant="ghost"
-						size="sm"
-						className="mr-auto"
-						icon={<Bookmark className="w-3.5 h-3.5" />}
-						onClick={() => onSaveFilterAsShortcut?.({
-							filterStart, filterEnd, filterClient, filterServices,
-							filterPaymentStatus, filterOrderStatus, filterNF,
-						})}
-					>
-						Salvar como atalho
-					</Button>
-					<button
-						onClick={handleRefreshOrders}
-						disabled={isRefreshing}
-						className={`p-2.5 rounded-[10px] transition border border-slate-200 ${
-							isRefreshing
-								? "bg-slate-50 text-slate-300 cursor-not-allowed"
-								: "bg-white text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
-						}`}
-						title='Atualizar Lista'
-					>
-						<RefreshCcw
-							className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-						/>
-					</button>
-					<button
-						onClick={() => setIsConfigModalOpen(true)}
-						className='bg-slate-100 text-slate-600 hover:bg-slate-200 p-2.5 rounded-[10px] transition'
-						title='Configurações (Taxas)'
-					>
-						<Settings className='w-4 h-4' />
-					</button>
-					<button
-						onClick={() => openModal()}
-						className='bg-indigo-600 text-white px-4 sm:px-5 py-2.5 rounded-[10px] hover:bg-indigo-700 transition font-bold text-sm flex items-center gap-2 shadow-md shadow-indigo-200'
-					>
-						<Plus className='w-4 h-4' /> <span className='hidden sm:inline'>Nova</span> Ordem
-					</button>
-				</div>
-			</div>
-
-			{/* 3. STATUS ORDEM + TABS PAGAMENTO */}
-			<div className='flex gap-2 mb-2 overflow-x-auto pb-1 -mx-1 px-1'>
-				{([
-					{ key: "TODOS", label: "Todas", icon: <BarChart2 className="w-3.5 h-3.5" />, active: "bg-indigo-500 text-white border-indigo-500", inactive: "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50" },
-					{ key: "ABERTA", label: "Abertas", icon: <Clock className="w-3.5 h-3.5" />, active: "bg-blue-500 text-white border-blue-500", inactive: "bg-white text-blue-600 border-blue-200 hover:bg-blue-50" },
-					{ key: "CONCLUIDA", label: "Concluídas", icon: <CheckCircle2 className="w-3.5 h-3.5" />, active: "bg-emerald-500 text-white border-emerald-500", inactive: "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50" },
-					{ key: "CANCELADA", label: "Canceladas", icon: <XCircle className="w-3.5 h-3.5" />, active: "bg-slate-600 text-white border-slate-600", inactive: "bg-white text-slate-500 border-slate-200 hover:bg-slate-50" },
-				] as const).map((btn) => {
-					const count = orders.filter((o) => btn.key === "TODOS" || o.status === btn.key).length;
-					return (
-						<button key={btn.key} onClick={() => setFilterOrderStatus(btn.key as any)}
-							className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-semibold text-xs transition-all duration-150 shadow-sm ${filterOrderStatus === btn.key ? btn.active + " shadow-md" : btn.inactive}`}
-						>
-							{btn.icon}{btn.label}
-							<span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-2xs font-bold ${filterOrderStatus === btn.key ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{count}</span>
-						</button>
-					);
-				})}
-			</div>
-			<div className='flex flex-col sm:flex-row justify-between items-center gap-2 border-b border-slate-200 pb-1'>
-				<div className='flex gap-1 overflow-x-auto w-full sm:w-auto pb-1'>
-					{[
-						{ key: "TODOS", label: "Todas" },
-						{
-							key: "PAGO",
-							label: "Pagas",
-							color: "text-emerald-600 bg-emerald-50",
-						},
-						{
-							key: "NAO_PAGO",
-							label: "Não Pagas",
-							color: "text-red-600 bg-red-50",
-						},
-						{
-							key: "PARCIAL",
-							label: "Parcial",
-							color: "text-amber-600 bg-amber-50",
-						},
-					].map((tab) => (
-						<button
-							key={tab.key}
-							onClick={() => setFilterPaymentStatus(tab.key as any)}
-							className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-all ${
-								filterPaymentStatus === tab.key
-									? "border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50/50"
-									: "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-							}`}
-						>
-							{tab.label}
-						</button>
-					))}
-					{/* Filtro NF */}
-					<div className="ml-auto flex items-center gap-1.5">
-						{[
-							{ key: "TODOS", label: "NF: Todas" },
-							{ key: "COM_NF", label: "Com NF" },
-							{ key: "SEM_NF", label: "Sem NF" },
-						].map((tab) => (
-							<button
-								key={tab.key}
-								onClick={() => setFilterNF(tab.key as any)}
-								className={`px-3 py-1.5 text-2xs font-bold rounded-lg transition-all ${
-									filterNF === tab.key
-										? "bg-indigo-600 text-white shadow-sm"
-										: "text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200"
-								}`}
-							>
-								{tab.label}
-							</button>
-						))}
-					</div>
-				</div>
-			</div>
-
-			{/* 4. TABELA */}
-			<div className='space-y-2'>
-				<DataTable
-					isEmpty={paginatedOrders.length === 0}
-					emptyTitle='Nenhuma ordem no período e filtros selecionados'
-					// Piso de 420px: em telas curtas (celular, notebook 768px)
-					// `100vh - 420px` deixava a janela da tabela com ~250px, bem
-					// menos do que a lista ocupava antes, quando crescia com a
-					// página. O teto por viewport continua valendo no desktop.
-					maxHeight='max(420px, calc(100vh - 420px))'
-				>
-					<TableHead>
-						<tr>
-							<Th className='w-14 sm:w-20'>ID</Th>
-							<Th>Cliente</Th>
-							<Th className='hidden lg:table-cell'>Criação</Th>
-							<Th className='hidden xl:table-cell'>Conclusão</Th>
-							<Th className='hidden md:table-cell'>Serviços</Th>
-							<Th>Total</Th>
-							<Th className='hidden sm:table-cell'>Pagamento</Th>
-							<Th className='hidden sm:table-cell'>Status</Th>
-							<Th align='right'>Ações</Th>
-						</tr>
-					</TableHead>
-					<tbody className='divide-y divide-slate-100/60 text-left text-sm text-slate-600'>
-						{paginatedOrders.map((order) => {
-							const isExpanded = expandedOrderId === order.id;
-							return (
-								<React.Fragment key={order.id}>
-									<tr
-										className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
-											isExpanded ? "bg-indigo-50/30" : ""
-										}`}
-										onClick={() =>
-											setExpandedOrderId(
-												isExpanded ? null : Number(order.id)
-											)
-										}
-									>
-										<td className='p-2 sm:p-4 font-mono text-xs text-slate-400'>
-											<span>#{order.id}</span>
-											{order.nota_fiscal && <span className='ml-1 px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px] font-bold'>NF</span>}
-										</td>
-										<td className='p-2 sm:p-4 max-w-[140px] sm:max-w-[200px]'>
-											<span className='font-bold text-slate-700 text-xs sm:text-sm block break-words leading-snug'>{order.cliente_nome}</span>
-											<span className='text-2xs text-slate-400 sm:hidden block mt-0.5'>{Utils.formatDateTime(order.data)}</span>
-										</td>
-										<td className='p-2 sm:p-4 text-xs hidden lg:table-cell'>
-											{Utils.formatDateTime(order.data)}
-										</td>
-										<td className='p-2 sm:p-4 text-xs hidden xl:table-cell'>
-											{order.data_conclusao ? (
-												<span className='text-emerald-600 font-medium'>
-													{Utils.formatDateTime(order.data_conclusao)}
-												</span>
-											) : (
-												<span className='text-slate-400 italic'>--</span>
-											)}
-										</td>
-										<td
-											className='p-2 sm:p-4 text-xs max-w-[200px] truncate hidden md:table-cell'
-											title={order.items
-												.map((i) => Utils.displayName(i.servico))
-												.join(", ")}
-										>
-											{order.items.length > 0 ? (
-												<div className='flex gap-1 overflow-hidden'>
-													{order.items.slice(0, 2).map((i, idx) => (
-														<span
-															key={idx}
-															className='inline-flex items-center px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-2xs text-slate-600 whitespace-nowrap'
-														>
-															{Utils.displayName(i.servico)}
-														</span>
-													))}
-												</div>
-											) : (
-												"Sem itens"
-											)}
-										</td>
-										<td className='num p-2 sm:p-4 font-bold text-slate-800 text-xs sm:text-sm'>
-											{Utils.formatCurrency(order.total)}
-											{(order.taxa_extra || 0) > 0 && (
-												<span className='text-[9px] text-slate-400 block'>
-													(+ juros)
-												</span>
-											)}
-										</td>
-										<td className='p-2 sm:p-4 hidden sm:table-cell'>
-											<Badge
-												status={order.status_pagamento || "NAO_PAGO"}
-											/>
-										</td>
-										<td className='p-2 sm:p-4 hidden sm:table-cell'>
-											<span
-												className={`px-2 py-1 rounded-[6px] text-2xs font-bold border uppercase tracking-wide
-											${
-												order.status === "ABERTA"
-													? "bg-blue-50 text-blue-600 border-blue-100"
-													: order.status === "CONCLUIDA"
-													? "bg-emerald-50 text-emerald-600 border-emerald-100"
-													: "bg-slate-100 text-slate-500 border-slate-200"
-											}`}
-											>
-												{order.status}
-											</span>
-										</td>
-										<td className='p-2 sm:p-4 text-right' onClick={(e) => e.stopPropagation()}>
-											<div className='flex justify-end gap-1 sm:gap-1.5 flex-wrap'>
-												{order.status === "ABERTA" && (
-													<button
-														onClick={() => updateStatus(order, { status: "CONCLUIDA" })}
-														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-emerald-500 text-white text-2xs font-bold rounded-lg hover:bg-emerald-600 shadow-sm shadow-emerald-200 transition-all'
-													>
-														<CheckCircle2 className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Concluir</span>
-													</button>
-												)}
-												{order.status === "ABERTA" && (
-													<button
-														onClick={() => updateStatus(order, { status: "CANCELADA" })}
-														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-red-50 text-red-600 text-2xs font-bold rounded-lg border border-red-200 hover:bg-red-100 transition-all'
-													>
-														<XCircle className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Cancelar</span>
-													</button>
-												)}
-												{order.status === "CONCLUIDA" && (
-													<button
-														onClick={() => updateStatus(order, { status: "ABERTA" })}
-														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-2xs font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
-													>
-														<Clock className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Reabrir</span>
-													</button>
-												)}
-												{order.status === "CANCELADA" && (
-													<button
-														onClick={() => updateStatus(order, { status: "ABERTA" })}
-														className='flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-50 text-blue-600 text-2xs font-bold rounded-lg border border-blue-200 hover:bg-blue-100 transition-all'
-													>
-														<Clock className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Reabrir</span>
-													</button>
-												)}
-												<button
-													onClick={() => openModal(order)}
-													className='p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-[6px] transition'
-												>
-													<Edit2 className='w-4 h-4' />
-												</button>
-												<button
-													onClick={() => handleDelete(order.id!)}
-													className='p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-[6px] transition'
-												>
-													<Trash2 className='w-4 h-4' />
-												</button>
-												<button
-													onClick={() => setExpandedOrderId(isExpanded ? null : Number(order.id))}
-													className='p-1.5 text-slate-400 hover:text-indigo-600'
-												>
-													{isExpanded ? <ChevronUp className='w-4 h-4' /> : <ChevronDown className='w-4 h-4' />}
-												</button>
-											</div>
-										</td>
-									</tr>
-									{isExpanded && (
-										<tr className='bg-slate-50/50'>
-											<td
-												colSpan={9}
-												className='p-4 border-b border-indigo-100'
-											>
-												<div className='grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-2 duration-300 origin-top'>
-													{/* Detalhes (Item 1) */}
-													<div className='col-span-2 space-y-3'>
-														<div className='bg-white p-4 rounded-[10px] border-l-4 border-indigo-500 shadow-sm'>
-															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2'>
-																<List className='w-4 h-4 text-indigo-500' />{" "}
-																Detalhes do Pedido
-															</h5>
-															<ul className='space-y-2'>
-																{order.items.map((item, idx) => (
-																	<li
-																		key={idx}
-																		className='flex justify-between text-xs border-b border-slate-50 last:border-0 pb-2'
-																	>
-																		<span className='text-slate-700'>
-																			<strong className='text-indigo-600'>
-																				{item.quantidade}x
-																			</strong>{" "}
-																			{Utils.displayName(item.servico)}
-																			{Utils.displayName(item.material)
-																				? ` - ${Utils.displayName(item.material)}`
-																				: ""}
-																			{Utils.displayName(item.gramatura)
-																				? ` (${Utils.displayName(item.gramatura)})`
-																				: ""}
-																			{Utils.displayName(item.tamanho)
-																				? ` · ${Utils.displayName(item.tamanho)}`
-																				: ""}
-																			{Utils.displayName(item.cor) && (
-																				<span className='text-slate-400 text-2xs ml-1'>
-																					({Utils.displayName(item.cor)})
-																				</span>
-																			)}
-																		</span>
-																		<span className='num font-bold text-slate-600'>
-																			{Utils.formatCurrency(item.total)}
-																		</span>
-																	</li>
-																))}
-															</ul>
-															{(order.taxa_extra || 0) > 0 && (
-																<div className='num flex justify-end mt-2 pt-2 border-t border-slate-100 text-2xs text-red-500 font-bold'>
-																	+ Juros/Taxas:{" "}
-																	{Utils.formatCurrency(
-																		order.taxa_extra || 0
-																	)}
-																</div>
-															)}
-														</div>
-														<div className='bg-white p-4 rounded-[10px] border-l-4 border-amber-400 shadow-sm'>
-															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-2'>
-																Descrição / Obs
-															</h5>
-															<p className='text-xs text-slate-600 italic leading-relaxed'>
-																{order.descricao ||
-																	"Nenhuma observação registrada."}
-															</p>
-														</div>
-													</div>
-													{/* Coluna 2 */}
-													<div className='space-y-3'>
-														<div className='bg-white p-4 rounded-[10px] border-l-4 border-slate-400 shadow-sm'>
-															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-3'>
-																Financeiro
-															</h5>
-															<div className='space-y-2 mb-3'>
-																<div className='flex justify-between text-xs'>
-																	<span className='text-slate-500'>
-																		Forma:
-																	</span>
-																	<span className='font-bold text-slate-700'>
-																		{order.forma_pagamento || "N/D"}
-																	</span>
-																</div>
-																<div className='flex justify-between text-xs'>
-																	<span className='text-slate-500'>
-																		Total:
-																	</span>
-																	<span className='num font-bold text-indigo-600'>
-																		{Utils.formatCurrency(order.total)}
-																	</span>
-																</div>
-															</div>
-															{/* Ações */}
-															<div className='flex flex-col gap-2 pt-2 border-t border-slate-100'>
-																<div className='flex gap-1'>
-																	{["PAGO", "PARCIAL", "NAO_PAGO"].map(
-																		(btn) => (
-																			<button
-																				key={btn}
-																				onClick={() =>
-																					updateStatus(order, {
-																						status_pagamento: btn as any,
-																					})
-																				}
-																				className={`flex-1 text-[9px] font-bold py-1 rounded border transition-colors ${
-																					order.status_pagamento === btn
-																						? "bg-slate-800 text-white"
-																						: "text-slate-400 hover:bg-slate-100"
-																				}`}
-																			>
-																				{btn.replace("_", " ")}
-																			</button>
-																		)
-																	)}
-																</div>
-															</div>
-														</div>
-														<div className='bg-white p-4 rounded-[10px] border-l-4 border-blue-400 shadow-sm'>
-															<h5 className='text-2xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-2'>
-																<FolderOpen className='w-4 h-4 text-blue-500' />{" "}
-																Arquivos
-															</h5>
-															<div className='mb-2 bg-slate-50 p-2 rounded border border-slate-200 text-2xs text-slate-500 font-mono break-all'>
-																01_A3_Art_Copy/Ordens/{order.data.split("T")[0]}/OS{order.id}_{order.cliente_nome.replace(/\s+/g, "_")}
-															</div>
-															{onedriveConfig?.cid && (() => {
-																const folderName = `OS${order.id}_${order.cliente_nome.replace(/\s+/g, "_")}`;
-																const date = order.data?.split("T")[0] || "";
-																const fullPath = `/personal/${onedriveConfig.cid}/Documents/${onedriveConfig.folderPath}/${date}/${folderName}`;
-																const url = `https://onedrive.live.com/?id=${encodeURIComponent(fullPath)}&search=${encodeURIComponent(folderName)}&view=0`;
-																return (
-																	<a
-																		href={url}
-																		target="_blank"
-																		rel="noopener noreferrer"
-																		className='inline-flex items-center gap-1.5 text-2xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors'
-																		onClick={(e) => e.stopPropagation()}
-																	>
-																		<FolderOpen className='w-3.5 h-3.5' />
-																		Abrir no OneDrive
-																	</a>
-																);
-															})()}
-														</div>
-													</div>
-												</div>
-											</td>
-										</tr>
-									)}
-								</React.Fragment>
-							);
-						})}
-					</tbody>
-				</DataTable>
-				{/* Paginação + contagem de linhas — fora da casca da tabela, que
-				    agora rola por conta própria. */}
-				<div className='flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-white border border-slate-200/70 rounded-2xl shadow-card'>
-					<div className='flex items-center gap-3 text-xs text-slate-500'>
-						<span className='font-semibold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg border border-indigo-100'>
-							{filteredOrders.length} {filteredOrders.length === 1 ? 'ordem' : 'ordens'}
-						</span>
-						<span>|</span>
-						<label className='flex items-center gap-1.5'>
-							Exibir
-							<select
-								value={pageSize}
-								onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-								className='border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white'
-							>
-								{[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
-							</select>
-							por página
-						</label>
-					</div>
-					{totalPages > 1 && (
-						<div className='flex items-center gap-1'>
-							<button
-								onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-								disabled={currentPage === 1}
-								className='px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
-							>
-								Anterior
-							</button>
-							{Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-								let page: number;
-								if (totalPages <= 7) {
-									page = i + 1;
-								} else if (currentPage <= 4) {
-									page = i + 1;
-								} else if (currentPage >= totalPages - 3) {
-									page = totalPages - 6 + i;
-								} else {
-									page = currentPage - 3 + i;
-								}
-								return (
-									<button
-										key={page}
-										onClick={() => setCurrentPage(page)}
-										className={`w-8 h-8 text-xs font-semibold rounded-lg transition-colors ${
-											currentPage === page
-												? 'bg-indigo-600 text-white shadow-sm'
-												: 'border border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
-										}`}
-									>
-										{page}
-									</button>
-								);
-							})}
-							<button
-								onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-								disabled={currentPage === totalPages}
-								className='px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
-							>
-								Próxima
-							</button>
-						</div>
-					)}
-				</div>
-			</div>
+			{/* VISTA DE LISTA — os estados de filtro e paginação continuam aqui e
+			    descem por prop, para sobreviverem à ida e à volta do formulário. */}
+			<OrdersList
+				orders={orders}
+				clients={clients}
+				filteredOrders={filteredOrders}
+				paginatedOrders={paginatedOrders}
+				summary={summary}
+				uniqueServices={uniqueServices}
+				filterStart={filterStart}
+				setFilterStart={setFilterStart}
+				filterEnd={filterEnd}
+				setFilterEnd={setFilterEnd}
+				filterClient={filterClient}
+				setFilterClient={setFilterClient}
+				filterServices={filterServices}
+				setFilterServices={setFilterServices}
+				filterPaymentStatus={filterPaymentStatus}
+				setFilterPaymentStatus={setFilterPaymentStatus}
+				filterOrderStatus={filterOrderStatus}
+				setFilterOrderStatus={setFilterOrderStatus}
+				filterNF={filterNF}
+				setFilterNF={setFilterNF}
+				currentPage={currentPage}
+				setCurrentPage={setCurrentPage}
+				pageSize={pageSize}
+				setPageSize={setPageSize}
+				expandedOrderId={expandedOrderId}
+				onToggleExpand={handleToggleExpand}
+				onNewOrder={handleNewOrder}
+				onEditOrder={openModal}
+				onDelete={handleDelete}
+				onUpdateStatus={updateStatus}
+				onRefresh={handleRefreshOrders}
+				onOpenConfig={handleOpenConfig}
+				onSaveFilterAsShortcut={onSaveFilterAsShortcut}
+				onedriveConfig={onedriveConfig}
+				isRefreshing={isRefreshing}
+			/>
 
 			{/* MODAL PRINCIPAL */}
 			<Modal
