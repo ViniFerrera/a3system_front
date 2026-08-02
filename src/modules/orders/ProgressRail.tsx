@@ -31,13 +31,16 @@ export const ProgressRail = ({
 	onIr: (id: EtapaId) => void;
 }) => (
 	<nav aria-label="Andamento do preenchimento" className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible">
-		{etapas.map((etapa, i) => {
+		{etapas.map((etapa) => {
 			const Icone = ICONES[etapa.id];
 			return (
 				<button
 					key={etapa.id}
 					type="button"
 					onClick={() => onIr(etapa.id)}
+					aria-label={`Ir para ${etapa.label}${etapa.opcional ? " (opcional)" : ""}: ${
+						etapa.resumo || (etapa.completa ? "preenchido" : "pendente")
+					}`}
 					className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all flex-shrink-0 lg:w-full ${
 						etapa.completa
 							? "bg-success-50 border-success-200"
@@ -51,7 +54,10 @@ export const ProgressRail = ({
 					>
 						{etapa.completa ? <Check className="w-4 h-4" /> : <Icone className="w-4 h-4" />}
 					</span>
-					<span className="min-w-0">
+					{/* O texto abaixo é decorativo: o rótulo acessível do botão já
+					    diz o passo e a situação, e sem isto o leitor de tela lia
+					    tudo duas vezes. */}
+					<span className="min-w-0" aria-hidden="true">
 						<span className="block text-sm font-semibold text-ink">
 							{etapa.label}
 							{etapa.opcional && (
@@ -62,10 +68,6 @@ export const ProgressRail = ({
 							{etapa.resumo || (etapa.completa ? "preenchido" : "pendente")}
 						</span>
 					</span>
-					{/* Conector vertical entre etapas, só no desktop */}
-					{i < etapas.length - 1 && (
-						<span className="hidden lg:block absolute" aria-hidden="true" />
-					)}
 				</button>
 			);
 		})}

@@ -706,10 +706,16 @@ export const OrderFormPage = ({
 			<div className='sticky bottom-0 z-20 -mx-4 md:-mx-8 px-4 md:px-8 py-3 bg-white/95 backdrop-blur border-t border-slate-200'>
 				<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 					<div className='flex items-center gap-3'>
-						<label className='text-2xs font-bold text-ink-muted uppercase'>
+						{/* `htmlFor`: sem ele o leitor de tela anunciava só "campo
+						    numérico" — o rótulo não envolve nem aponta para o input. */}
+						<label
+							htmlFor='ordem-desconto'
+							className='text-2xs font-bold text-ink-muted uppercase'
+						>
 							Desconto (%)
 						</label>
 						<Input
+							id='ordem-desconto'
 							type='number'
 							// `!w-20`: o Input do kit já traz `w-full`, e no CSS gerado
 							// `.w-full` vem depois de `.w-20` — sem o `!` o campo de
