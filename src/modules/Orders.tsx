@@ -528,22 +528,59 @@ export const OrderModule = ({
 	}, [newOrderSignal]);
 
 	// Aplica o filtro que veio de um atalho. Volta para a lista, porque o filtro
-	// só faz sentido lá.
+	// só faz sentido lá — e voltar desmonta o formulário, então passa pela mesma
+	// régua de descarte dos outros caminhos: edição aberta ou rascunho com
+	// conteúdo pergunta antes. Recusando, o filtro NÃO é aplicado e o formulário
+	// fica intacto.
 	//
 	// Depende do nonce: o App zera `pendingOrderFilter` no callback, então o
 	// mesmo atalho clicado duas vezes seguidas volta a passar por aqui.
 	useEffect(() => {
 		if (!pendingOrderFilter) return;
-		setFilterStart(pendingOrderFilter.filterStart);
-		setFilterEnd(pendingOrderFilter.filterEnd);
-		setFilterClient(pendingOrderFilter.filterClient);
-		setFilterServices(pendingOrderFilter.filterServices);
-		setFilterPaymentStatus(pendingOrderFilter.filterPaymentStatus);
-		setFilterOrderStatus(pendingOrderFilter.filterOrderStatus);
-		setFilterNF(pendingOrderFilter.filterNF);
-		setCurrentPage(1);
-		setView("list");
-		onPendingFilterApplied?.();
+		// Congela o payload: o efeito é assíncrono e `pendingOrderFilter` pode
+		// ser zerado pelo App antes de chegarmos aos setters.
+		const filtro = pendingOrderFilter;
+		let cancelado = false;
+
+		const aplicarFiltro = async () => {
+			const atual = formStateRef.current;
+			const rascunho = rascunhoRef.current;
+			const emJogo =
+				atual.view === "form" &&
+				(!!atual.editingOrder || (!!rascunho && temRascunho(rascunho)));
+			if (emJogo) {
+				const ok = await confirm({
+					title: "Descartar e aplicar o filtro salvo?",
+					message: atual.editingOrder
+						? `As alterações da ordem #${atual.editingOrder.id} serão perdidas.`
+						: "O que você preencheu será perdido.",
+					confirmLabel: "Aplicar filtro",
+					cancelLabel: "Continuar editando",
+					danger: true,
+				});
+				if (!ok) {
+					// Mesmo recusando, o pendente precisa ser consumido: senão o
+					// atalho fica pendurado no App e dispara sozinho depois.
+					onPendingFilterApplied?.();
+					return;
+				}
+			}
+			if (cancelado) return;
+			setFilterStart(filtro.filterStart);
+			setFilterEnd(filtro.filterEnd);
+			setFilterClient(filtro.filterClient);
+			setFilterServices(filtro.filterServices);
+			setFilterPaymentStatus(filtro.filterPaymentStatus);
+			setFilterOrderStatus(filtro.filterOrderStatus);
+			setFilterNF(filtro.filterNF);
+			setCurrentPage(1);
+			setView("list");
+			onPendingFilterApplied?.();
+		};
+		aplicarFiltro();
+		return () => {
+			cancelado = true;
+		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [pendingOrderFilter?.nonce]);
 
