@@ -499,7 +499,7 @@ export const OrderFormPage = ({
 	const secao = "bg-white border border-slate-200/70 rounded-2xl shadow-card p-5";
 
 	return (
-		<div className='flex flex-col gap-4 pb-28'>
+		<div className='flex flex-col gap-4'>
 			<div className='flex items-center gap-3'>
 				<Button
 					variant='ghost'
@@ -696,9 +696,15 @@ export const OrderFormPage = ({
 				</div>
 			</div>
 
-			{/* RODAPÉ FIXO: desconto, total e ações */}
-			<div className='fixed bottom-0 left-0 right-0 lg:left-[220px] bg-white/95 backdrop-blur border-t border-slate-200 px-4 lg:px-8 py-3 z-20'>
-				<div className='max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
+			{/* RODAPÉ GRUDADO: desconto, total e ações.
+			    `sticky` em vez de `fixed`: a barra acompanha a coluna de conteúdo
+			    sozinha. A versão anterior partia de `lg:left-[220px]`, a largura
+			    da sidebar aberta — com o menu recolhido (64px) sobrava uma faixa
+			    de conteúdo rolando a descoberto à esquerda da barra.
+			    As margens negativas cancelam o padding do <main> para a barra
+			    sangrar de ponta a ponta da área de conteúdo. */}
+			<div className='sticky bottom-0 z-20 -mx-4 md:-mx-8 px-4 md:px-8 py-3 bg-white/95 backdrop-blur border-t border-slate-200'>
+				<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 					<div className='flex items-center gap-3'>
 						<label className='text-2xs font-bold text-ink-muted uppercase'>
 							Desconto (%)
