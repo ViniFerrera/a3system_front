@@ -6,14 +6,13 @@ import {
 import {
 	TrendingUp, Wallet, ArrowDownRight, Filter,
 	CheckCircle2, Clock, XCircle, BarChart2, AlertTriangle, Receipt,
-	Target, Package, RefreshCw, DollarSign,
+	Target, Package, RefreshCw,
 } from "lucide-react";
 import { Order, Expense, StockItem } from "@/types";
 import { Utils } from "@/utils";
 import { MultiSelect } from "@/components/ui/MultiSelect";
 import { StatTile } from "@/components/ui/StatTile";
 import { fetchDashboardMetrics, DashboardMetrics } from "@/services/dashboardMetrics";
-import { BreakEvenCard } from "./dashboard/BreakEvenCard";
 import { ServiceMixChart } from "./dashboard/ServiceMixChart";
 import { VolumeRevenueChart } from "./dashboard/VolumeRevenueChart";
 import { TicketBandsCard } from "./dashboard/TicketBandsCard";
@@ -422,79 +421,71 @@ export const DashboardModule = ({
 
 			{/* ── Barra de Filtros ── */}
 			<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-3 sm:p-4">
-				<div className="flex flex-col gap-3">
-					{/* Período Presets */}
+				<div className="flex flex-wrap items-end gap-3">
 					<div className="flex flex-wrap items-center gap-2">
-						<span className="flex items-center gap-1.5 text-slate-400 font-bold text-xs uppercase tracking-wide mr-1">
-							<Filter className="w-3.5 h-3.5 text-indigo-400" /> Período
+						<span className="flex items-center gap-1.5 text-ink-faint font-bold text-xs uppercase tracking-wide mr-1">
+							<Filter className="w-3.5 h-3.5 text-primary-400" /> Período
 						</span>
 						{periodPresets.map((p) => (
 							<button key={p.key} onClick={() => setPeriodPreset(p.key)}
-								className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${periodPreset === p.key ? "bg-indigo-600 text-white border-indigo-600 shadow-sm" : "bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600"}`}
+								className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${periodPreset === p.key ? "bg-primary-600 text-white border-primary-600 shadow-sm" : "bg-white text-ink-muted border-slate-200 hover:border-primary-300 hover:text-primary-600"}`}
 							>{p.label}</button>
 						))}
 					</div>
-					{/* Se custom, mostra date pickers */}
-					{periodPreset === "custom" && (
-						<div className="flex flex-wrap gap-3 items-end">
-							<div className="w-full md:w-36">
-								<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Início</label>
-								<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-							</div>
-							<div className="w-full md:w-36">
-								<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Fim</label>
-								<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-slate-50" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-							</div>
-						</div>
-					)}
-					{/* Filtros adicionais */}
-					<div className="flex flex-wrap gap-3 items-end">
-						<div className="w-full md:w-44">
-							<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Pagamento</label>
-							<MultiSelect options={["PAGO", "PARCIAL", "NAO_PAGO"]} selected={selectedPaymentStatus} onChange={setSelectedPaymentStatus} placeholder="Todos" />
-						</div>
-						<div className="w-full md:w-52">
-							<label className="text-2xs font-bold text-slate-400 uppercase mb-1 block">Serviços</label>
-							<MultiSelect options={allServices} selected={selectedServices} onChange={setSelectedServices} placeholder="Todos" />
-						</div>
-						<button
-							onClick={() => { setPeriodPreset("12m"); setSelectedServices([]); setSelectedPaymentStatus([]); setOrderStatusFilter("ALL"); }}
-							className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-red-500 px-3 py-2 rounded-xl hover:bg-red-50 transition-all"
-						>
-							<RefreshCw className="w-3 h-3" /> Limpar
-						</button>
+
+					<div className="w-40">
+						<label className="text-2xs font-bold text-ink-faint uppercase mb-1 block">Pagamento</label>
+						<MultiSelect options={["PAGO", "PARCIAL", "NAO_PAGO"]} selected={selectedPaymentStatus} onChange={setSelectedPaymentStatus} placeholder="Todos" />
 					</div>
+					<div className="w-48">
+						<label className="text-2xs font-bold text-ink-faint uppercase mb-1 block">Serviços</label>
+						<MultiSelect options={allServices} selected={selectedServices} onChange={setSelectedServices} placeholder="Todos" />
+					</div>
+					<button
+						onClick={() => { setPeriodPreset("12m"); setSelectedServices([]); setSelectedPaymentStatus([]); setOrderStatusFilter("ALL"); }}
+						className="flex items-center gap-1.5 text-xs font-semibold text-ink-faint hover:text-danger-500 px-3 py-2 rounded-xl hover:bg-danger-50 transition-all"
+					>
+						<RefreshCw className="w-3 h-3" /> Limpar
+					</button>
 				</div>
+
+				{periodPreset === "custom" && (
+					<div className="flex flex-wrap gap-3 items-end mt-3 pt-3 border-t border-slate-100">
+						<div className="w-full sm:w-36">
+							<label className="text-2xs font-bold text-ink-faint uppercase mb-1 block">Início</label>
+							<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-primary-400 outline-none bg-surface-sunken" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+						</div>
+						<div className="w-full sm:w-36">
+							<label className="text-2xs font-bold text-ink-faint uppercase mb-1 block">Fim</label>
+							<input type="date" className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-primary-400 outline-none bg-surface-sunken" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+						</div>
+					</div>
+				)}
 			</div>
 
 			{/* ── KPI Cards ── */}
 			{/* Os gradientes de `accent` são literais de propósito: o Tailwind varre
 			    o código estaticamente e classe montada por concatenação não vira CSS. */}
-			<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-				<StatTile label="Receita" value={fmt(kpis.revenue)} sub="no período" icon={<TrendingUp className="w-4 h-4" />}
-					accent="from-emerald-400 to-emerald-600" sparkColor="#10b981" trend={kpis.revTrend} spark={sparks.receita} />
+			<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
 				<StatTile label="Volume de OS" value={String(currentOrders.length)} sub={`${statusCounts.open} em aberto`} icon={<Target className="w-4 h-4" />}
 					accent="from-violet-500 to-purple-600" sparkColor="#8b5cf6" trend={kpis.volTrend} />
-				<StatTile label="Ticket Médio" value={fmt(kpis.ticket)} sub="por ordem" icon={<Receipt className="w-4 h-4" />}
-					accent="from-sky-400 to-sky-600" sparkColor="#0ea5e9" trend={kpis.ticketTrend} />
+				<StatTile label="Receita" value={fmt(kpis.revenue)} sub="no período" icon={<TrendingUp className="w-4 h-4" />}
+					accent="from-emerald-400 to-emerald-600" sparkColor="#10b981" trend={kpis.revTrend} spark={sparks.receita} />
 				<StatTile label="Despesas" value={fmt(kpis.expense)} sub="pagas no período" icon={<ArrowDownRight className="w-4 h-4" />}
 					accent="from-rose-400 to-rose-600" sparkColor="#f43f5e" spark={sparks.despesa} />
 				<StatTile label="Lucro Líquido" value={fmt(kpis.profit)} sub={`Margem: ${kpis.margin.toFixed(1)}%`} icon={<Wallet className="w-4 h-4" />}
 					accent={kpis.profit >= 0 ? "from-primary-500 to-violet-600" : "from-orange-500 to-red-600"} sparkColor="#6366f1" spark={sparks.lucro} />
-				<StatTile label="A Receber" value={fmt(kpis.toReceive)} sub="pendente + parcial" icon={<DollarSign className="w-4 h-4" />}
-					accent={kpis.toReceive > 0 ? "from-amber-400 to-orange-500" : "from-slate-400 to-slate-500"} sparkColor="#f59e0b" />
+				<StatTile label="Ticket Médio" value={fmt(kpis.ticket)} sub="por ordem" icon={<Receipt className="w-4 h-4" />}
+					accent="from-sky-400 to-sky-600" sparkColor="#0ea5e9" trend={kpis.ticketTrend} />
 			</div>
 
 			{/* ── Aviso discreto: só os blocos de métricas agregadas dependem da rota ── */}
 			{metricsError && (
 				<div className="flex items-center gap-2 text-2xs text-warning-700 bg-warning-50 border border-warning-200 rounded-xl px-3 py-2">
 					<AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-					Não foi possível carregar as análises agregadas (equilíbrio, faixas, concentração e retenção). O restante do painel segue atualizado.
+					Não foi possível carregar as análises agregadas (faixas, concentração e retenção). O restante do painel segue atualizado.
 				</div>
 			)}
-
-			{/* ── Ponto de Equilíbrio do mês ── */}
-			<BreakEvenCard metrics={metrics} />
 
 			{/* ── Fluxo Mensal + Distribuição Pagamento ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

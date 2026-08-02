@@ -43,7 +43,7 @@ export const StatTile = ({
 		<div className="flex items-start justify-between gap-2">
 			<div className="min-w-0">
 				<p className="text-2xs font-bold text-ink-muted uppercase tracking-wide truncate">{label}</p>
-				<p className="num text-xl font-bold text-ink mt-1 truncate">{value}</p>
+				<p className="num text-lg font-bold text-ink mt-1 leading-tight break-words">{value}</p>
 			</div>
 			{icon && <div className="text-ink-faint flex-shrink-0">{icon}</div>}
 		</div>
