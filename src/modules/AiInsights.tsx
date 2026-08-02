@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import {
 	Button,
 	DataTable,
+	PageLoader,
 	TableHead,
 	Textarea,
 	Th,
@@ -255,7 +256,14 @@ export const AiInsightsModule = () => {
 					</Button>
 				</div>
 
-				{insightData ? (
+				{isInsightsLoading ? (
+					<div className='bg-white rounded-xl border border-slate-200 shadow-card'>
+						<PageLoader
+							message='A IA está analisando seu histórico...'
+							hint='Projeções, oportunidades e calendário — pode levar alguns segundos.'
+						/>
+					</div>
+				) : insightData ? (
 					<div className='grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in slide-in-from-bottom-4 duration-500'>
 						{/* Gráfico de Projeção */}
 						<Card className='p-6'>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, FileBarChart, Printer, AlertCircle } from "lucide-react";
-import { Button, Field } from "@/components/ui";
+import { Button, Field, PageLoader } from "@/components/ui";
 import { api } from "@/services/api";
 
 /**
@@ -182,7 +182,16 @@ export const EstudoModule = ({
 				</div>
 			)}
 
-			{html ? (
+			{carregando ? (
+				// Substitui o estudo anterior em vez de deixá-lo à vista: o que está
+				// na tela já não corresponde ao período pedido.
+				<div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+					<PageLoader
+						message="Gerando o estudo empresarial..."
+						hint="São 12 capítulos — isto pode levar alguns segundos."
+					/>
+				</div>
+			) : html ? (
 				// iframe e não div: o estudo traz <style> com seletores globais
 				// (h2, table, p) que vazariam para o resto do sistema.
 				<div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -200,17 +209,15 @@ export const EstudoModule = ({
 					/>
 				</div>
 			) : (
-				!carregando && (
-					<div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
-						<FileBarChart className="w-10 h-10 text-ink-faint/60 mx-auto mb-3" />
-						<p className="text-ink-muted text-sm font-medium">
-							Escolha um período e clique em <b>Gerar estudo</b>.
-						</p>
-						<p className="num text-ink-faint text-xs mt-1">
-							12 capítulos com receita, volume, clientes, custos e tabela de preços.
-						</p>
-					</div>
-				)
+				<div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+					<FileBarChart className="w-10 h-10 text-ink-faint/60 mx-auto mb-3" />
+					<p className="text-ink-muted text-sm font-medium">
+						Escolha um período e clique em <b>Gerar estudo</b>.
+					</p>
+					<p className="num text-ink-faint text-xs mt-1">
+						12 capítulos com receita, volume, clientes, custos e tabela de preços.
+					</p>
+				</div>
 			)}
 		</div>
 	);

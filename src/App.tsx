@@ -6,7 +6,7 @@ import { api } from "@/services/api";
 import { LoadingProvider } from "@/components/ui/LoadingOverlay";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
-import { Skeleton, SkeletonTile } from "@/components/ui/Skeleton";
+import { PageLoader } from "@/components/ui/PageLoader";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
 import { CommandPalette } from "@/components/shell/CommandPalette";
@@ -342,21 +342,14 @@ const AppInner = () => {
 				<main className="flex-1 overflow-y-auto p-4 md:p-8 mt-14 md:mt-0">
 					<div className="max-w-7xl mx-auto">
 						{dadosCarregando ? (
-							<div className="space-y-4">
-								<div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-									{Array.from({ length: 6 }).map((_, i) => <SkeletonTile key={i} />)}
-								</div>
-								<Skeleton className="h-64 w-full" />
-							</div>
+							<PageLoader
+								message="Carregando seus dados..."
+								hint="Ordens, clientes, estoque, preços, despesas e maquinário."
+							/>
 						) : (
-							<Suspense
-								fallback={
-									<div className="space-y-4">
-										<Skeleton className="h-24 w-full" />
-										<Skeleton className="h-64 w-full" />
-									</div>
-								}
-							>
+							// Fallback do chunk da aba: o carregamento dos dados já
+							// terminou aqui, só falta o código do módulo chegar.
+							<Suspense fallback={<PageLoader message="Abrindo módulo..." />}>
 								{painel("dashboard", <DashboardModule orders={orders} expenses={expenses} stock={stock} />)}
 								{painel("ai", <AiInsightsModule />)}
 								{painel("orders", (

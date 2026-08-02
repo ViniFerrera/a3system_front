@@ -16,3 +16,4 @@ export { StatTile } from "./StatTile";
 export { PageHeader } from "./PageHeader";
 export { EmptyState } from "./EmptyState";
 export { Skeleton, SkeletonTile } from "./Skeleton";
+export { PageLoader } from "./PageLoader";

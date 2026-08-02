@@ -7,7 +7,7 @@ import { useLoading } from "@/components/ui/LoadingOverlay";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Field";
+import { Input, Select, Textarea } from "@/components/ui/Field";
 import { ItemGrid } from "./ItemGrid";
 import { SearchableSelect } from "./SearchableSelect";
 import { SuggestionCards } from "./SuggestionCards";
@@ -496,11 +496,12 @@ export const OrderFormPage = ({
 		alvo.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 	};
 
-	const secao = "bg-white border border-slate-200/70 rounded-2xl shadow-card p-5";
+	const secao = "bg-white border border-slate-200/70 rounded-xl shadow-card p-4";
+	const rotulo = "block text-2xs font-bold text-ink-muted uppercase tracking-wide mb-1.5";
 
 	return (
-		<div className='flex flex-col gap-4'>
-			<div className='flex items-center gap-3'>
+		<div className='flex flex-col gap-3'>
+			<div className='flex items-center gap-2'>
 				<Button
 					variant='ghost'
 					size='sm'
@@ -509,23 +510,34 @@ export const OrderFormPage = ({
 				>
 					Voltar
 				</Button>
-				<h2 className='text-lg font-bold text-ink'>
+				<h2 className='text-base font-bold text-ink'>
 					{editingOrder ? `Editar ordem #${editingOrder.id}` : "Nova ordem"}
 				</h2>
 			</div>
 
-			<div className='grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-5 items-start'>
-				<div className='lg:sticky lg:top-20'>
-					<ProgressRail etapas={etapas} onIr={irParaSecao} />
+			{/* Sem `items-start`: com ele a coluna da trilha encolhe até a altura do
+			    próprio conteúdo, e um `sticky` dentro de uma caixa da sua própria
+			    altura não tem por onde deslizar — a trilha rolava junto do
+			    formulário. Esticada (padrão do grid), ela gruda de verdade. */}
+			<div className='grid grid-cols-1 lg:grid-cols-[168px_1fr] gap-x-6 gap-y-3'>
+				{/* A coluna externa estica com a linha do grid; o `sticky` é o filho.
+				    É a altura sobrando na coluna que dá curso ao deslizamento.
+				    O `pt` mora aqui, e não no filho, para alinhar o primeiro passo
+				    com o primeiro rótulo do cartão ao lado (p-4 do cartão menos o
+				    py-1.5 do passo) sem viajar junto na barra grudada. */}
+				<div className='lg:pt-2.5'>
+					<div className='lg:sticky lg:top-4'>
+						<ProgressRail etapas={etapas} onIr={irParaSecao} />
+					</div>
 				</div>
 
-				<div className='space-y-5'>
+				<div className='space-y-3 min-w-0'>
 					{/* CLIENTE E DATA */}
 					<section ref={refCliente} className={secao}>
-						<div className='grid grid-cols-1 md:grid-cols-12 gap-5'>
+						<div className='grid grid-cols-1 md:grid-cols-12 gap-3'>
 							<div className='md:col-span-8 flex gap-2 items-end'>
-								<div className='flex-1'>
-									<label className='block text-2xs font-bold text-ink-muted uppercase mb-1.5'>
+								<div className='flex-1 min-w-0'>
+									<label className={rotulo}>
 										Cliente <span className='text-danger-500'>*</span>
 									</label>
 									<SearchableSelect
@@ -546,20 +558,22 @@ export const OrderFormPage = ({
 									)}
 								</div>
 								<button
+									type='button'
 									onClick={onQuickClient}
-									className='bg-indigo-50 text-indigo-600 p-2.5 rounded-[10px] hover:bg-indigo-100 transition'
+									className='h-9 w-9 flex-shrink-0 inline-flex items-center justify-center bg-primary-50 text-primary-600 rounded-[10px] hover:bg-primary-100 transition-colors'
 									title='Novo Cliente Rápido'
+									aria-label='Cadastrar cliente rápido'
 								>
 									<Plus className='w-4 h-4' />
 								</button>
 							</div>
 							<div className='md:col-span-4'>
-								<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
+								<label className={rotulo} htmlFor='ordem-data'>
 									Data
 								</label>
-								<input
+								<Input
+									id='ordem-data'
 									type='date'
-									className='w-full border border-slate-200 rounded-[10px] p-2.5 bg-white text-sm'
 									value={formData.data ? formData.data.split("T")[0] : ""}
 									onChange={(e) =>
 										setFormData({ ...formData, data: e.target.value })
@@ -571,13 +585,16 @@ export const OrderFormPage = ({
 
 					{/* PAGAMENTO — sem colapso: na página há espaço para tudo à vista. */}
 					<section ref={refPagamento} className={secao}>
-						<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+						{/* Nota Fiscal cabe na mesma linha dos outros campos: são quatro
+						    escolhas curtas do mesmo assunto, e empilhá-la abaixo só
+						    esticava a seção. */}
+						<div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3'>
 							<div>
-								<label className='block text-xs font-bold text-slate-500 mb-1'>
+								<label className={rotulo} htmlFor='ordem-status-pag'>
 									Status
 								</label>
-								<select
-									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+								<Select
+									id='ordem-status-pag'
 									value={formData.status_pagamento || "NAO_PAGO"}
 									onChange={(e) =>
 										setFormData({
@@ -589,14 +606,14 @@ export const OrderFormPage = ({
 									<option value='NAO_PAGO'>Não Pago</option>
 									<option value='PARCIAL'>Parcial</option>
 									<option value='PAGO'>Pago</option>
-								</select>
+								</Select>
 							</div>
 							<div>
-								<label className='block text-xs font-bold text-slate-500 mb-1'>
-									Forma Pagamento
+								<label className={rotulo} htmlFor='ordem-forma-pag'>
+									Forma de pagamento
 								</label>
-								<select
-									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm'
+								<Select
+									id='ordem-forma-pag'
 									value={formData.forma_pagamento || ""}
 									onChange={(e) =>
 										setFormData({
@@ -610,15 +627,16 @@ export const OrderFormPage = ({
 									<option value='PIX'>PIX</option>
 									<option value='DEBITO'>Cartão de Débito</option>
 									<option value='CREDITO'>Cartão de Crédito</option>
-								</select>
+								</Select>
 							</div>
 							<div>
-								<label className='block text-xs font-bold text-slate-500 mb-1'>
-									Taxa Extra / Juros (R$)
+								<label className={rotulo} htmlFor='ordem-taxa'>
+									Taxa / juros (R$)
 								</label>
-								<input
+								<Input
+									id='ordem-taxa'
 									type='number'
-									className='w-full border border-slate-200 p-2 rounded-[8px] text-sm bg-white'
+									className='num'
 									value={formData.taxa_extra || 0}
 									onChange={(e) =>
 										setFormData({
@@ -628,48 +646,54 @@ export const OrderFormPage = ({
 									}
 								/>
 							</div>
-						</div>
-
-						{/* Nota Fiscal */}
-						<div className='mt-3'>
-							<label className='block text-xs font-bold text-slate-500 mb-1.5'>
-								Nota Fiscal
-							</label>
-							<div className='flex gap-2'>
-								<button
-									type='button'
-									onClick={() => setFormData({ ...formData, nota_fiscal: false })}
-									className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
-										!formData.nota_fiscal
-											? "bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
-											: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
-									}`}
+							<div>
+								<span className={rotulo}>Nota fiscal</span>
+								{/* `radiogroup`: são dois estados excludentes do mesmo campo,
+								    não dois botões de ação independentes. */}
+								<div
+									role='radiogroup'
+									aria-label='Nota fiscal'
+									className='flex h-9 p-0.5 bg-slate-100 rounded-[10px]'
 								>
-									Sem NF
-								</button>
-								<button
-									type='button'
-									onClick={() => setFormData({ ...formData, nota_fiscal: true })}
-									className={`flex-1 py-2 rounded-xl border text-sm font-bold transition-all ${
-										formData.nota_fiscal
-											? "bg-blue-50 text-blue-700 border-blue-300 shadow-sm"
-											: "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
-									}`}
-								>
-									Com NF
-								</button>
+									{[
+										{ nf: false, label: "Sem NF" },
+										{ nf: true, label: "Com NF" },
+									].map(({ nf, label }) => {
+										const ativo = !!formData.nota_fiscal === nf;
+										return (
+											<button
+												key={label}
+												type='button'
+												role='radio'
+												aria-checked={ativo}
+												onClick={() => setFormData({ ...formData, nota_fiscal: nf })}
+												className={`flex-1 rounded-lg text-xs font-semibold transition-all duration-150 ${
+													ativo
+														? "bg-white text-primary-700 shadow-sm"
+														: "text-ink-faint hover:text-ink-muted"
+												}`}
+											>
+												{label}
+											</button>
+										);
+									})}
+								</div>
 							</div>
 						</div>
 					</section>
 
 					{/* DESCRIÇÃO */}
 					<section ref={refDescricao} className={secao}>
-						<label className='block text-xs font-bold text-slate-500 uppercase mb-1.5'>
-							Descrição Detalhada
+						<label className={rotulo} htmlFor='ordem-descricao'>
+							Descrição
+							<span className='ml-1.5 font-normal normal-case tracking-normal text-ink-faint'>
+								opcional
+							</span>
 						</label>
-						<textarea
-							rows={3}
-							className='w-full border border-slate-200 rounded-[10px] p-3 text-sm'
+						<Textarea
+							id='ordem-descricao'
+							rows={2}
+							placeholder='Observações, detalhes de acabamento, prazo combinado...'
 							value={formData.descricao}
 							onChange={(e) =>
 								setFormData({ ...formData, descricao: e.target.value })
@@ -678,7 +702,7 @@ export const OrderFormPage = ({
 					</section>
 
 					{/* MATERIAL: sugestões + grade editável de itens */}
-					<section ref={refMaterial} className={`${secao} space-y-4`}>
+					<section ref={refMaterial} className={`${secao} space-y-3`}>
 						<SuggestionCards
 							presets={presets}
 							recentes={recentes}
@@ -703,7 +727,7 @@ export const OrderFormPage = ({
 			    de conteúdo rolando a descoberto à esquerda da barra.
 			    As margens negativas cancelam o padding do <main> para a barra
 			    sangrar de ponta a ponta da área de conteúdo. */}
-			<div className='sticky bottom-0 z-20 -mx-4 md:-mx-8 px-4 md:px-8 py-3 bg-white/95 backdrop-blur border-t border-slate-200'>
+			<div className='sticky bottom-0 z-20 -mx-4 md:-mx-8 px-4 md:px-8 py-2.5 bg-white/95 backdrop-blur border-t border-slate-200'>
 				<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
 					<div className='flex items-center gap-3'>
 						{/* `htmlFor`: sem ele o leitor de tela anunciava só "campo
@@ -733,7 +757,7 @@ export const OrderFormPage = ({
 							<p className='text-2xs text-ink-faint font-bold uppercase'>
 								Total Final
 							</p>
-							<p className='num text-xl font-bold text-primary-600 tracking-tight'>
+							<p className='num text-lg font-bold text-primary-600 tracking-tight'>
 								{Utils.formatCurrency(
 									gridSubtotal *
 										(1 - (formData.desconto_pontual || 0) / 100) +

@@ -5,6 +5,7 @@ import {
 	Field,
 	Input,
 	PageHeader,
+	PageLoader,
 	useConfirm,
 } from "@/components/ui";
 import {
@@ -103,11 +104,7 @@ export const UsersModule = () => {
 	};
 
 	if (loading) {
-		return (
-			<div className="flex items-center justify-center h-64">
-				<div className="w-8 h-8 rounded-full border-4 border-primary-500 border-t-transparent animate-spin" />
-			</div>
-		);
+		return <PageLoader message="Carregando controle de acesso..." />;
 	}
 
 	return (

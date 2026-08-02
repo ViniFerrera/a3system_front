@@ -58,18 +58,20 @@ export const SearchableSelect = ({
 
 	return (
 		<div className='relative w-full' ref={wrapperRef}>
+			{/* h-9/px-3 espelham o CONTROL do kit (Input/Select): o gatilho fica
+			    alinhado com os campos vizinhos em vez de ficar um degrau mais alto. */}
 			<div
-				className='w-full border border-slate-200 rounded-[10px] p-2.5 bg-white text-sm flex justify-between items-center cursor-pointer hover:border-indigo-300 transition-colors shadow-sm'
+				className='w-full h-9 px-3 border border-slate-200 rounded-[10px] bg-white text-sm flex justify-between items-center gap-2 cursor-pointer hover:border-slate-300 transition-colors'
 				onClick={() => setIsOpen(!isOpen)}
 			>
 				<span
-					className={
-						selectedOption ? "text-slate-800 font-medium" : "text-slate-400"
-					}
+					className={`truncate ${
+						selectedOption ? "text-ink font-medium" : "text-ink-faint"
+					}`}
 				>
 					{selectedOption ? selectedOption.label : placeholder}
 				</span>
-				<ChevronDown className='w-4 h-4 text-slate-400' />
+				<ChevronDown className='w-4 h-4 text-ink-faint flex-shrink-0' />
 			</div>
 			{isOpen && (
 				<div className='absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-[10px] shadow-xl max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100'>

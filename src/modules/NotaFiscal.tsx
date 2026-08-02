@@ -5,6 +5,7 @@ import {
 	DataTable,
 	Field,
 	PageHeader,
+	PageLoader,
 	Select,
 	TableHead,
 	Th,
@@ -49,6 +50,9 @@ export const NotaFiscalModule: React.FC<Props> = ({ orders, quickAction }) => {
 	const [generating, setGenerating] = useState(false);
 	const [message, setMessage] = useState("");
 	const [error, setError] = useState("");
+	// Só cobre a montagem: as recargas após gerar um PDF acontecem com a página
+	// já montada e não devem trocá-la por uma tela de carregamento.
+	const [carregandoLista, setCarregandoLista] = useState(true);
 
 	// Carrega lista de NFs já geradas
 	const loadList = async () => {
@@ -57,6 +61,8 @@ export const NotaFiscalModule: React.FC<Props> = ({ orders, quickAction }) => {
 			setGeneratedList(res.data || []);
 		} catch {
 			console.error("Erro ao carregar lista de NFs");
+		} finally {
+			setCarregandoLista(false);
 		}
 	};
 
@@ -152,6 +158,10 @@ export const NotaFiscalModule: React.FC<Props> = ({ orders, quickAction }) => {
 		const [y, mo] = m.split("-");
 		return `${meses[parseInt(mo) - 1]} ${y}`;
 	};
+
+	if (carregandoLista) {
+		return <PageLoader message="Carregando notas fiscais..." />;
+	}
 
 	return (
 		<div className="space-y-6">

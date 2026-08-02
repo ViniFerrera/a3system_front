@@ -7,6 +7,7 @@ import {
 	Button,
 	DataTable,
 	PageHeader,
+	PageLoader,
 	TableHead,
 	Th,
 	useConfirm,
@@ -36,6 +37,10 @@ export const DatabaseSecurityModule = () => {
 	const confirm = useConfirm();
 	const [stats, setStats] = useState<TableStat[]>([]);
 	const [loading, setLoading] = useState(false);
+	// Separado de `loading` porque este só vale para a montagem: no "Atualizar"
+	// manual o spinner mora no botão, e trocar o painel inteiro por uma tela de
+	// carregamento faria a página piscar a cada clique.
+	const [primeiraCarga, setPrimeiraCarga] = useState(true);
 	const [backupLoading, setBackupLoading] = useState(false);
 	const [restoreLoading, setRestoreLoading] = useState(false);
 	const [lastBackup, setLastBackup] = useState<string | null>(null);
@@ -50,6 +55,7 @@ export const DatabaseSecurityModule = () => {
 			setMessage({ type: "error", text: "Erro ao carregar estatísticas" });
 		} finally {
 			setLoading(false);
+			setPrimeiraCarga(false);
 		}
 	}, []);
 
@@ -110,6 +116,10 @@ export const DatabaseSecurityModule = () => {
 			setRestoreLoading(false);
 		}
 	};
+
+	if (primeiraCarga) {
+		return <PageLoader message="Consultando o banco de dados..." />;
+	}
 
 	return (
 		<div className="space-y-6 pb-20 md:pb-0">
