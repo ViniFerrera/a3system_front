@@ -239,9 +239,12 @@ const AppInner = () => {
 		]).finally(() => setDadosCarregando(false));
 	}, [user]);
 
-	const handleStockUpdate = () => {
+	// Identidade estável: desce até `updateStatus` em Ordens, que é passado às
+	// linhas memoizadas da tabela. Recriado a cada render, derrubava o memo de
+	// todas elas a cada mudança de estado do App.
+	const handleStockUpdate = useCallback(() => {
 		api.get("/stock").then((res) => setStock(res.data)).catch(console.error);
-	};
+	}, []);
 
 	const handleLogout = () => {
 		localStorage.removeItem("a3_token");

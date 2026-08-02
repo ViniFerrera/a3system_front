@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
 
 interface LoadingContextType {
 	show: (message?: string) => void;
@@ -25,8 +25,14 @@ export const LoadingProvider = ({ children }: { children: React.ReactNode }) => 
 		setVisible(false);
 	}, []);
 
+	// Sem o memo o objeto muda de identidade a cada show/hide, e todo componente
+	// que chamou useLoading() re-renderiza junto. Pior: os handlers que dependem
+	// dele (`updateStatus` em Ordens) trocavam de identidade e derrubavam o
+	// React.memo das linhas da tabela. `visible` e `message` não saem daqui.
+	const value = useMemo(() => ({ show, hide }), [show, hide]);
+
 	return (
-		<LoadingContext.Provider value={{ show, hide }}>
+		<LoadingContext.Provider value={value}>
 			{children}
 			{visible && (
 				<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in">
