@@ -13,14 +13,14 @@ export interface DashboardMetrics {
 	};
 	faixasTicket: { faixa: string; pedidos: number; receita: number }[];
 	concentracao: {
-		top5Pct: number;
+		topPct: number;
 		/**
 		 * Receita dos clientes IDENTIFICADOS no período — a rota exclui o
 		 * "Cliente Balcão" das análises de cliente. Nunca rotular como
 		 * faturamento da empresa: é menor que o KPI de Receita do Dashboard.
 		 */
 		receitaTotal: number;
-		top5: { nome: string; receita: number; pedidos: number }[];
+		top: { nome: string; receita: number; pedidos: number }[];
 	};
 	retencao: {
 		novos: { clientes: number; pedidos: number; receita: number };

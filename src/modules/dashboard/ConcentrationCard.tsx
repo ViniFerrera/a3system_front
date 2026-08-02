@@ -7,7 +7,7 @@ import { DashboardMetrics } from "@/services/dashboardMetrics";
 export const ConcentrationCard = ({ metrics }: { metrics: DashboardMetrics | null }) => {
 	if (!metrics) return <SkeletonTile />;
 
-	const { top5, top5Pct, receitaTotal } = metrics.concentracao;
+	const { top, topPct, receitaTotal } = metrics.concentracao;
 
 	return (
 		<div className="bg-white border border-slate-200/70 rounded-2xl shadow-card p-5">
@@ -16,24 +16,22 @@ export const ConcentrationCard = ({ metrics }: { metrics: DashboardMetrics | nul
 					<h4 className="text-base font-bold text-ink flex items-center gap-2">
 						<Users className="w-4 h-4 text-primary-500" /> Concentração
 					</h4>
-					<p className="text-xs text-ink-faint mt-0.5">
-						Peso dos cinco maiores na receita do período
-					</p>
+					<p className="text-xs text-ink-faint mt-0.5">Peso dos dez maiores na receita do período</p>
 				</div>
-				<span className="num text-xl font-bold text-primary-600">{top5Pct.toFixed(0)}%</span>
+				<span className="num text-xl font-bold text-primary-600">{topPct.toFixed(0)}%</span>
 			</div>
 
 			<div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mt-4">
 				<div
 					className="h-full bg-gradient-to-r from-primary-500 to-violet-500 rounded-full transition-all duration-500"
-					style={{ width: `${Math.min(top5Pct, 100)}%` }}
+					style={{ width: `${Math.min(topPct, 100)}%` }}
 				/>
 			</div>
 
-			<div className="space-y-2 mt-4">
+			<div className="space-y-2 mt-4 max-h-64 overflow-y-auto custom-scrollbar pr-1">
 				{/* A chave leva o índice: a rota agrupa por `cliente_id` e dois ids
 				    distintos podem carregar o mesmo nome. */}
-				{top5.map((c, i) => (
+				{top.map((c, i) => (
 					<div key={`${i}-${c.nome}`} className="flex items-center gap-2.5">
 						<span className="num text-2xs font-bold text-ink-faint w-4">{i + 1}</span>
 						<span className="text-xs font-semibold text-ink-muted flex-1 truncate">{c.nome}</span>
