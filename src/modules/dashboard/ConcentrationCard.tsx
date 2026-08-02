@@ -7,7 +7,11 @@ import { DashboardMetrics } from "@/services/dashboardMetrics";
 export const ConcentrationCard = ({ metrics }: { metrics: DashboardMetrics | null }) => {
 	if (!metrics) return <SkeletonTile />;
 
-	const { top, topPct, receitaTotal } = metrics.concentracao;
+	// Tolerância à janela de deploy: backend e frontend publicam em serviços
+	// diferentes, então o frontend novo pode receber o JSON antigo (top5/top5Pct).
+	const { receitaTotal } = metrics.concentracao;
+	const top = metrics.concentracao.top ?? [];
+	const topPct = metrics.concentracao.topPct ?? 0;
 
 	return (
 		<div className="bg-white border border-slate-200/70 rounded-2xl shadow-card p-5">
