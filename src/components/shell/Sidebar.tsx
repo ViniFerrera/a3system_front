@@ -1,5 +1,5 @@
-import React from "react";
-import { Printer, ChevronRight, ChevronLeft, LogOut } from "lucide-react";
+import React, { useState } from "react";
+import { Printer, ChevronRight, ChevronLeft, ChevronDown, LogOut } from "lucide-react";
 import { NAV_ITEMS, NAV_GROUPS } from "./navItems";
 
 interface Props {
@@ -19,9 +19,43 @@ const BADGE_COLOR: Record<string, string> = {
 	expenses: "bg-danger-500",
 };
 
+// Configuração nasce recolhida: é o grupo menos usado no dia a dia.
+const GRUPOS_PADRAO: Record<string, boolean> = {
+	Principal: true,
+	Operacional: true,
+	"Configuração": false,
+};
+
 export const Sidebar = ({
 	activeTab, onSelect, collapsed, onToggleCollapse, isMobileOpen, counts, user, onLogout,
 }: Props) => {
+	const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>(() => {
+		try {
+			const cru = localStorage.getItem("a3_nav_groups");
+			return cru ? { ...GRUPOS_PADRAO, ...JSON.parse(cru) } : GRUPOS_PADRAO;
+		} catch {
+			return GRUPOS_PADRAO;
+		}
+	});
+
+	const alternarGrupo = (grupo: string) => {
+		setGruposAbertos((prev) => {
+			const proximo = { ...prev, [grupo]: !prev[grupo] };
+			localStorage.setItem("a3_nav_groups", JSON.stringify(proximo));
+			return proximo;
+		});
+	};
+
+	// Soma dos badges dos filhos — mostrada no cabeçalho quando o grupo está
+	// fechado, para um alerta não ficar escondido dentro da sanfona.
+	const somaDoGrupo = (grupo: string) =>
+		NAV_ITEMS.filter((n) => n.group === grupo).reduce((acc, item) => {
+			if (item.id === "orders") return acc + counts.orders;
+			if (item.id === "stock") return acc + counts.stock;
+			if (item.id === "expenses") return acc + counts.expenses;
+			return acc;
+		}, 0);
+
 	const badgeFor = (id: string) => {
 		const count =
 			id === "orders" ? counts.orders : id === "stock" ? counts.stock : id === "expenses" ? counts.expenses : 0;
@@ -37,10 +71,10 @@ export const Sidebar = ({
 
 	// O recolhimento só existe no desktop (o botão que o aciona é `hidden md:flex`).
 	// No mobile a sidebar é uma gaveta: se respeitasse `collapsed`, quem tivesse
-	// recolhido o menu no desktop abriria no celular uma faixa de 76px sem rótulos.
+	// recolhido o menu no desktop abriria no celular uma faixa de 64px sem rótulos.
 	const isCollapsed = collapsed && !isMobileOpen;
 
-	const width = isCollapsed ? "w-[76px]" : "w-[260px]";
+	const width = isCollapsed ? "w-[64px]" : "w-[220px]";
 
 	return (
 		<aside
@@ -69,48 +103,67 @@ export const Sidebar = ({
 				</button>
 			</div>
 
-			<nav aria-label="Módulos" className="flex-1 px-3 py-2 overflow-y-auto custom-scrollbar space-y-2">
-				{NAV_GROUPS.map((group) => (
-					<div key={group}>
-						{!isCollapsed && (
-							<p className="text-2xs font-bold uppercase tracking-widest text-slate-600 px-3 mb-1">{group}</p>
-						)}
-						<div className="space-y-0.5">
-							{NAV_ITEMS.filter((n) => n.group === group).map((item) => {
-								const isActive = activeTab === item.id;
-								return (
-									<button
-										key={item.id}
-										type="button"
-										onClick={() => onSelect(item.id)}
-										title={isCollapsed ? item.label : undefined}
-										aria-label={isCollapsed ? item.label : undefined}
-										aria-current={isActive ? "page" : undefined}
-										className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 group ${
-											isCollapsed ? "justify-center" : ""
-										} ${
-											isActive
-												? "bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-lg shadow-primary-900/30"
-												: "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
-										}`}
-									>
-										<item.icon
-											className={`w-[18px] h-[18px] flex-shrink-0 ${
-												isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"
-											}`}
-										/>
-										{!isCollapsed && (
-											<>
-												<span className="flex-1 text-left truncate">{item.label}</span>
-												{badgeFor(item.id)}
-											</>
-										)}
-									</button>
-								);
-							})}
+			<nav className="flex-1 px-2.5 py-2 overflow-y-auto custom-scrollbar space-y-1" aria-label="Navegação principal">
+				{NAV_GROUPS.map((group) => {
+					// Na trilha recolhida todo grupo conta como aberto: do contrário
+					// os ícones sumiriam e o menu ficaria inutilizável.
+					const aberto = isCollapsed || !!gruposAbertos[group];
+					const soma = somaDoGrupo(group);
+					return (
+						<div key={group}>
+							{!isCollapsed && (
+								<button
+									type="button"
+									onClick={() => alternarGrupo(group)}
+									aria-expanded={aberto}
+									className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-2xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-colors"
+								>
+									<ChevronDown className={`w-3 h-3 transition-transform ${aberto ? "" : "-rotate-90"}`} />
+									<span className="flex-1 text-left">{group}</span>
+									{!aberto && soma > 0 && (
+										<span className="num text-2xs font-bold px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-200">{soma}</span>
+									)}
+								</button>
+							)}
+							{aberto && (
+								<div className="space-y-0.5">
+									{NAV_ITEMS.filter((n) => n.group === group).map((item) => {
+										const isActive = activeTab === item.id;
+										return (
+											<button
+												key={item.id}
+												type="button"
+												onClick={() => onSelect(item.id)}
+												title={isCollapsed ? item.label : undefined}
+												aria-label={isCollapsed ? item.label : undefined}
+												aria-current={isActive ? "page" : undefined}
+												className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-full text-sm font-medium transition-all duration-150 group ${
+													isCollapsed ? "justify-center" : ""
+												} ${
+													isActive
+														? "bg-slate-950 text-white shadow-lg shadow-black/30"
+														: "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+												}`}
+											>
+												<item.icon
+													className={`w-[17px] h-[17px] flex-shrink-0 ${
+														isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"
+													}`}
+												/>
+												{!isCollapsed && (
+													<>
+														<span className="flex-1 text-left truncate">{item.label}</span>
+														{badgeFor(item.id)}
+													</>
+												)}
+											</button>
+										);
+									})}
+								</div>
+							)}
 						</div>
-					</div>
-				))}
+					);
+				})}
 			</nav>
 
 			<div className="px-3 py-3 border-t border-slate-800/60">
