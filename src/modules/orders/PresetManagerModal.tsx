@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { Plus, Trash2, Edit2, Save, X } from "lucide-react";
+import { Plus, Trash2, Edit2, Save, X, Star } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { api } from "@/services/api";
 import { PriceRule } from "@/types";
 import { ItemGrid } from "./ItemGrid";
-import { OrderPreset } from "./PresetBar";
+import { OrderPreset } from "./presetTypes";
 import {
 	EditableItem,
 	createEmptyItem,
@@ -105,6 +105,16 @@ export const PresetManagerModal = ({
 		}
 	};
 
+	// Salva só o campo favorito; o PUT preserva os demais quando não enviados.
+	const alternarFavorito = async (preset: OrderPreset) => {
+		try {
+			await api.put(`/order-presets/${preset.id}`, { favorito: !preset.favorito });
+			onChanged();
+		} catch (e) {
+			toast.error("Não foi possível alterar o favorito.");
+		}
+	};
+
 	const remover = async (preset: OrderPreset) => {
 		const ok = await confirm({
 			title: "Apagar pré-definição?",
@@ -166,6 +176,17 @@ export const PresetManagerModal = ({
 										</p>
 									</div>
 									<div className="flex items-center gap-1 flex-shrink-0">
+										<button
+											type="button"
+											onClick={() => alternarFavorito(preset)}
+											title={preset.favorito ? "Remover dos favoritos" : "Marcar como favorito"}
+											aria-label={preset.favorito ? "Remover dos favoritos" : "Marcar como favorito"}
+											className={`p-1.5 rounded-lg transition ${
+												preset.favorito ? "text-warning-500 hover:bg-warning-50" : "text-ink-faint hover:text-warning-500 hover:bg-warning-50"
+											}`}
+										>
+											<Star className={`w-4 h-4 ${preset.favorito ? "fill-current" : ""}`} />
+										</button>
 										<button
 											type="button"
 											onClick={() => abrirEdicao(preset)}

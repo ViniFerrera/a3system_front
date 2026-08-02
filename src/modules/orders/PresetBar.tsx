@@ -2,25 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Settings2, Sparkles, History } from "lucide-react";
 import { api } from "@/services/api";
 import { Utils } from "@/utils";
-
-export interface OrderPreset {
-	id: number;
-	nome: string;
-	itens: any[];
-	posicao: number;
-	ativo: boolean;
-}
-
-export interface RecentItem {
-	servico: string;
-	material: string;
-	gramatura?: string;
-	tamanho?: string;
-	cor?: string;
-	is_double_sided?: boolean;
-	quantidade: number;
-	vezes: number;
-}
+import { OrderPreset, RecentItem } from "./presetTypes";
 
 /** "1_Impressao · 1_Comum · A4 · Colorido" com os prefixos numéricos removidos. */
 const descreveItem = (item: any) =>
