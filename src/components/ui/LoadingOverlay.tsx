@@ -39,17 +39,17 @@ export const LoadingProvider = ({ children }: { children: React.ReactNode }) => 
 					{/* Sem cartão branco por trás: o pedido era o GIF com fundo
 					    transparente, não uma caixa opaca ao redor dele. */}
 					<div className="flex flex-col items-center gap-3 animate-scale-in">
-						{/* Servido de public/: URL absoluta a partir da raiz, não do
-						    CDN externo — o hotlink não carregava em produção.
-						    `mix-blend-multiply`: o arquivo em si não tem transparência
-						    (GIF89a de 128 quadros, sem cor transparente marcada) — o
-						    fundo branco vem gravado em todo quadro. Sem CSS remove esse
-						    pixel; multiply "apaga" o branco contra qualquer fundo claro,
-						    deixando só o desenho escuro visível. */}
+						{/* WebP animado com canal alfa de verdade — gerado a partir do
+						    GIF original (public/gif_loading.gif), que não tinha
+						    transparência nenhuma (fundo branco sólido em todo quadro,
+						    sem cor marcada como transparente). O recorte respeita o
+						    rosto branco do robô: só o fundo, conectado à borda, virou
+						    transparente. Servido de public/, URL absoluta a partir
+						    da raiz. */}
 						<img
-							src="/gif_loading.gif"
+							src="/gif_loading.webp"
 							alt="Carregando"
-							className="w-20 h-20 sm:w-24 sm:h-24 object-contain mix-blend-multiply"
+							className="w-20 h-20 sm:w-24 sm:h-24 object-contain"
 						/>
 						<p className="text-sm font-semibold text-ink bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full shadow-sm">
 							{message}

@@ -493,17 +493,17 @@ export const DashboardModule = ({
 				<VolumeRevenueChart data={volumeReceita6mData} />
 			</div>
 
-			{/* ── Mix por serviço ── */}
-			<ServiceMixChart data={serviceMix} />
+			{/* ── Mix por serviço + Retenção ── */}
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+				<ServiceMixChart data={serviceMix} />
+				<RetentionCard metrics={metrics} />
+			</div>
 
 			{/* ── Faixas de ticket + Concentração de clientes ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 				<TicketBandsCard metrics={metrics} />
 				<ConcentrationCard metrics={metrics} />
 			</div>
-
-			{/* ── Retenção ── */}
-			<RetentionCard metrics={metrics} />
 
 			{/* ══ SEÇÃO INFERIOR — filtro próprio ══ */}
 			<div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
