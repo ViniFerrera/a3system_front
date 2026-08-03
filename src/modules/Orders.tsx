@@ -209,68 +209,6 @@ export const OrderModule = ({
 
 	// --- CÁLCULO DE KPIS ---
 	const summary = useMemo(() => {
-		const now = new Date();
-		const currentMonth = now.getMonth();
-		const currentYear = now.getFullYear();
-
-		const getMonthData = (dateStr: string) => {
-			const d = new Date(dateStr);
-			const isThisMonth =
-				d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-			const isLastMonth =
-				currentMonth === 0
-					? d.getMonth() === 11 && d.getFullYear() === currentYear - 1
-					: d.getMonth() === currentMonth - 1 &&
-					  d.getFullYear() === currentYear;
-			return { isThisMonth, isLastMonth };
-		};
-
-		const thisMonthOrders = filteredOrders.filter(
-			(o) => getMonthData(o.data).isThisMonth
-		).length;
-		const lastMonthOrders = filteredOrders.filter(
-			(o) => getMonthData(o.data).isLastMonth
-		).length;
-		const variationTotal =
-			lastMonthOrders === 0
-				? thisMonthOrders > 0
-					? 100
-					: 0
-				: ((thisMonthOrders - lastMonthOrders) / lastMonthOrders) * 100;
-
-		const thisMonthOpen = filteredOrders.filter(
-			(o) => o.status === "ABERTA" && getMonthData(o.data).isThisMonth
-		).length;
-		const lastMonthOpen = filteredOrders.filter(
-			(o) => o.status === "ABERTA" && getMonthData(o.data).isLastMonth
-		).length;
-		const variationOpen =
-			lastMonthOpen === 0
-				? thisMonthOpen > 0
-					? 100
-					: 0
-				: ((thisMonthOpen - lastMonthOpen) / lastMonthOpen) * 100;
-
-		const thisMonthCompleted = filteredOrders.filter(
-			(o) =>
-				o.status === "CONCLUIDA" &&
-				o.data_conclusao &&
-				getMonthData(o.data_conclusao).isThisMonth
-		).length;
-		const lastMonthCompleted = filteredOrders.filter(
-			(o) =>
-				o.status === "CONCLUIDA" &&
-				o.data_conclusao &&
-				getMonthData(o.data_conclusao).isLastMonth
-		).length;
-		const variationCompleted =
-			lastMonthCompleted === 0
-				? thisMonthCompleted > 0
-					? 100
-					: 0
-				: ((thisMonthCompleted - lastMonthCompleted) / lastMonthCompleted) *
-				  100;
-
 		const totalDurationMs = filteredOrders.reduce((acc, o) => {
 			if (o.status === "CONCLUIDA" && o.data_conclusao) {
 				const diff =
@@ -299,28 +237,11 @@ export const OrderModule = ({
 			(o) => o.status === "CONCLUIDA"
 		).length;
 
-		const sparklineData = Array(7)
-			.fill(0)
-			.map((_, i) => {
-				const d = new Date();
-				d.setDate(d.getDate() - (6 - i));
-				d.setHours(0, 0, 0, 0);
-				return filteredOrders.filter((o) => {
-					const od = new Date(o.data);
-					od.setHours(0, 0, 0, 0);
-					return od.getTime() === d.getTime();
-				}).length;
-			});
-
 		return {
 			totalOrders,
 			openOrdersSnapshot,
 			completedOrdersSnapshot,
 			avgTimeDisplay,
-			variationTotal,
-			variationOpen,
-			variationCompleted,
-			sparklineData,
 		};
 	}, [filteredOrders]);
 

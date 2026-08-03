@@ -8,9 +8,6 @@ import {
 	Clock,
 	Timer,
 	Calendar,
-	TrendingUp,
-	TrendingDown,
-	Minus,
 	Settings,
 	RefreshCcw,
 	CheckCircle2,
@@ -20,40 +17,12 @@ import { DataTable, TableHead, Th } from "@/components/ui/DataTable";
 import { OrderRow } from "./OrderRow";
 import { SearchableSelect } from "./SearchableSelect";
 
-/** Variação vs. período anterior, compacta o bastante para caber ao lado do número. */
-const VariationIndicator = ({ val }: { val: number }) => {
-	const isNeutral = val === 0;
-	const isPositive = val > 0;
-	if (isNeutral) {
-		return (
-			<span className='inline-flex items-center gap-0.5 text-2xs font-bold text-ink-faint'>
-				<Minus className='w-2.5 h-2.5' />0%
-			</span>
-		);
-	}
-	return (
-		<span
-			className={`inline-flex items-center gap-0.5 text-2xs font-bold ${
-				isPositive ? "text-success-600" : "text-danger-500"
-			}`}
-		>
-			{isPositive ? <TrendingUp className='w-2.5 h-2.5' /> : <TrendingDown className='w-2.5 h-2.5' />}
-			{isPositive ? "+" : ""}
-			{val.toFixed(0)}%
-		</span>
-	);
-};
-
 /** KPIs do topo da lista, calculados em `Orders.tsx` sobre as ordens filtradas. */
 export interface OrdersSummary {
 	totalOrders: number;
 	openOrdersSnapshot: number;
 	completedOrdersSnapshot: number;
 	avgTimeDisplay: string;
-	variationTotal: number;
-	variationOpen: number;
-	variationCompleted: number;
-	sparklineData: number[];
 }
 
 export type FilterPaymentStatus = "TODOS" | "PAGO" | "NAO_PAGO" | "PARCIAL";
@@ -167,9 +136,9 @@ export const OrdersList = ({
 			    vertical logo abaixo, que era o ponto principal do pedido. */}
 			<div className='flex-shrink-0 bg-white border border-slate-200/70 rounded-2xl shadow-card px-4 sm:px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-3'>
 				{[
-					{ label: "Total de ordens", value: summary.totalOrders, trend: summary.variationTotal, icon: BarChart2, accent: "bg-primary-50 text-primary-600" },
-					{ label: "Abertas", value: summary.openOrdersSnapshot, trend: summary.variationOpen, icon: Clock, accent: "bg-info-50 text-info-600" },
-					{ label: "Concluídas", value: summary.completedOrdersSnapshot, trend: summary.variationCompleted, icon: CheckCircle2, accent: "bg-success-50 text-success-600" },
+					{ label: "Total de ordens", value: summary.totalOrders, icon: BarChart2, accent: "bg-primary-50 text-primary-600" },
+					{ label: "Abertas", value: summary.openOrdersSnapshot, icon: Clock, accent: "bg-info-50 text-info-600" },
+					{ label: "Concluídas", value: summary.completedOrdersSnapshot, icon: CheckCircle2, accent: "bg-success-50 text-success-600" },
 				].map((s, i) => (
 					<div key={s.label} className={`flex items-center gap-2.5 pr-6 ${i < 2 ? "border-r border-slate-100" : ""}`}>
 						<div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${s.accent}`}>
@@ -177,10 +146,7 @@ export const OrdersList = ({
 						</div>
 						<div>
 							<p className='text-2xs text-ink-faint font-semibold'>{s.label}</p>
-							<div className='flex items-center gap-1.5'>
-								<span className='num text-base font-bold text-ink leading-none'>{s.value}</span>
-								<VariationIndicator val={s.trend} />
-							</div>
+							<span className='num text-base font-bold text-ink leading-none'>{s.value}</span>
 						</div>
 					</div>
 				))}
