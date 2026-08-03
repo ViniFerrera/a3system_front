@@ -271,16 +271,16 @@ const AppInner = () => {
 		<div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
 
 			{/* ── Mobile Header ── */}
-			<div className="md:hidden fixed top-0 w-full z-50 flex items-center justify-between px-4 py-3 bg-slate-900/95 backdrop-blur-md shadow-lg border-b border-slate-800/50">
+			<div className="md:hidden fixed top-0 w-full z-50 flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-200/80">
 				<div className="flex items-center gap-2.5">
-					<div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-lg shadow-glow-indigo">
+					<div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-lg">
 						<Printer className="w-4 h-4 text-white" />
 					</div>
-					<span className="font-bold text-white text-lg tracking-tight">A3 System</span>
+					<span className="font-bold text-ink text-base tracking-tight">A3 System</span>
 				</div>
 				<button
 					onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-					className="text-slate-300 hover:text-white transition-colors p-2 -mr-2 rounded-lg hover:bg-slate-800/50"
+					className="text-ink-muted hover:text-ink transition-colors p-2 -mr-2 rounded-lg hover:bg-slate-100"
 					aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
 				>
 					{isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

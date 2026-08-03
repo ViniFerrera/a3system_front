@@ -566,7 +566,7 @@ export const OrderFormPage = ({
 								<button
 									type='button'
 									onClick={onQuickClient}
-									className='h-9 w-9 flex-shrink-0 inline-flex items-center justify-center bg-primary-50 text-primary-600 rounded-[10px] hover:bg-primary-100 transition-colors'
+									className='h-8 w-8 flex-shrink-0 inline-flex items-center justify-center bg-primary-50 text-primary-600 rounded-[10px] hover:bg-primary-100 transition-colors'
 									title='Novo Cliente Rápido'
 									aria-label='Cadastrar cliente rápido'
 								>
@@ -659,7 +659,7 @@ export const OrderFormPage = ({
 								<div
 									role='radiogroup'
 									aria-label='Nota fiscal'
-									className='flex h-9 p-0.5 bg-slate-100 rounded-[10px]'
+									className='flex h-8 p-0.5 bg-slate-100 rounded-[10px]'
 								>
 									{[
 										{ nf: false, label: "Sem NF" },

@@ -1,7 +1,7 @@
 import React from "react";
 
 const CONTROL =
-	"w-full h-9 px-3 text-sm bg-white border border-slate-200 rounded-[10px] text-ink placeholder:text-ink-faint outline-none transition-all hover:border-slate-300 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 disabled:bg-slate-50 disabled:text-ink-faint";
+	"w-full h-8 px-2.5 text-sm bg-white border border-slate-200 rounded-[10px] text-ink placeholder:text-ink-faint outline-none transition-all hover:border-slate-300 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 disabled:bg-slate-50 disabled:text-ink-faint";
 
 export const Field = ({
 	label,

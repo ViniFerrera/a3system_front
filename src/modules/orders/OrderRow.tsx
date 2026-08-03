@@ -14,6 +14,39 @@ import {
 	XCircle,
 } from "lucide-react";
 
+const STATUS_DOT: Record<string, string> = {
+	ABERTA: "bg-info-500",
+	CONCLUIDA: "bg-success-500",
+	CANCELADA: "bg-slate-400",
+};
+
+const STATUS_PILL: Record<string, string> = {
+	ABERTA: "bg-info-50 text-info-700",
+	CONCLUIDA: "bg-success-50 text-success-700",
+	CANCELADA: "bg-slate-100 text-slate-500",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+	ABERTA: "Aberta",
+	CONCLUIDA: "Concluída",
+	CANCELADA: "Cancelada",
+};
+
+/** Cor determinística por nome — mesma ideia de um avatar, sem depender de foto. */
+const AVATAR_COLORS = [
+	"bg-primary-50 text-primary-600",
+	"bg-sky-50 text-sky-600",
+	"bg-amber-50 text-amber-700",
+	"bg-emerald-50 text-emerald-600",
+	"bg-rose-50 text-rose-600",
+	"bg-violet-50 text-violet-600",
+];
+const avatarColorFor = (name: string) => {
+	let hash = 0;
+	for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+	return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+};
+
 interface OrderRowProps {
 	order: Order;
 	isExpanded: boolean;
@@ -43,32 +76,39 @@ export const OrderRow = React.memo(function OrderRow({
 		<>
 			<tr
 				className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
-					isExpanded ? "bg-indigo-50/30" : ""
+					isExpanded ? "bg-primary-50/30" : ""
 				}`}
 				onClick={() => onToggleExpand(Number(order.id))}
 			>
-				<td className='p-2 sm:p-4 font-mono text-xs text-slate-400'>
+				<td className='p-2 sm:p-3 font-mono text-xs text-ink-faint'>
 					<span>#{order.id}</span>
-					{order.nota_fiscal && <span className='ml-1 px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px] font-bold'>NF</span>}
+					{order.nota_fiscal && <span className='ml-1 px-1 py-0.5 bg-info-100 text-info-700 rounded text-[9px] font-bold'>NF</span>}
 				</td>
-				<td className='p-2 sm:p-4 max-w-[140px] sm:max-w-[200px]'>
-					<span className='font-bold text-slate-700 text-xs sm:text-sm block break-words leading-snug'>{order.cliente_nome}</span>
-					<span className='text-2xs text-slate-400 sm:hidden block mt-0.5'>{Utils.formatDateTime(order.data)}</span>
+				<td className='p-2 sm:p-3 max-w-[160px] sm:max-w-[220px]'>
+					<div className='flex items-center gap-2'>
+						<span className={`hidden sm:flex w-6 h-6 rounded-full items-center justify-center text-2xs font-bold flex-shrink-0 ${avatarColorFor(order.cliente_nome)}`}>
+							{order.cliente_nome?.charAt(0)?.toUpperCase()}
+						</span>
+						<div className='min-w-0'>
+							<span className='font-semibold text-ink text-xs sm:text-sm block truncate leading-snug'>{order.cliente_nome}</span>
+							<span className='text-2xs text-ink-faint sm:hidden block mt-0.5'>{Utils.formatDateTime(order.data)}</span>
+						</div>
+					</div>
 				</td>
-				<td className='p-2 sm:p-4 text-xs hidden lg:table-cell'>
+				<td className='p-2 sm:p-3 text-xs hidden lg:table-cell text-ink-muted'>
 					{Utils.formatDateTime(order.data)}
 				</td>
-				<td className='p-2 sm:p-4 text-xs hidden xl:table-cell'>
+				<td className='p-2 sm:p-3 text-xs hidden xl:table-cell'>
 					{order.data_conclusao ? (
-						<span className='text-emerald-600 font-medium'>
+						<span className='text-success-600 font-medium'>
 							{Utils.formatDateTime(order.data_conclusao)}
 						</span>
 					) : (
-						<span className='text-slate-400 italic'>--</span>
+						<span className='text-ink-faint italic'>--</span>
 					)}
 				</td>
 				<td
-					className='p-2 sm:p-4 text-xs max-w-[200px] truncate hidden md:table-cell'
+					className='p-2 sm:p-3 text-xs max-w-[200px] truncate hidden md:table-cell'
 					title={order.items
 						.map((i) => Utils.displayName(i.servico))
 						.join(", ")}
@@ -78,44 +118,36 @@ export const OrderRow = React.memo(function OrderRow({
 							{order.items.slice(0, 2).map((i, idx) => (
 								<span
 									key={idx}
-									className='inline-flex items-center px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-2xs text-slate-600 whitespace-nowrap'
+									className='inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-100 text-2xs text-ink-muted whitespace-nowrap'
 								>
 									{Utils.displayName(i.servico)}
 								</span>
 							))}
 						</div>
 					) : (
-						"Sem itens"
+						<span className='text-ink-faint'>Sem itens</span>
 					)}
 				</td>
-				<td className='num p-2 sm:p-4 font-bold text-slate-800 text-xs sm:text-sm'>
+				<td className='num p-2 sm:p-3 font-bold text-ink text-xs sm:text-sm'>
 					{Utils.formatCurrency(order.total)}
 					{(order.taxa_extra || 0) > 0 && (
-						<span className='text-[9px] text-slate-400 block'>
+						<span className='text-[9px] text-ink-faint block font-normal'>
 							(+ juros)
 						</span>
 					)}
 				</td>
-				<td className='p-2 sm:p-4 hidden sm:table-cell'>
+				<td className='p-2 sm:p-3 hidden sm:table-cell'>
 					<Badge
 						status={order.status_pagamento || "NAO_PAGO"}
 					/>
 				</td>
-				<td className='p-2 sm:p-4 hidden sm:table-cell'>
-					<span
-						className={`px-2 py-1 rounded-[6px] text-2xs font-bold border uppercase tracking-wide
-					${
-						order.status === "ABERTA"
-							? "bg-blue-50 text-blue-600 border-blue-100"
-							: order.status === "CONCLUIDA"
-							? "bg-emerald-50 text-emerald-600 border-emerald-100"
-							: "bg-slate-100 text-slate-500 border-slate-200"
-					}`}
-					>
-						{order.status}
+				<td className='p-2 sm:p-3 hidden sm:table-cell'>
+					<span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-2xs font-semibold ${STATUS_PILL[order.status] || "bg-slate-100 text-slate-500"}`}>
+						<span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[order.status] || "bg-slate-400"}`} />
+						{STATUS_LABEL[order.status] || order.status}
 					</span>
 				</td>
-				<td className='p-2 sm:p-4 text-right' onClick={(e) => e.stopPropagation()}>
+				<td className='p-2 sm:p-3 text-right' onClick={(e) => e.stopPropagation()}>
 					<div className='flex justify-end gap-1 sm:gap-1.5 flex-wrap'>
 						{order.status === "ABERTA" && (
 							<button

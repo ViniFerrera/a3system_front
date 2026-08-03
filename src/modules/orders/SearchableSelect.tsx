@@ -58,10 +58,10 @@ export const SearchableSelect = ({
 
 	return (
 		<div className='relative w-full' ref={wrapperRef}>
-			{/* h-9/px-3 espelham o CONTROL do kit (Input/Select): o gatilho fica
+			{/* h-8/px-2.5 espelham o CONTROL do kit (Input/Select): o gatilho fica
 			    alinhado com os campos vizinhos em vez de ficar um degrau mais alto. */}
 			<div
-				className='w-full h-9 px-3 border border-slate-200 rounded-[10px] bg-white text-sm flex justify-between items-center gap-2 cursor-pointer hover:border-slate-300 transition-colors'
+				className='w-full h-8 px-2.5 border border-slate-200 rounded-[10px] bg-white text-sm flex justify-between items-center gap-2 cursor-pointer hover:border-slate-300 transition-colors'
 				onClick={() => setIsOpen(!isOpen)}
 			>
 				<span

@@ -74,32 +74,32 @@ export const Sidebar = ({
 	// recolhido o menu no desktop abriria no celular uma faixa de 64px sem rótulos.
 	const isCollapsed = collapsed && !isMobileOpen;
 
-	const width = isCollapsed ? "w-[64px]" : "w-[220px]";
+	const width = isCollapsed ? "w-[64px]" : "w-[216px]";
 
 	return (
 		<aside
-			className={`fixed inset-y-0 left-0 ${width} bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex flex-col z-40 transform transition-[transform,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:translate-x-0 shadow-2xl ${
+			className={`fixed inset-y-0 left-0 ${width} bg-white border-r border-slate-200/80 flex flex-col z-40 transform transition-[transform,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:translate-x-0 shadow-xl md:shadow-none ${
 				isMobileOpen ? "translate-x-0" : "-translate-x-full"
 			} md:sticky md:top-0 md:h-screen pt-16 md:pt-0`}
 		>
-			<div className="hidden md:flex items-center gap-3 px-4 py-4 border-b border-slate-800/60">
-				<div className="bg-gradient-to-br from-primary-500 to-violet-600 p-2.5 rounded-xl shadow-lg shadow-primary-900/40 flex-shrink-0">
-					<Printer className="w-5 h-5 text-white" />
+			<div className="hidden md:flex items-center gap-2.5 px-4 py-4 border-b border-slate-100">
+				<div className="bg-gradient-to-br from-primary-500 to-violet-600 p-2 rounded-lg flex-shrink-0">
+					<Printer className="w-4 h-4 text-white" />
 				</div>
 				{!isCollapsed && (
 					<div className="min-w-0">
-						<span className="font-bold text-lg text-white tracking-tight block truncate">A3 System</span>
-						<span className="text-2xs text-slate-500 font-medium">Gestão Gráfica</span>
+						<span className="font-bold text-sm text-ink tracking-tight block truncate">A3 System</span>
+						<span className="text-2xs text-ink-faint font-medium">Gestão Gráfica</span>
 					</div>
 				)}
 				<button
 					type="button"
 					onClick={onToggleCollapse}
-					className="hidden md:flex ml-auto text-slate-500 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10"
+					className="hidden md:flex ml-auto text-ink-faint hover:text-ink transition-colors p-1 rounded-lg hover:bg-slate-100"
 					aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
 					title={collapsed ? "Expandir menu" : "Recolher menu"}
 				>
-					{collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+					{collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
 				</button>
 			</div>
 
@@ -116,12 +116,12 @@ export const Sidebar = ({
 									type="button"
 									onClick={() => alternarGrupo(group)}
 									aria-expanded={aberto}
-									className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-2xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-colors"
+									className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-2xs font-bold uppercase tracking-widest text-ink-faint hover:text-ink-muted transition-colors"
 								>
 									<ChevronDown className={`w-3 h-3 transition-transform ${aberto ? "" : "-rotate-90"}`} />
 									<span className="flex-1 text-left">{group}</span>
 									{!aberto && soma > 0 && (
-										<span className="num text-2xs font-bold px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-200">{soma}</span>
+										<span className="num text-2xs font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-ink-muted">{soma}</span>
 									)}
 								</button>
 							)}
@@ -137,17 +137,17 @@ export const Sidebar = ({
 												title={isCollapsed ? item.label : undefined}
 												aria-label={isCollapsed ? item.label : undefined}
 												aria-current={isActive ? "page" : undefined}
-												className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-full text-sm font-medium transition-all duration-150 group ${
+												className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all duration-150 group ${
 													isCollapsed ? "justify-center" : ""
 												} ${
 													isActive
-														? "bg-slate-950 text-white shadow-lg shadow-black/30"
-														: "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+														? "bg-primary-50 text-primary-700"
+														: "text-ink-muted hover:bg-slate-50 hover:text-ink"
 												}`}
 											>
 												<item.icon
-													className={`w-[17px] h-[17px] flex-shrink-0 ${
-														isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"
+													className={`w-[16px] h-[16px] flex-shrink-0 ${
+														isActive ? "text-primary-600" : "text-ink-faint group-hover:text-ink-muted"
 													}`}
 												/>
 												{!isCollapsed && (
@@ -166,30 +166,30 @@ export const Sidebar = ({
 				})}
 			</nav>
 
-			<div className="px-3 py-3 border-t border-slate-800/60">
-				<div className={`flex items-center gap-3 mb-2 ${isCollapsed ? "justify-center" : ""}`}>
+			<div className="px-3 py-3 border-t border-slate-100">
+				<div className={`flex items-center gap-2.5 mb-2 ${isCollapsed ? "justify-center" : ""}`}>
 					{user.picture ? (
 						<img
 							src={user.picture}
 							alt={user.name}
-							className="w-9 h-9 rounded-full border-2 border-slate-700/80 object-cover ring-2 ring-slate-800 flex-shrink-0"
+							className="w-8 h-8 rounded-full border border-slate-200 object-cover flex-shrink-0"
 						/>
 					) : (
-						<div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+						<div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center text-white text-2xs font-bold flex-shrink-0">
 							{user.name?.charAt(0)}
 						</div>
 					)}
 					{!isCollapsed && (
 						<div className="flex-1 min-w-0">
-							<p className="text-xs font-semibold text-slate-300 truncate">{user.name}</p>
-							<p className="text-2xs text-slate-500 truncate">{user.email}</p>
+							<p className="text-xs font-semibold text-ink truncate">{user.name}</p>
+							<p className="text-2xs text-ink-faint truncate">{user.email}</p>
 						</div>
 					)}
 				</div>
 				<button
 					type="button"
 					onClick={onLogout}
-					className={`w-full flex items-center gap-2 text-xs text-slate-500 hover:text-danger-500 transition-colors px-3 py-2 rounded-lg hover:bg-danger-500/10 ${
+					className={`w-full flex items-center gap-2 text-xs font-medium text-ink-faint hover:text-danger-600 transition-colors px-3 py-2 rounded-lg hover:bg-danger-50 ${
 						isCollapsed ? "justify-center" : ""
 					}`}
 					aria-label="Sair"
