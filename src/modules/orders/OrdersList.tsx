@@ -123,14 +123,16 @@ export const OrdersList = ({
 	const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
 
 	return (
-		// `lg:h-[calc(100dvh-2rem)]` trava a página inteira (estatísticas, filtros,
+		// `lg:h-[calc(100dvh-8.5rem)]` trava a página inteira (estatísticas, filtros,
 		// abas de pagamento/NF) numa altura amarrada à viewport — mesma técnica do
-		// formulário de ordem (ver OrderFormPage). Só a área da tabela abaixo tem
-		// `flex-1 min-h-0`, então é ela quem sobra de altura e rola por conta
-		// própria; o resto fica sempre visível, sem precisar rolar a página para
-		// alcançar a paginação. Abaixo de `lg` nada disto atua: a página volta a
-		// rolar inteira, como em qualquer lista mobile.
-		<div className='flex flex-col gap-3 lg:h-[calc(100dvh_-_2rem)] lg:sticky lg:top-4 lg:min-h-0'>
+		// formulário de ordem (ver OrderFormPage, com a mesma conta de 8.5rem =
+		// Topbar 56px + padding vertical do <main> 64px + top-4 do sticky 16px).
+		// Só a área da tabela abaixo tem `flex-1 min-h-0`, então é ela quem sobra
+		// de altura e rola por conta própria; o resto fica sempre visível, sem
+		// precisar rolar a página para alcançar a paginação. Abaixo de `lg` nada
+		// disto atua: a página volta a rolar inteira, como em qualquer lista
+		// mobile.
+		<div className='flex flex-col gap-3 lg:h-[calc(100dvh_-_8.5rem)] lg:sticky lg:top-4 lg:min-h-0'>
 			{/* 1. FAIXA DE ESTATÍSTICAS — pills compactas numa única linha, no lugar
 			    dos 4 cartões altos com sparkline: a lista de ordens ganha espaço
 			    vertical logo abaixo, que era o ponto principal do pedido. */}
