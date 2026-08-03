@@ -162,8 +162,10 @@ export const OrderModule = ({
 
 	const filteredOrders = useMemo(() => {
 		return orders.filter((o) => {
-			// Extrai YYYY-MM-DD direto da string armazenada (hora local, sem converter para UTC)
-			const orderDateString = o.data ? o.data.split("T")[0] : "";
+			// Data efetiva: se PAGO, a data do pagamento; senão, a de criação.
+			// Extrai YYYY-MM-DD direto da string (hora local, sem converter para UTC).
+			const effective = Utils.effectiveOrderDate(o);
+			const orderDateString = effective ? effective.split("T")[0] : "";
 			if (filterStart && orderDateString < filterStart) return false;
 			if (filterEnd && orderDateString > filterEnd) return false;
 			if (filterClient !== 0 && o.cliente_id !== filterClient) return false;
@@ -306,6 +308,13 @@ export const OrderModule = ({
 			const finalUpdates = { ...updates };
 			if (updates.status === "CONCLUIDA" && order.status !== "CONCLUIDA") {
 				finalUpdates.data_conclusao = Utils.localIsoNow();
+			}
+			// Idem para data_pagamento: só grava ao ENTRAR em PAGO; ao sair,
+			// limpa para não reaproveitar uma data velha num pagamento futuro.
+			if (updates.status_pagamento === "PAGO" && order.status_pagamento !== "PAGO") {
+				finalUpdates.data_pagamento = Utils.localIsoNow();
+			} else if (updates.status_pagamento && updates.status_pagamento !== "PAGO" && order.status_pagamento === "PAGO") {
+				finalUpdates.data_pagamento = undefined;
 			}
 			const res = await api.put(`/orders/${order.id}`, {
 				...order,
