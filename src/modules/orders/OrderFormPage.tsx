@@ -323,10 +323,19 @@ export const OrderFormPage = ({
 		dataPayload.append("descricao", formData.descricao || "");
 		dataPayload.append("total", String(total));
 		dataPayload.append("status", editingOrder ? editingOrder.status : "ABERTA");
-		dataPayload.append(
-			"status_pagamento",
-			formData.status_pagamento || "NAO_PAGO"
-		);
+		const novoStatusPagamento = formData.status_pagamento || "NAO_PAGO";
+		dataPayload.append("status_pagamento", novoStatusPagamento);
+		// Data de pagamento: só relevante ao EDITAR uma ordem existente que está
+		// transicionando de/para PAGO pelo formulário completo. Ordem nova PAGO
+		// já é resolvida pelo backend (data_pagamento = data de criação).
+		if (editingOrder) {
+			const pagamentoAnterior = editingOrder.status_pagamento;
+			if (novoStatusPagamento === "PAGO" && pagamentoAnterior !== "PAGO") {
+				dataPayload.append("data_pagamento", Utils.localIsoNow());
+			} else if (novoStatusPagamento !== "PAGO" && pagamentoAnterior === "PAGO") {
+				dataPayload.append("data_pagamento", "");
+			}
+		}
 		dataPayload.append("forma_pagamento", formData.forma_pagamento || "");
 		dataPayload.append("taxa_extra", String(formData.taxa_extra || 0));
 		dataPayload.append("nota_fiscal", String(formData.nota_fiscal || false));
