@@ -24,18 +24,14 @@ export const PageLoader = ({
 	<div
 		role="status"
 		aria-live="polite"
-		className={`flex flex-col items-center justify-center gap-4 min-h-[55vh] py-16 animate-fade-in ${className}`}
+		className={`flex flex-col items-center justify-center gap-3 min-h-[55vh] py-16 animate-fade-in ${className}`}
 	>
-		<div className="relative w-11 h-11" aria-hidden="true">
-			<div className="absolute inset-0 rounded-full border-[3px] border-primary-100" />
-			{/* motion-reduce: quem pediu menos movimento fica com o anel parado —
-			    o texto abaixo continua dizendo que há carregamento em curso. */}
-			<div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-primary-600 animate-spin motion-reduce:animate-none" />
-			<div
-				className="absolute inset-1.5 rounded-full border-[3px] border-transparent border-b-primary-300 animate-spin motion-reduce:animate-none"
-				style={{ animationDirection: "reverse", animationDuration: "1.1s" }}
-			/>
-		</div>
+		<img
+			src="https://cdn.dribbble.com/userupload/19598405/file/original-9c9f2804bc469c3e8e86e2fad65f495d.gif"
+			alt=""
+			aria-hidden="true"
+			className="w-20 h-20 object-contain motion-reduce:hidden"
+		/>
 		<div className="text-center px-6">
 			<p className="text-sm font-semibold text-ink">{message}</p>
 			{hint && <p className="text-2xs text-ink-faint mt-1">{hint}</p>}

@@ -154,11 +154,18 @@ export const OrdersList = ({
 	const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
 
 	return (
-		<>
+		// `lg:h-[calc(100dvh-2rem)]` trava a página inteira (estatísticas, filtros,
+		// abas de pagamento/NF) numa altura amarrada à viewport — mesma técnica do
+		// formulário de ordem (ver OrderFormPage). Só a área da tabela abaixo tem
+		// `flex-1 min-h-0`, então é ela quem sobra de altura e rola por conta
+		// própria; o resto fica sempre visível, sem precisar rolar a página para
+		// alcançar a paginação. Abaixo de `lg` nada disto atua: a página volta a
+		// rolar inteira, como em qualquer lista mobile.
+		<div className='flex flex-col gap-3 lg:h-[calc(100dvh_-_2rem)] lg:sticky lg:top-4 lg:min-h-0'>
 			{/* 1. FAIXA DE ESTATÍSTICAS — pills compactas numa única linha, no lugar
 			    dos 4 cartões altos com sparkline: a lista de ordens ganha espaço
 			    vertical logo abaixo, que era o ponto principal do pedido. */}
-			<div className='bg-white border border-slate-200/70 rounded-2xl shadow-card px-4 sm:px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-3'>
+			<div className='flex-shrink-0 bg-white border border-slate-200/70 rounded-2xl shadow-card px-4 sm:px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-3'>
 				{[
 					{ label: "Total de ordens", value: summary.totalOrders, trend: summary.variationTotal, icon: BarChart2, accent: "bg-primary-50 text-primary-600" },
 					{ label: "Abertas", value: summary.openOrdersSnapshot, trend: summary.variationOpen, icon: Clock, accent: "bg-info-50 text-info-600" },
@@ -188,10 +195,11 @@ export const OrdersList = ({
 				</div>
 			</div>
 
-			{/* 2. FILTROS + AÇÕES — tudo numa faixa só: período, serviços, cliente,
-			    status/pagamento/NF como dropdowns compactos (no lugar das três
-			    fileiras de abas coloridas) e as ações à direita. */}
-			<div className='bg-white p-3 rounded-xl border border-slate-200/70 shadow-card flex flex-wrap items-center gap-2'>
+			{/* 2. FILTROS + AÇÕES — período, serviços, cliente e status (dropdown
+			    compacto) numa faixa só, com as ações à direita. Pagamento e Nota
+			    Fiscal ficam de fora daqui: voltaram a ser as abas coloridas logo
+			    acima da tabela (bloco 3), como eram antes do ajuste anterior. */}
+			<div className='flex-shrink-0 bg-white p-3 rounded-xl border border-slate-200/70 shadow-card flex flex-wrap items-center gap-2'>
 				<div className='flex items-center gap-2 border border-slate-200 rounded-[10px] px-2.5 h-8 bg-white hover:border-slate-300 transition-colors w-full sm:w-auto'>
 					<Calendar className='w-3.5 h-3.5 text-ink-faint flex-shrink-0' />
 					<input
@@ -236,26 +244,6 @@ export const OrdersList = ({
 					<option value='CONCLUIDA'>Concluídas ({orders.filter((o) => o.status === "CONCLUIDA").length})</option>
 					<option value='CANCELADA'>Canceladas ({orders.filter((o) => o.status === "CANCELADA").length})</option>
 				</Select>
-				<Select
-					className='!w-auto'
-					value={filterPaymentStatus}
-					onChange={(e) => setFilterPaymentStatus(e.target.value as any)}
-				>
-					<option value='TODOS'>Pagamento: Todos</option>
-					<option value='PAGO'>Pagas</option>
-					<option value='NAO_PAGO'>Não pagas</option>
-					<option value='PARCIAL'>Parcial</option>
-				</Select>
-				<Select
-					className='!w-auto'
-					value={filterNF}
-					onChange={(e) => setFilterNF(e.target.value as any)}
-				>
-					<option value='TODOS'>NF: Todas</option>
-					<option value='COM_NF'>Com NF</option>
-					<option value='SEM_NF'>Sem NF</option>
-				</Select>
-
 				<div className='flex items-center gap-2 sm:ml-auto'>
 					<button
 						onClick={onRefresh}
@@ -287,16 +275,58 @@ export const OrdersList = ({
 				</div>
 			</div>
 
-			{/* 4. TABELA */}
-			<div className='space-y-2'>
+			{/* 3. ABAS DE PAGAMENTO (esquerda) + NOTA FISCAL (direita) — mesmo efeito
+			    visual (cor sólida quando ativa) e posição de antes do ajuste que
+			    tinha convertido os dois em dropdowns. */}
+			<div className='flex-shrink-0 flex flex-col sm:flex-row justify-between items-center gap-2 border-b border-slate-200 pb-1'>
+				<div className='flex gap-1 overflow-x-auto w-full sm:w-auto pb-1'>
+					{[
+						{ key: "TODOS", label: "Todas" },
+						{ key: "PAGO", label: "Pagas" },
+						{ key: "NAO_PAGO", label: "Não Pagas" },
+						{ key: "PARCIAL", label: "Parcial" },
+					].map((tab) => (
+						<button
+							key={tab.key}
+							onClick={() => setFilterPaymentStatus(tab.key as any)}
+							className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-all ${
+								filterPaymentStatus === tab.key
+									? "border-b-2 border-primary-600 text-primary-600 bg-primary-50/50"
+									: "text-ink-faint hover:text-ink-muted hover:bg-slate-50"
+							}`}
+						>
+							{tab.label}
+						</button>
+					))}
+				</div>
+				{/* Filtro NF */}
+				<div className='flex items-center gap-1.5'>
+					{[
+						{ key: "TODOS", label: "NF: Todas" },
+						{ key: "COM_NF", label: "Com NF" },
+						{ key: "SEM_NF", label: "Sem NF" },
+					].map((tab) => (
+						<button
+							key={tab.key}
+							onClick={() => setFilterNF(tab.key as any)}
+							className={`px-3 py-1.5 text-2xs font-bold rounded-lg transition-all ${
+								filterNF === tab.key
+									? "bg-primary-600 text-white shadow-sm"
+									: "text-ink-faint hover:text-ink-muted bg-slate-100 hover:bg-slate-200"
+							}`}
+						>
+							{tab.label}
+						</button>
+					))}
+				</div>
+			</div>
+
+			{/* 4. TABELA — única área que cresce/rola dentro da caixa travada. */}
+			<div className='flex-1 min-h-0 flex flex-col gap-2'>
 				<DataTable
+					className='lg:flex-1 lg:min-h-0'
 					isEmpty={paginatedOrders.length === 0}
 					emptyTitle='Nenhuma ordem no período e filtros selecionados'
-					// Piso de 420px: em telas curtas (celular, notebook 768px)
-					// `100vh - 420px` deixava a janela da tabela com ~250px, bem
-					// menos do que a lista ocupava antes, quando crescia com a
-					// página. O teto por viewport continua valendo no desktop.
-					maxHeight='max(420px, calc(100vh - 420px))'
 				>
 					<TableHead>
 						<tr>
@@ -327,8 +357,9 @@ export const OrdersList = ({
 					</tbody>
 				</DataTable>
 				{/* Paginação + contagem de linhas — fora da casca da tabela, que
-				    agora rola por conta própria. */}
-				<div className='flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-white border border-slate-200/70 rounded-2xl shadow-card'>
+				    agora rola por conta própria. `flex-shrink-0`: dentro da caixa
+				    travada (lg+) fica sempre visível, nunca é empurrada pra fora. */}
+				<div className='flex-shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-white border border-slate-200/70 rounded-2xl shadow-card'>
 					<div className='flex items-center gap-3 text-xs text-slate-500'>
 						<span className='font-semibold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg border border-indigo-100'>
 							{filteredOrders.length} {filteredOrders.length === 1 ? 'ordem' : 'ordens'}
@@ -391,6 +422,6 @@ export const OrdersList = ({
 					)}
 				</div>
 			</div>
-		</>
+		</div>
 	);
 };

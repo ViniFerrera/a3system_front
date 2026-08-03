@@ -35,13 +35,18 @@ export const LoadingProvider = ({ children }: { children: React.ReactNode }) => 
 		<LoadingContext.Provider value={value}>
 			{children}
 			{visible && (
-				<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in">
-					<div className="bg-white rounded-2xl shadow-elevated px-8 py-6 flex flex-col items-center gap-4 min-w-[220px] animate-scale-in">
-						<div className="relative">
-							<div className="w-10 h-10 rounded-full border-[3px] border-indigo-100 border-t-indigo-600 animate-spin" />
-							<div className="absolute inset-0 w-10 h-10 rounded-full border-[3px] border-transparent border-b-violet-400 animate-spin" style={{ animationDirection: "reverse", animationDuration: "0.8s" }} />
-						</div>
-						<p className="text-sm font-semibold text-slate-700 text-center">{message}</p>
+				<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/10 backdrop-blur-[2px] animate-fade-in">
+					{/* Sem cartão branco por trás: o pedido era o GIF com fundo
+					    transparente, não uma caixa opaca ao redor dele. */}
+					<div className="flex flex-col items-center gap-3 animate-scale-in">
+						<img
+							src="https://cdn.dribbble.com/userupload/19598405/file/original-9c9f2804bc469c3e8e86e2fad65f495d.gif"
+							alt="Carregando"
+							className="w-20 h-20 sm:w-24 sm:h-24 object-contain"
+						/>
+						<p className="text-sm font-semibold text-ink bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full shadow-sm">
+							{message}
+						</p>
 					</div>
 				</div>
 			)}

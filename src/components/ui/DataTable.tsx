@@ -22,7 +22,14 @@ export const DataTable = ({
 	maxHeight?: string;
 	className?: string;
 }) => (
-	<div className={`bg-white border border-slate-200/70 rounded-2xl shadow-card overflow-hidden ${className}`}>
+	// `flex flex-col`: quando o chamador passa `lg:flex-1 lg:min-h-0` no
+	// `className` (ver OrdersList), é este flex column que deixa a área rolável
+	// abaixo esticar até preencher a altura disponível em vez de crescer com o
+	// conteúdo. Sem `min-h-0` num container flex-1, a coluna que rola nunca
+	// encolhe abaixo do próprio conteúdo — e o `overflow-y-auto` não entra em
+	// ação. Para quem não passa essas classes (a maioria dos usos), o
+	// comportamento continua idêntico ao de antes.
+	<div className={`bg-white border border-slate-200/70 rounded-2xl shadow-card overflow-hidden flex flex-col ${className}`}>
 		{isLoading ? (
 			<div className="p-4 space-y-2">
 				{Array.from({ length: 6 }).map((_, i) => (
@@ -33,7 +40,7 @@ export const DataTable = ({
 			<EmptyState icon={emptyIcon} title={emptyTitle} description={emptyDescription} />
 		) : (
 			<div
-				className="overflow-x-auto overflow-y-auto custom-scrollbar scroll-shadow-x"
+				className="flex-1 min-h-0 overflow-x-auto overflow-y-auto custom-scrollbar scroll-shadow-x"
 				style={maxHeight ? { maxHeight } : undefined}
 			>
 				<table className="w-full text-sm border-collapse">{children}</table>

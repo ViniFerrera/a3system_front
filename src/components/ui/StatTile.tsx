@@ -1,31 +1,13 @@
 import React from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
-/** Sparkline em SVG inline — evita montar um gráfico Recharts por tile. */
-const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
-	if (!data || data.length < 2) return null;
-	const max = Math.max(...data);
-	const min = Math.min(...data);
-	const span = max - min || 1;
-	const points = data
-		.map((v, i) => `${(i / (data.length - 1)) * 100},${28 - ((v - min) / span) * 26}`)
-		.join(" ");
-	return (
-		<svg viewBox="0 0 100 28" preserveAspectRatio="none" className="w-full h-7 mt-2">
-			<polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-		</svg>
-	);
-};
-
 export const StatTile = ({
 	label,
 	value,
 	sub,
 	icon,
 	accent = "from-primary-500 to-violet-600",
-	sparkColor = "#6366f1",
 	trend,
-	spark,
 }: {
 	label: string;
 	value: string;
@@ -33,10 +15,8 @@ export const StatTile = ({
 	icon?: React.ReactNode;
 	/** Gradiente da linha de acento no topo do card. */
 	accent?: string;
-	sparkColor?: string;
 	/** Variação percentual vs. período anterior. */
 	trend?: number;
-	spark?: number[];
 }) => (
 	<div className="relative bg-white border border-slate-200/70 rounded-2xl shadow-card hover:shadow-card-hover transition-shadow duration-200 p-4 overflow-hidden">
 		<div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accent}`} />
@@ -60,6 +40,5 @@ export const StatTile = ({
 			)}
 			{sub && <span className="text-2xs text-ink-faint truncate">{sub}</span>}
 		</div>
-		{spark && <Sparkline data={spark} color={sparkColor} />}
 	</div>
 );
