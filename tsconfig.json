@@ -15,8 +15,7 @@
 		"noUnusedLocals": false,
 		"noUnusedParameters": false,
 		"noFallthroughCasesInSwitch": true,
-		"baseUrl": "./src",
-		"paths": { "@/*": ["./*"] }
+		"paths": { "@/*": ["./src/*"] }
 	},
 	"include": ["src", "../backend/src/ai.ts"],
 	"references": [{ "path": "./tsconfig.node.json" }]
