@@ -23,16 +23,6 @@ type OrderStatusFilter = "CONCLUIDA" | "ABERTA" | "CANCELADA" | "ALL";
 type PeriodPreset = "30d" | "3m" | "6m" | "12m" | "custom";
 type BottomPeriod = "7d" | "30d" | "3m" | "6m";
 
-const paymentLabel: Record<string, string> = {
-	PAGO: "Pago", PARCIAL: "Parcial", NAO_PAGO: "Não Pago",
-};
-
-const paymentBadge: Record<string, string> = {
-	PAGO: "bg-emerald-100 text-emerald-700",
-	PARCIAL: "bg-amber-100 text-amber-700",
-	NAO_PAGO: "bg-red-100 text-red-600",
-};
-
 const CustomTooltip = ({ active, payload, label }: any) => {
 	if (!active || !payload?.length) return null;
 	return (
@@ -85,9 +75,8 @@ export const DashboardModule = ({
 	const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string[]>([]);
 	const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("ALL");
 
-	// ── Filtro inferior (gráficos + tabela OS abertas) ───────────────────────
+	// ── Filtro inferior (gráficos) ────────────────────────────────────────────
 	const [bottomPeriod, setBottomPeriod] = useState<BottomPeriod>("30d");
-	const [expandedDashOrder, setExpandedDashOrder] = useState<number | null>(null);
 	const bottomDates = useMemo(() => periodToDates(bottomPeriod), [bottomPeriod]);
 
 	// Quando preset muda, atualiza as datas
@@ -211,9 +200,9 @@ export const DashboardModule = ({
 		return { revenue, expense, profit, margin, ticket, toReceive, revTrend, volTrend, ticketTrend };
 	}, [currentOrders, currentExpenses, prevRevenue, prevOrders, orders, startDate, endDate, orderStatusFilter, selectedServices]);
 
-	// ── Gráfico Mensal — fábrica reaproveitada por dois recortes de tempo:
-	// o do filtro superior (`monthlyData`, base dos KPIs/sparklines) e o fixo
-	// de 12 meses do card "Fluxo de Caixa Mensal" (`historicoData`, abaixo). ──
+	// ── Gráfico Mensal — fábrica reaproveitada pelos recortes fixos abaixo:
+	// 12 meses para o "Fluxo de Caixa Mensal" (`historicoData`) e 6 meses para
+	// o "Volume × Receita" ao lado (`historico6mData`). ──
 	const buildMonthlyData = useCallback((start: string, end: string) => {
 		const months = new Map<string, { name: string; receita_concluida: number; receita_aberta: number; despesa: number; lucro: number; volume: number }>();
 		let curr = new Date(new Date(start).getFullYear(), new Date(start).getMonth(), 1);
@@ -253,11 +242,6 @@ export const DashboardModule = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [orders, expenses, selectedServices, selectedPaymentStatus, orderStatusFilter]);
 
-	const monthlyData = useMemo(
-		() => buildMonthlyData(startDate, endDate),
-		[buildMonthlyData, startDate, endDate]
-	);
-
 	// Recorte fixo dos últimos 12 meses, calculado uma vez (não depende do
 	// filtro de período acima) — é o que trava o card "Fluxo de Caixa Mensal"
 	// num histórico estável mesmo com o padrão de tela mudado para 30 dias.
@@ -278,16 +262,6 @@ export const DashboardModule = ({
 	const volumeReceita6mData = useMemo(
 		() => historico6mData.map((m) => ({ name: m.name, receita: m.receita_concluida + m.receita_aberta, volume: m.volume })),
 		[historico6mData]
-	);
-
-	// ── Volume × Receita (mesmo recorte do gráfico mensal) ───────────────────
-	const volumeReceitaData = useMemo(
-		() => monthlyData.map((m) => ({
-			name: m.name,
-			receita: m.receita_concluida + m.receita_aberta,
-			volume: m.volume,
-		})),
-		[monthlyData]
 	);
 
 	// ── Dados do filtro inferior ──────────────────────────────────────────────
@@ -365,16 +339,6 @@ export const DashboardModule = ({
 		[topServices]
 	);
 
-	const topClients = useMemo(() => {
-		const map = new Map<string, { volume: number; revenue: number }>();
-		currentOrders.forEach((o) => {
-			const cur = map.get(o.cliente_nome) || { volume: 0, revenue: 0 };
-			map.set(o.cliente_nome, { volume: cur.volume + 1, revenue: cur.revenue + calcOrderTotal(o) });
-		});
-		return Array.from(map.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue).slice(0, 7);
-	}, [currentOrders]);
-	const maxClientRevenue = topClients[0]?.revenue || 1;
-
 	// ── Alertas ───────────────────────────────────────────────────────────────
 	const stockAlerts = useMemo(() => stock.filter((s) => (s.saldo || 0) <= (s.minimo || 0)), [stock]);
 	const upcomingExpenses = useMemo(() => {
@@ -383,13 +347,6 @@ export const DashboardModule = ({
 		return expenses.filter((e) => e.status === "PENDENTE" && new Date(e.vencimento) <= in7)
 			.sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime()).slice(0, 5);
 	}, [expenses]);
-
-	// ── Ordens Abertas (tabela) ───────────────────────────────────────────────
-	const openOrders = useMemo(() =>
-		orders.filter((o) => o.status === "ABERTA")
-			.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
-			.slice(0, 10),
-		[orders]);
 
 	// ── UI helpers ────────────────────────────────────────────────────────────
 	const fmt = Utils.formatCurrency;
@@ -536,11 +493,8 @@ export const DashboardModule = ({
 				<VolumeRevenueChart data={volumeReceita6mData} />
 			</div>
 
-			{/* ── Mix por serviço + Volume × Receita ── */}
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-				<ServiceMixChart data={serviceMix} />
-				<VolumeRevenueChart data={volumeReceitaData} />
-			</div>
+			{/* ── Mix por serviço ── */}
+			<ServiceMixChart data={serviceMix} />
 
 			{/* ── Faixas de ticket + Concentração de clientes ── */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -548,39 +502,8 @@ export const DashboardModule = ({
 				<ConcentrationCard metrics={metrics} />
 			</div>
 
-			{/* ── Retenção + Top Clientes ── */}
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-				<RetentionCard metrics={metrics} />
-
-				<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-6">
-					<h4 className="text-base font-bold text-slate-800">Top Clientes</h4>
-					<p className="text-xs text-slate-400 mt-0.5 mb-4">Ranking por receita</p>
-					{topClients.length > 0 ? (
-						<div className="space-y-3.5">
-							{topClients.map((c, i) => (
-								<div key={c.name} className="flex items-center gap-3">
-									<span className={`text-xs font-bold w-5 text-center flex-shrink-0 ${i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700/70" : "text-slate-300"}`}>{i + 1}</span>
-									<div className="flex-1 min-w-0">
-										<div className="flex items-center justify-between mb-1">
-											<span className="text-xs font-semibold text-slate-700 truncate pr-2">{c.name}</span>
-											{/* Volume ao lado da receita: o ranking passa a mostrar os dois. */}
-											<span className="flex items-baseline gap-2 flex-shrink-0">
-												<span className="num text-2xs text-ink-faint">{c.volume} OS</span>
-												<span className="text-xs font-bold text-slate-800">{fmt(c.revenue)}</span>
-											</span>
-										</div>
-										<div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-											<div className="h-full bg-gradient-to-r from-indigo-400 to-violet-500 rounded-full" style={{ width: `${(c.revenue / maxClientRevenue) * 100}%` }} />
-										</div>
-									</div>
-								</div>
-							))}
-						</div>
-					) : (
-						<div className="h-[220px] flex items-center justify-center text-slate-300 text-sm">Sem dados no período</div>
-					)}
-				</div>
-			</div>
+			{/* ── Retenção ── */}
+			<RetentionCard metrics={metrics} />
 
 			{/* ══ SEÇÃO INFERIOR — filtro próprio ══ */}
 			<div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
@@ -698,99 +621,6 @@ export const DashboardModule = ({
 						)}
 					</div>
 				</div>
-			</div>
-
-			{/* ── Tabela: Últimas Ordens Abertas ── */}
-			<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
-				<div className="flex items-center justify-between mb-3 sm:mb-4">
-					<div>
-						<h4 className="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
-							<Clock className="w-4 h-4 text-blue-500" /> Ordens em Aberto
-						</h4>
-						<p className="text-2xs sm:text-xs text-slate-400 mt-0.5">{openOrders.length} OS pendentes de conclusão</p>
-					</div>
-				</div>
-				{openOrders.length === 0 ? (
-					<div className="flex flex-col items-center justify-center py-8 text-slate-300">
-						<CheckCircle2 className="w-7 h-7 mb-2 text-emerald-300" />
-						<p className="text-sm font-semibold text-emerald-400">Nenhuma ordem em aberto!</p>
-					</div>
-				) : (
-					<div className="overflow-x-auto">
-						<table className="w-full text-sm">
-							<thead>
-								<tr className="border-b border-slate-200/60">
-									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">#OS</th>
-									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Cliente</th>
-									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden md:table-cell">Data</th>
-									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4 hidden lg:table-cell">Serviços</th>
-									<th className="text-left text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5 pr-4">Pagamento</th>
-									<th className="text-right text-2xs font-bold text-slate-500 uppercase tracking-wide pb-2.5">Valor</th>
-								</tr>
-							</thead>
-							<tbody className="divide-y divide-slate-50">
-								{openOrders.map((o) => {
-									const isExp = expandedDashOrder === o.id;
-									const safeClient = o.cliente_nome.replace(/[<>:"/\\|?*]/g, "").trim().replace(/\s+/g, "_");
-									const dateStr = o.data ? o.data.split("T")[0] : "";
-									const fmtDate = (() => { const d = new Date(o.data); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")} - ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; })();
-									return (
-										<React.Fragment key={o.id}>
-											<tr className={`hover:bg-slate-50/50 transition-colors cursor-pointer ${isExp ? "bg-indigo-50/40" : ""}`} onClick={() => setExpandedDashOrder(isExp ? null : o.id!)}>
-												<td className="py-2.5 pr-4 font-bold text-indigo-600 text-xs">#{o.id}</td>
-												<td className="py-2.5 pr-4">
-													<span className="font-semibold text-slate-700 text-xs truncate max-w-[150px] block">{o.cliente_nome}</span>
-												</td>
-												<td className="py-2.5 pr-4 text-xs text-slate-400 hidden md:table-cell">{fmtDate}</td>
-												<td className="py-2.5 pr-4 hidden lg:table-cell">
-													<span className="text-xs text-slate-500 truncate max-w-[180px] block">
-														{o.items.map((i) => i.servico).filter((v, i, a) => a.indexOf(v) === i).join(", ") || "—"}
-													</span>
-												</td>
-												<td className="py-2.5 pr-4">
-													<span className={`inline-block text-2xs font-bold px-2 py-0.5 rounded-full ${paymentBadge[o.status_pagamento || "NAO_PAGO"]}`}>
-														{paymentLabel[o.status_pagamento || "NAO_PAGO"]}
-													</span>
-												</td>
-												<td className="py-2.5 text-right font-bold text-slate-800 text-xs">{fmt(o.total)}</td>
-											</tr>
-											{isExp && (
-												<tr className="bg-slate-50/70">
-													<td colSpan={6} className="px-4 py-3">
-														<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
-															<div className="space-y-1.5">
-																<p className="font-bold text-slate-600 text-2xs uppercase tracking-wide mb-1">Itens do Pedido</p>
-																{o.items.map((item, idx) => (
-																	<div key={idx} className="flex justify-between bg-white p-2 rounded-lg border border-slate-100">
-																		<span className="text-slate-600"><strong className="text-indigo-600">{item.quantidade}x</strong> {item.servico} - {item.material}</span>
-																		<span className="font-bold text-slate-700">{fmt(item.total)}</span>
-																	</div>
-																))}
-																{o.descricao && <p className="text-slate-500 italic mt-2">{o.descricao}</p>}
-															</div>
-															<div className="space-y-2">
-																<div className="bg-white p-3 rounded-lg border border-slate-100 space-y-1.5">
-																	<p className="font-bold text-slate-600 text-2xs uppercase tracking-wide">Financeiro</p>
-																	<div className="flex justify-between"><span className="text-slate-500">Forma:</span><span className="font-bold">{o.forma_pagamento || "N/D"}</span></div>
-																	<div className="flex justify-between"><span className="text-slate-500">Total:</span><span className="font-bold text-indigo-600">{fmt(o.total)}</span></div>
-																	<div className="flex justify-between"><span className="text-slate-500">Pagamento:</span><span className={`font-bold ${paymentBadge[o.status_pagamento || "NAO_PAGO"]} px-2 py-0.5 rounded-full text-2xs`}>{paymentLabel[o.status_pagamento || "NAO_PAGO"]}</span></div>
-																</div>
-																<div className="bg-white p-3 rounded-lg border border-slate-100">
-																	<p className="font-bold text-slate-600 text-2xs uppercase tracking-wide mb-1">Pasta OneDrive</p>
-																	<p className="text-slate-500 font-mono text-2xs break-all bg-slate-50 p-2 rounded border border-slate-200">01_A3_Art_Copy/Ordens/{dateStr}/OS{o.id}_{safeClient}</p>
-																</div>
-															</div>
-														</div>
-													</td>
-												</tr>
-											)}
-										</React.Fragment>
-									);
-								})}
-							</tbody>
-						</table>
-					</div>
-				)}
 			</div>
 
 		</div>
