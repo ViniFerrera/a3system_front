@@ -107,5 +107,13 @@ export const Utils = {
         const d = new Date();
         const pad = (n: number) => String(n).padStart(2, '0');
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    }
+    },
+    /**
+     * Data efetiva de receita: quando o pedido está PAGO, é a data em que foi
+     * pago; senão, é a data de criação. Usada em todo cálculo/filtro de
+     * receita por período (Dashboard, aba Ordens, Nota Fiscal, DRE) — nunca a
+     * data de conclusão, que é sobre execução, não sobre dinheiro.
+     */
+    effectiveOrderDate: (o: { status_pagamento?: string; data_pagamento?: string; data: string }) =>
+        o.status_pagamento === 'PAGO' && o.data_pagamento ? o.data_pagamento : o.data,
 };
