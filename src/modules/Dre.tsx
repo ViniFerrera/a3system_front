@@ -63,7 +63,8 @@ export const DreModule = ({
 	const availableYears = useMemo(() => {
 		const years = new Set<number>();
 		orders.forEach((o) => {
-			if (o.data) years.add(parseInt(o.data.slice(0, 4)));
+			const efetiva = Utils.effectiveOrderDate(o);
+			if (efetiva) years.add(parseInt(efetiva.slice(0, 4)));
 		});
 		expenses.forEach((e) => {
 			if (e.vencimento) years.add(parseInt(e.vencimento.slice(0, 4)));
@@ -81,7 +82,7 @@ export const DreModule = ({
 	}, [selectedYear, selectedMonth]);
 
 	const filteredOrders = useMemo(
-		() => orders.filter((o) => o.data?.startsWith(periodPrefix)),
+		() => orders.filter((o) => Utils.effectiveOrderDate(o)?.startsWith(periodPrefix)),
 		[orders, periodPrefix]
 	);
 
@@ -163,9 +164,9 @@ export const DreModule = ({
 
 		// Receita (ordens válidas)
 		orders
-			.filter((o) => o.data?.startsWith(`${selectedYear}`) && o.status !== "CANCELADA")
+			.filter((o) => Utils.effectiveOrderDate(o)?.startsWith(`${selectedYear}`) && o.status !== "CANCELADA")
 			.forEach((o) => {
-				const key = o.data.slice(0, 7);
+				const key = Utils.effectiveOrderDate(o).slice(0, 7);
 				if (months[key]) months[key].receita += o.total || 0;
 			});
 
