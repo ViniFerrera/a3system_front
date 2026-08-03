@@ -81,12 +81,13 @@ export const NotaFiscalModule: React.FC<Props> = ({ orders, quickAction }) => {
 		}
 	}, [quickAction?.nonce]);
 
-	// Preview: ordens com NF paga no mês selecionado
+	// Preview: ordens com NF paga no mês selecionado — mês em que foi PAGA,
+	// não em que foi criada (consistente com a rota que gera o PDF).
 	const preview = useMemo(() => {
 		return orders.filter((o) => {
 			const isNf = o.nota_fiscal === true || (o.nota_fiscal as any) === "true";
 			const isPago = o.status_pagamento === "PAGO";
-			const orderMonth = (o.data || "").slice(0, 7);
+			const orderMonth = (o.data_pagamento || o.data || "").slice(0, 7);
 			return isNf && isPago && orderMonth === selectedMonth;
 		});
 	}, [orders, selectedMonth]);
@@ -275,7 +276,7 @@ export const NotaFiscalModule: React.FC<Props> = ({ orders, quickAction }) => {
 									<tr key={o.id} className="border-b border-slate-100 hover:bg-surface-sunken">
 										<td className="num py-2 px-3 font-medium text-primary-600">#{o.id}</td>
 										<td className="num py-2 px-3 text-ink-muted">
-											{(o.data || "").slice(0, 10).split("-").reverse().join("/")}
+											{(o.data_pagamento || o.data || "").slice(0, 10).split("-").reverse().join("/")}
 										</td>
 										<td className="py-2 px-3 text-ink">{o.cliente_nome}</td>
 										<td className="num py-2 px-3 text-right font-medium text-ink">
