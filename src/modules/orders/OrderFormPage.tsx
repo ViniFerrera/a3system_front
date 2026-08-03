@@ -500,24 +500,24 @@ export const OrderFormPage = ({
 	const rotulo = "block text-2xs font-bold text-ink-muted uppercase tracking-wide mb-1.5";
 
 	return (
-		// `lg:h-[calc(100dvh-8.5rem)]` trava a caixa inteira (cabeçalho + trilha +
-		// formulário + rodapé) numa altura amarrada à viewport, não ao conteúdo —
-		// só assim a coluna do formulário abaixo tem uma altura definida para
-		// `overflow-y-auto` valer e o resto (trilha, rodapé) parar de se mexer.
-		// Os 8.5rem (136px) não são um chute: é o que sobra fora desta caixa até
-		// o rodapé da viewport — Topbar (h-14 = 56px) + padding vertical do
-		// <main> (md:p-8 = 32px em cima e embaixo) + o próprio `top-4` (16px) do
-		// sticky abaixo. Uma reserva menor (era 2rem) deixava a caixa mais alta
-		// do que o espaço restante em `main`, e a página inteira ganhava rolagem
-		// pra mostrar o excesso — exatamente o que não queríamos.
+		// `lg:h-[calc(100dvh-6.5rem)]` trava a caixa inteira (cabeçalho + trilha +
+		// formulário + rodapé) numa altura amarrada à viewport. Os 6.5rem (104px)
+		// cobrem só o que fica ACIMA da caixa: Topbar (h-14 = 56px) + padding de
+		// cima do <main> (md:p-8 = 32px) + o `top-4` (16px) do sticky abaixo.
+		// O padding de BAIXO do <main> (outros 32px) não entra na conta — em vez
+		// disso a caixa "sangra" por cima dele com `lg:-mb-8` (mesma ideia da
+		// faixa de baixo, que já sangra os lados com `-mx-4 md:-mx-8`), então o
+		// rodapé de Salvar/Desconto encosta mesmo na borda da tela, sem sobrar
+		// vão embaixo. (Reservar os 32px do padding de baixo TAMBÉM na altura,
+		// sem cancelar o padding, foi o erro da vez passada: sobrava um vão
+		// vazio do tamanho desse padding entre o rodapé e o fim da tela.)
 		// `dvh` em vez de `vh`: acompanha a barra de endereço sumindo no mobile;
 		// e se o navegador não suportar a unidade, o calc() inteiro é descartado
 		// e a caixa volta a crescer com o conteúdo — degrada para o comportamento
-		// de antes, não quebra. `lg:sticky lg:top-4` é o que resta grudado à
-		// viewport nos ~16px de rolagem antes da caixa alcançar essa altura.
-		// Abaixo de `lg` nada disto atua: a página inteira rola como sempre, e a
-		// trilha vira a faixa horizontal de chips (ver ProgressRail).
-		<div className='flex flex-col gap-3 lg:sticky lg:top-4 lg:h-[calc(100dvh_-_8.5rem)]'>
+		// de antes, não quebra. Abaixo de `lg` nada disto atua: a página inteira
+		// rola como sempre, e a trilha vira a faixa horizontal de chips (ver
+		// ProgressRail).
+		<div className='flex flex-col gap-3 lg:sticky lg:top-4 lg:h-[calc(100dvh_-_6.5rem)] lg:-mb-8'>
 			<div className='flex items-center gap-2 flex-shrink-0'>
 				<Button
 					variant='ghost'
