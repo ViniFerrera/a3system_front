@@ -111,8 +111,11 @@ export const Utils = {
     /**
      * Data efetiva de receita: quando o pedido está PAGO, é a data em que foi
      * pago; senão, é a data de criação. Usada em todo cálculo/filtro de
-     * receita por período (Dashboard, aba Ordens, Nota Fiscal, DRE) — nunca a
-     * data de conclusão, que é sobre execução, não sobre dinheiro.
+     * receita por período (Dashboard, aba Ordens, DRE) — nunca a data de
+     * conclusão, que é sobre execução, não sobre dinheiro.
+     * (Nota Fiscal expressa a mesma regra inline — `o.data_pagamento || o.data`
+     * já pré-filtrado por `status_pagamento === "PAGO"` — em vez de chamar
+     * esta função, já que o filtro adjacente torna o segundo check redundante.)
      */
     effectiveOrderDate: (o: { status_pagamento?: string; data_pagamento?: string; data: string }) =>
         o.status_pagamento === 'PAGO' && o.data_pagamento ? o.data_pagamento : o.data,

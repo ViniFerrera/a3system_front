@@ -276,6 +276,8 @@ export const NotaFiscalModule: React.FC<Props> = ({ orders, quickAction }) => {
 									<tr key={o.id} className="border-b border-slate-100 hover:bg-surface-sunken">
 										<td className="num py-2 px-3 font-medium text-primary-600">#{o.id}</td>
 										<td className="num py-2 px-3 text-ink-muted">
+											{/* data_pagamento aqui é seguro pois `preview` (acima) já filtra
+											    isPago — este array nunca contém pedido não pago. */}
 											{(o.data_pagamento || o.data || "").slice(0, 10).split("-").reverse().join("/")}
 										</td>
 										<td className="py-2 px-3 text-ink">{o.cliente_nome}</td>
