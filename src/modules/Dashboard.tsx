@@ -141,7 +141,7 @@ export const DashboardModule = ({
 
 	// ── Dados filtrados (filtro principal) ───────────────────────────────────
 	const currentOrders = useMemo(() => orders.filter((o) =>
-		matchesFilters(o) && filterByDate(o.data_conclusao || o.data, startDate, endDate)
+		matchesFilters(o) && filterByDate(Utils.effectiveOrderDate(o), startDate, endDate)
 	), [orders, startDate, endDate, selectedServices, selectedPaymentStatus, orderStatusFilter]);
 
 	const currentExpenses = useMemo(() =>
@@ -164,7 +164,7 @@ export const DashboardModule = ({
 	// `calcOrderTotal` viram identidade); com filtro, a comparação passa a ser
 	// entre iguais.
 	const prevOrders = useMemo(() => orders.filter((o) =>
-		matchesFilters(o) && filterByDate(o.data_conclusao || o.data, prevRange.start, prevRange.end)
+		matchesFilters(o) && filterByDate(Utils.effectiveOrderDate(o), prevRange.start, prevRange.end)
 	), [orders, prevRange, selectedServices, selectedPaymentStatus, orderStatusFilter]);
 
 	const prevRevenue = useMemo(() =>
@@ -186,7 +186,7 @@ export const DashboardModule = ({
 		const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
 		const ticket = currentOrders.length > 0 ? revenue / currentOrders.length : 0;
 		const toReceive = orders
-			.filter((o) => o.status !== "CANCELADA" && (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(o.data_conclusao || o.data, startDate, endDate) && (o.status_pagamento || "NAO_PAGO") !== "PAGO")
+			.filter((o) => o.status !== "CANCELADA" && (orderStatusFilter === "ALL" || o.status === orderStatusFilter) && filterByDate(Utils.effectiveOrderDate(o), startDate, endDate) && (o.status_pagamento || "NAO_PAGO") !== "PAGO")
 			.reduce((acc, o) => acc + o.total, 0);
 		const revTrend = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : undefined;
 		// Volume e ticket do período anterior, para as variações dos tiles novos.
@@ -217,7 +217,7 @@ export const DashboardModule = ({
 		orders.forEach((o) => {
 			if (o.status === "CANCELADA") return;
 			if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return;
-			const key = (o.data_conclusao || o.data || "").slice(0, 7);
+			const key = (Utils.effectiveOrderDate(o) || "").slice(0, 7);
 			const entry = months.get(key);
 			if (!entry) return;
 			if (selectedPaymentStatus.length > 0 && !selectedPaymentStatus.includes(o.status_pagamento || "NAO_PAGO")) return;
@@ -268,14 +268,14 @@ export const DashboardModule = ({
 	const bottomOrders = useMemo(() => orders.filter((o) => {
 		if (o.status === "CANCELADA") return false;
 		if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return false;
-		return filterByDate(o.data_conclusao || o.data, bottomDates.start, bottomDates.end);
+		return filterByDate(Utils.effectiveOrderDate(o), bottomDates.start, bottomDates.end);
 	}), [orders, bottomDates, orderStatusFilter]);
 
 	// ── Gráfico Diário ────────────────────────────────────────────────────────
 	const dailyData = useMemo(() => {
 		const daysMap = new Map<string, { receita: number; volume: number }>();
 		bottomOrders.forEach((o) => {
-			const key = (o.data_conclusao || o.data || "").slice(0, 10);
+			const key = (Utils.effectiveOrderDate(o) || "").slice(0, 10);
 			const cur = daysMap.get(key) || { receita: 0, volume: 0 };
 			daysMap.set(key, { receita: cur.receita + o.total, volume: cur.volume + 1 });
 		});
@@ -298,7 +298,7 @@ export const DashboardModule = ({
 		const map = new Map<number, { revenue: number; count: number }>();
 		days.forEach((_, i) => map.set(i, { revenue: 0, count: 0 }));
 		bottomOrders.forEach((o) => {
-			const ds = (o.data_conclusao || o.data || "").slice(0, 10);
+			const ds = (Utils.effectiveOrderDate(o) || "").slice(0, 10);
 			const [yy, mm, dd] = ds.split("-").map(Number);
 			const day = new Date(yy, mm - 1, dd).getDay();
 			const cur = map.get(day)!;
