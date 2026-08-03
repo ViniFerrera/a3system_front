@@ -75,6 +75,7 @@ export interface Order {
 	taxa_extra?: number;
 	data: string;
 	data_conclusao?: string;
+	data_pagamento?: string;
 	anexos: string[];
 	nota_fiscal?: boolean;
 }
