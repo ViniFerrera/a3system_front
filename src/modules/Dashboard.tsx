@@ -204,14 +204,14 @@ export const DashboardModule = ({
 	// 12 meses para o "Fluxo de Caixa Mensal" (`historicoData`) e 6 meses para
 	// o "Volume × Receita" ao lado (`historico6mData`). ──
 	const buildMonthlyData = useCallback((start: string, end: string) => {
-		const months = new Map<string, { name: string; receita_concluida: number; receita_aberta: number; despesa: number; lucro: number; volume: number }>();
+		const months = new Map<string, { name: string; receita_paga: number; receita_pendente: number; despesa: number; lucro: number; volume: number }>();
 		let curr = new Date(new Date(start).getFullYear(), new Date(start).getMonth(), 1);
 		const endD = new Date(end);
 		while (curr <= endD) {
 			const key = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}`;
 			const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 			const label = `${monthNames[curr.getMonth()]}/${String(curr.getFullYear()).slice(2)}`;
-			months.set(key, { name: label, receita_concluida: 0, receita_aberta: 0, despesa: 0, lucro: 0, volume: 0 });
+			months.set(key, { name: label, receita_paga: 0, receita_pendente: 0, despesa: 0, lucro: 0, volume: 0 });
 			curr.setMonth(curr.getMonth() + 1);
 		}
 		orders.forEach((o) => {
@@ -226,8 +226,10 @@ export const DashboardModule = ({
 			// Conta o pedido no mesmo ponto em que a receita entra, para volume e
 			// receita do mês nunca falarem de conjuntos diferentes de OS.
 			entry.volume += 1;
-			if (o.status === "CONCLUIDA") entry.receita_concluida += val;
-			else entry.receita_aberta += val;
+			// Verde só quando efetivamente pago — parcial e não pago contam como
+			// pendente, mesmo que a ordem já esteja concluída na produção.
+			if ((o.status_pagamento || "NAO_PAGO") === "PAGO") entry.receita_paga += val;
+			else entry.receita_pendente += val;
 		});
 		expenses.filter((e) => e.status === "PAGO").forEach((e) => {
 			const key = (e.vencimento || "").slice(0, 7);
@@ -236,8 +238,8 @@ export const DashboardModule = ({
 		});
 		return Array.from(months.values()).map((d) => ({
 			...d,
-			receita: d.receita_concluida + d.receita_aberta,
-			lucro: d.receita_concluida + d.receita_aberta - d.despesa,
+			receita: d.receita_paga + d.receita_pendente,
+			lucro: d.receita_paga + d.receita_pendente - d.despesa,
 		}));
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [orders, expenses, selectedServices, selectedPaymentStatus, orderStatusFilter]);
@@ -260,7 +262,7 @@ export const DashboardModule = ({
 		[buildMonthlyData, last6Range]
 	);
 	const volumeReceita6mData = useMemo(
-		() => historico6mData.map((m) => ({ name: m.name, receita: m.receita_concluida + m.receita_aberta, volume: m.volume })),
+		() => historico6mData.map((m) => ({ name: m.name, receita: m.receita_paga + m.receita_pendente, volume: m.volume })),
 		[historico6mData]
 	);
 
@@ -470,8 +472,8 @@ export const DashboardModule = ({
 							</p>
 						</div>
 						<div className="flex flex-wrap gap-2 sm:gap-3 text-2xs sm:text-2xs font-semibold text-slate-500">
-							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-emerald-400 inline-block" />Concluídas</span>
-							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-amber-300 inline-block" />Abertas</span>
+							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-emerald-400 inline-block" />Pago</span>
+							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-amber-300 inline-block" />Pendente</span>
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded bg-rose-400 inline-block" />Despesa</span>
 							<span className="flex items-center gap-1"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-indigo-500 inline-block" />Lucro</span>
 						</div>
@@ -482,8 +484,8 @@ export const DashboardModule = ({
 							<XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
 							<YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
 							<Tooltip content={<CustomTooltip />} />
-							<Bar dataKey="receita_concluida" name="Concluídas" stackId="receita" fill="#34d399" barSize={16} />
-							<Bar dataKey="receita_aberta" name="Abertas" stackId="receita" fill="#fbbf24" radius={[5, 5, 0, 0]} barSize={16} />
+							<Bar dataKey="receita_paga" name="Pago" stackId="receita" fill="#34d399" barSize={16} />
+							<Bar dataKey="receita_pendente" name="Pendente" stackId="receita" fill="#fbbf24" radius={[5, 5, 0, 0]} barSize={16} />
 							<Bar dataKey="despesa" name="Despesa" fill="#fb7185" radius={[5, 5, 0, 0]} barSize={16} />
 							<Line type="monotone" dataKey="lucro" name="Lucro" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }} />
 						</ComposedChart>
