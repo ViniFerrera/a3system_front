@@ -26,8 +26,10 @@ export const PageLoader = ({
 		aria-live="polite"
 		className={`flex flex-col items-center justify-center gap-3 min-h-[55vh] py-16 animate-fade-in ${className}`}
 	>
+		{/* Servido de public/: URL absoluta a partir da raiz, não do CDN
+		    externo — o hotlink não carregava em produção. */}
 		<img
-			src="https://cdn.dribbble.com/userupload/19598405/file/original-9c9f2804bc469c3e8e86e2fad65f495d.gif"
+			src="/gif_loading.gif"
 			alt=""
 			aria-hidden="true"
 			className="w-20 h-20 object-contain motion-reduce:hidden"

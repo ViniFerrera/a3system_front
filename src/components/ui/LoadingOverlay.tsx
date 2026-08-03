@@ -39,8 +39,10 @@ export const LoadingProvider = ({ children }: { children: React.ReactNode }) => 
 					{/* Sem cartão branco por trás: o pedido era o GIF com fundo
 					    transparente, não uma caixa opaca ao redor dele. */}
 					<div className="flex flex-col items-center gap-3 animate-scale-in">
+						{/* Servido de public/: URL absoluta a partir da raiz, não do
+						    CDN externo — o hotlink não carregava em produção. */}
 						<img
-							src="https://cdn.dribbble.com/userupload/19598405/file/original-9c9f2804bc469c3e8e86e2fad65f495d.gif"
+							src="/gif_loading.gif"
 							alt="Carregando"
 							className="w-20 h-20 sm:w-24 sm:h-24 object-contain"
 						/>
