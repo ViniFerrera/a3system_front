@@ -311,6 +311,12 @@ export const OrderModule = ({
 			}
 			// Idem para data_pagamento: só grava ao ENTRAR em PAGO; ao sair,
 			// limpa para não reaproveitar uma data velha num pagamento futuro.
+			// O `undefined` aqui não é cosmético: `order` (com o data_pagamento
+			// antigo) é espalhado no body do PUT abaixo ANTES de finalUpdates. Sem
+			// isto, esse valor velho seria reenviado como valor explícito, e o
+			// backend o aceita com prioridade sobre o próprio fallback de
+			// "saiu de PAGO" — ou seja, removê-la reintroduziria o bug de datas
+			// obsoletas que essa coluna existe para evitar.
 			if (updates.status_pagamento === "PAGO" && order.status_pagamento !== "PAGO") {
 				finalUpdates.data_pagamento = Utils.localIsoNow();
 			} else if (updates.status_pagamento && updates.status_pagamento !== "PAGO" && order.status_pagamento === "PAGO") {
