@@ -1,6 +1,6 @@
 import {
 	LayoutDashboard, FileText, Users, Box, Settings, Printer, DollarSign,
-	Bot, Shield, HardDrive, Receipt, BarChart3, FileBarChart,
+	Bot, Shield, HardDrive, Receipt, BarChart3, FileBarChart, Mail,
 } from "lucide-react";
 import React from "react";
 
@@ -25,6 +25,7 @@ export const NAV_ITEMS: NavItem[] = [
 	{ id: "nota-fiscal", icon: Receipt, label: "Nota Fiscal", group: "Configuração" },
 	{ id: "users", icon: Shield, label: "Usuários", group: "Configuração" },
 	{ id: "db-security", icon: HardDrive, label: "Banco de Dados", group: "Configuração" },
+	{ id: "reports", icon: Mail, label: "Relatórios", group: "Configuração" },
 ];
 
 export const NAV_GROUPS = ["Principal", "Operacional", "Configuração"] as const;

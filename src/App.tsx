@@ -30,6 +30,7 @@ const DatabaseSecurityModule = lazy(() => import("@/modules/DatabaseSecurity").t
 const NotaFiscalModule = lazy(() => import("@/modules/NotaFiscal").then((m) => ({ default: m.NotaFiscalModule })));
 const DreModule = lazy(() => import("@/modules/Dre").then((m) => ({ default: m.DreModule })));
 const EstudoModule = lazy(() => import("@/modules/Estudo").then((m) => ({ default: m.EstudoModule })));
+const ReportSettingsModule = lazy(() => import("@/modules/ReportSettings").then((m) => ({ default: m.ReportSettingsModule })));
 
 // ─── Helpers de Auth ─────────────────────────────────────────────────────────
 interface JwtUser {
@@ -357,6 +358,7 @@ const AppInner = () => {
 								{painel("nota-fiscal", <NotaFiscalModule orders={orders} quickAction={quickAction} />)}
 								{painel("users", <UsersModule />)}
 								{painel("db-security", <DatabaseSecurityModule />)}
+								{painel("reports", <ReportSettingsModule />)}
 							</Suspense>
 						)}
 					</div>
