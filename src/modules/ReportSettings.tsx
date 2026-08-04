@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
 	Mail, Plus, Trash2, Send, Copy, Check, Eye, EyeOff,
 	RefreshCw, CheckCircle2, AlertTriangle, Clock,
+	History, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { Button, Input, PageHeader, PageLoader, useConfirm } from "@/components/ui";
+import { Badge, Button, Input, PageHeader, PageLoader, useConfirm } from "@/components/ui";
 import { api } from "@/services/api";
 
 interface CronConfig {
@@ -11,6 +12,19 @@ interface CronConfig {
 	urlSemanal: string;
 	urlFechamento: string;
 }
+
+interface LogEnvio {
+	id: number;
+	created_at: string;
+	tipo: "weekly" | "month-close";
+	origem: "cron" | "teste";
+	status: "SUCESSO" | "SEM_DESTINATARIOS" | "ERRO" | "NAO_AUTORIZADO";
+	destinatarios: number | null;
+	erro: string | null;
+	ip: string | null;
+}
+
+const LOGS_PAGE_SIZE = 50;
 
 const CARD = "bg-white border border-slate-200/60 rounded-2xl shadow-card p-6";
 
@@ -55,6 +69,19 @@ const CampoCopiavel = ({ valor, rotulo }: { valor: string; rotulo: string }) => 
 	</div>
 );
 
+const rotuloTipo = (tipo: LogEnvio["tipo"]) => (tipo === "weekly" ? "Semanal" : "Fechamento");
+
+const formatarDataHora = (iso: string) =>
+	new Date(iso).toLocaleString("pt-BR", {
+		day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+	});
+
+const detalheLog = (log: LogEnvio) => {
+	if (log.status === "ERRO" && log.erro) return log.erro;
+	if (log.status === "NAO_AUTORIZADO" && log.ip) return `IP: ${log.ip}`;
+	return "—";
+};
+
 export const ReportSettingsModule = () => {
 	const confirm = useConfirm();
 	const [emails, setEmails] = useState<string[]>([]);
@@ -66,6 +93,10 @@ export const ReportSettingsModule = () => {
 	const [rotacionando, setRotacionando] = useState(false);
 	const [testando, setTestando] = useState<"weekly" | "month-close" | null>(null);
 	const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+	const [logs, setLogs] = useState<LogEnvio[]>([]);
+	const [logsTotal, setLogsTotal] = useState(0);
+	const [logsPage, setLogsPage] = useState(1);
+	const [logsCarregando, setLogsCarregando] = useState(false);
 
 	const carregar = useCallback(async () => {
 		try {
@@ -85,6 +116,21 @@ export const ReportSettingsModule = () => {
 	}, []);
 
 	useEffect(() => { carregar(); }, [carregar]);
+
+	const carregarLogs = useCallback(async (page: number) => {
+		setLogsCarregando(true);
+		try {
+			const res = await api.get(`/admin/reports/logs?page=${page}`);
+			setLogs(res.data.items);
+			setLogsTotal(res.data.total);
+		} catch {
+			setMessage({ type: "error", text: "Erro ao carregar histórico de envios" });
+		} finally {
+			setLogsCarregando(false);
+		}
+	}, []);
+
+	useEffect(() => { carregarLogs(logsPage); }, [logsPage, carregarLogs]);
 
 	const salvarEmails = async (lista: string[]) => {
 		setSalvando(true);
@@ -333,6 +379,85 @@ export const ReportSettingsModule = () => {
 						Testar fechamento de mês
 					</Button>
 				</div>
+			</div>
+
+			{/* Histórico de envios */}
+			<div className={CARD}>
+				<h3 className="text-base font-bold text-ink flex items-center gap-2 mb-2">
+					<History className="w-5 h-5 text-primary-500" /> Histórico de Envios
+				</h3>
+				<p className="text-sm text-ink-faint mb-4">
+					Todo disparo das rotas de relatório — automático (cron), manual (teste) ou tentativas
+					não autorizadas.
+				</p>
+
+				{logs.length === 0 && !logsCarregando ? (
+					<p className="text-sm text-ink-faint italic">Nenhum envio registrado ainda.</p>
+				) : (
+					<div className="overflow-x-auto">
+						<table className="w-full text-sm">
+							<thead>
+								<tr className="text-2xs text-ink-faint uppercase tracking-wide text-left border-b border-slate-100">
+									<th className="py-2 pr-3 font-bold">Data/Hora</th>
+									<th className="py-2 pr-3 font-bold">Tipo</th>
+									<th className="py-2 pr-3 font-bold">Origem</th>
+									<th className="py-2 pr-3 font-bold">Status</th>
+									<th className="py-2 pr-3 font-bold">Destinatários</th>
+									<th className="py-2 pr-3 font-bold">Detalhe</th>
+								</tr>
+							</thead>
+							<tbody className="divide-y divide-slate-100">
+								{logs.map((log) => (
+									<tr key={log.id}>
+										<td className="num py-2.5 pr-3 text-ink-muted whitespace-nowrap">
+											{formatarDataHora(log.created_at)}
+										</td>
+										<td className="py-2.5 pr-3 text-ink">{rotuloTipo(log.tipo)}</td>
+										<td className="py-2.5 pr-3 text-ink-muted">
+											{log.origem === "cron" ? "Cron" : "Teste manual"}
+										</td>
+										<td className="py-2.5 pr-3"><Badge status={log.status} /></td>
+										<td className="num py-2.5 pr-3 text-ink-muted">
+											{log.destinatarios ?? "—"}
+										</td>
+										<td
+											className="py-2.5 pr-3 text-ink-faint max-w-[240px] truncate"
+											title={detalheLog(log)}
+										>
+											{detalheLog(log)}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
+
+				{logsTotal > LOGS_PAGE_SIZE && (
+					<div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+						<span className="text-2xs text-ink-faint">
+							Página {logsPage} de {Math.ceil(logsTotal / LOGS_PAGE_SIZE)}
+						</span>
+						<div className="flex gap-2">
+							<Button
+								variant="secondary"
+								onClick={() => setLogsPage((p) => Math.max(1, p - 1))}
+								disabled={logsPage === 1 || logsCarregando}
+								icon={<ChevronLeft className="w-4 h-4" />}
+							>
+								Anterior
+							</Button>
+							<Button
+								variant="secondary"
+								onClick={() => setLogsPage((p) => p + 1)}
+								disabled={logsPage >= Math.ceil(logsTotal / LOGS_PAGE_SIZE) || logsCarregando}
+								icon={<ChevronRight className="w-4 h-4" />}
+							>
+								Próxima
+							</Button>
+						</div>
+					</div>
+				)}
 			</div>
 		</div>
 	);
