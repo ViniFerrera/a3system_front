@@ -237,16 +237,30 @@ export const OrderModule = ({
 		const completedOrdersSnapshot = filteredOrders.filter(
 			(o) => o.status === "CONCLUIDA"
 		).length;
-		const totalRevenue = filteredOrders.reduce(
-			(acc, o) => acc + (Number(o.total) || 0),
-			0
-		);
+		// Receita: soma o total das ordens não canceladas. "Recebida" considera
+		// só PAGO/PARCIAL; "pendente" é o que falta receber (NAO_PAGO); e a
+		// receita das ordens CANCELADA fica isolada, fora dos dois totais acima.
+		let totalRevenue = 0;
+		let pendingRevenue = 0;
+		let cancelledRevenue = 0;
+		for (const o of filteredOrders) {
+			const valor = Number(o.total) || 0;
+			if (o.status === "CANCELADA") {
+				cancelledRevenue += valor;
+				continue;
+			}
+			const pag = o.status_pagamento || "NAO_PAGO";
+			if (pag === "PAGO" || pag === "PARCIAL") totalRevenue += valor;
+			else pendingRevenue += valor;
+		}
 
 		return {
 			totalOrders,
 			openOrdersSnapshot,
 			completedOrdersSnapshot,
 			totalRevenue,
+			pendingRevenue,
+			cancelledRevenue,
 			avgTimeDisplay,
 		};
 	}, [filteredOrders]);
