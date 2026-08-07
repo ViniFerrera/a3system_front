@@ -88,11 +88,10 @@ export const OrderModule = ({
 		nonce: number;
 	} | null>(null);
 
-	// Filtros de Data — últimos 30 dias por padrão.
+	// Filtros de Data — mês atual por padrão.
 	const [filterStart, setFilterStart] = useState(() => {
 		const d = new Date();
-		d.setDate(d.getDate() - 30);
-		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 	});
 	const [filterEnd, setFilterEnd] = useState(() => {
 		const d = new Date();
@@ -238,11 +237,16 @@ export const OrderModule = ({
 		const completedOrdersSnapshot = filteredOrders.filter(
 			(o) => o.status === "CONCLUIDA"
 		).length;
+		const totalRevenue = filteredOrders.reduce(
+			(acc, o) => acc + (Number(o.total) || 0),
+			0
+		);
 
 		return {
 			totalOrders,
 			openOrdersSnapshot,
 			completedOrdersSnapshot,
+			totalRevenue,
 			avgTimeDisplay,
 		};
 	}, [filteredOrders]);

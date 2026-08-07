@@ -20,7 +20,7 @@ import { ConcentrationCard } from "./dashboard/ConcentrationCard";
 import { RetentionCard } from "./dashboard/RetentionCard";
 
 type OrderStatusFilter = "CONCLUIDA" | "ABERTA" | "CANCELADA" | "ALL";
-type PeriodPreset = "30d" | "3m" | "6m" | "12m" | "custom";
+type PeriodPreset = "mtd" | "30d" | "3m" | "6m" | "12m" | "custom";
 type BottomPeriod = "7d" | "30d" | "3m" | "6m";
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -51,7 +51,8 @@ const toLocalDate = (d: Date) =>
 const periodToDates = (preset: PeriodPreset | BottomPeriod) => {
 	const end = new Date();
 	const start = new Date();
-	if (preset === "7d") start.setDate(end.getDate() - 7);
+	if (preset === "mtd") start.setDate(1);
+	else if (preset === "7d") start.setDate(end.getDate() - 7);
 	else if (preset === "30d") start.setDate(end.getDate() - 30);
 	else if (preset === "3m") start.setMonth(end.getMonth() - 3);
 	else if (preset === "6m") start.setMonth(end.getMonth() - 6);
@@ -68,9 +69,9 @@ export const DashboardModule = ({
 	const now = new Date();
 
 	// ── Filtros principais ───────────────────────────────────────────────────
-	const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("30d");
-	const [startDate, setStartDate] = useState(() => periodToDates("30d").start);
-	const [endDate, setEndDate] = useState(() => periodToDates("30d").end);
+	const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("mtd");
+	const [startDate, setStartDate] = useState(() => periodToDates("mtd").start);
+	const [endDate, setEndDate] = useState(() => periodToDates("mtd").end);
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 	const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string[]>([]);
 	const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("ALL");
@@ -353,6 +354,7 @@ export const DashboardModule = ({
 	// ── UI helpers ────────────────────────────────────────────────────────────
 	const fmt = Utils.formatCurrency;
 	const periodPresets: { key: PeriodPreset; label: string }[] = [
+		{ key: "mtd", label: "Mês atual" },
 		{ key: "30d", label: "30 dias" },
 		{ key: "3m", label: "3 meses" },
 		{ key: "6m", label: "6 meses" },
@@ -412,7 +414,7 @@ export const DashboardModule = ({
 						<MultiSelect options={allServices} selected={selectedServices} onChange={setSelectedServices} placeholder="Todos" />
 					</div>
 					<button
-						onClick={() => { setPeriodPreset("30d"); setSelectedServices([]); setSelectedPaymentStatus([]); setOrderStatusFilter("ALL"); }}
+						onClick={() => { setPeriodPreset("mtd"); setSelectedServices([]); setSelectedPaymentStatus([]); setOrderStatusFilter("ALL"); }}
 						className="flex items-center gap-1.5 text-xs font-semibold text-ink-faint hover:text-danger-500 px-3 py-2 rounded-xl hover:bg-danger-50 transition-all"
 					>
 						<RefreshCw className="w-3 h-3" /> Limpar

@@ -12,6 +12,7 @@ import {
 	RefreshCcw,
 	CheckCircle2,
 	BarChart2,
+	Wallet,
 } from "lucide-react";
 import { DataTable, TableHead, Th } from "@/components/ui/DataTable";
 import { OrderRow } from "./OrderRow";
@@ -22,6 +23,7 @@ export interface OrdersSummary {
 	totalOrders: number;
 	openOrdersSnapshot: number;
 	completedOrdersSnapshot: number;
+	totalRevenue: number;
 	avgTimeDisplay: string;
 }
 
@@ -146,8 +148,9 @@ export const OrdersList = ({
 					{ label: "Total de ordens", value: summary.totalOrders, icon: BarChart2, accent: "bg-primary-50 text-primary-600" },
 					{ label: "Abertas", value: summary.openOrdersSnapshot, icon: Clock, accent: "bg-info-50 text-info-600" },
 					{ label: "Concluídas", value: summary.completedOrdersSnapshot, icon: CheckCircle2, accent: "bg-success-50 text-success-600" },
+					{ label: "Receita no período", value: Utils.formatCurrency(summary.totalRevenue), icon: Wallet, accent: "bg-emerald-50 text-emerald-600" },
 				].map((s, i) => (
-					<div key={s.label} className={`flex items-center gap-2.5 pr-6 ${i < 2 ? "border-r border-slate-100" : ""}`}>
+					<div key={s.label} className={`flex items-center gap-2.5 pr-6 ${i < 3 ? "border-r border-slate-100" : ""}`}>
 						<div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${s.accent}`}>
 							<s.icon className='w-4 h-4' />
 						</div>
