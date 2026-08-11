@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
 import { Select } from "@/components/ui/Field";
 import { Utils } from "@/utils";
-import { Order, Client } from "@/types";
+import { Order, Client, Orcamento } from "@/types";
+import { Badge } from "@/components/ui/Badge";
 import { MultiSelect } from "@/components/ui/MultiSelect";
 import {
 	Plus,
@@ -15,10 +16,63 @@ import {
 	Wallet,
 	HourglassIcon,
 	Ban,
+	FileText,
 } from "lucide-react";
 import { DataTable, TableHead, Th } from "@/components/ui/DataTable";
 import { OrderRow } from "./OrderRow";
 import { SearchableSelect } from "./SearchableSelect";
+
+const OrcamentoRow = React.memo(function OrcamentoRow({
+	orcamento,
+	onClick,
+}: {
+	orcamento: Orcamento;
+	onClick: () => void;
+}) {
+	return (
+		<tr
+			className="hover:bg-violet-50/60 transition-colors cursor-pointer border-l-2 border-l-violet-400"
+			onClick={onClick}
+		>
+			<td className='p-2 sm:p-3 font-mono text-xs text-ink-faint'>
+				<span className='text-violet-500 font-bold'>ORC#{orcamento.id}</span>
+			</td>
+			<td className='p-2 sm:p-3'>
+				<span className='font-semibold text-ink text-xs sm:text-sm'>
+					{orcamento.cliente_nome}
+				</span>
+				<p className='text-2xs text-ink-faint lg:hidden'>
+					{Utils.formatDateTime(orcamento.data)}
+				</p>
+			</td>
+			<td className='p-2 sm:p-3 text-xs hidden lg:table-cell text-ink-muted'>
+				{Utils.formatDateTime(orcamento.data)}
+			</td>
+			<td className='p-2 sm:p-3 text-xs hidden xl:table-cell'>
+				<span className='text-ink-faint italic'>—</span>
+			</td>
+			<td className='p-2 sm:p-3 text-xs hidden md:table-cell'>
+				<span className='inline-flex items-center px-1.5 py-0.5 rounded-md bg-violet-100 text-2xs text-violet-700 whitespace-nowrap'>
+					{orcamento.versao_count ?? 1} versão(ões)
+				</span>
+			</td>
+			<td className='p-2 sm:p-3 font-bold text-ink text-xs sm:text-sm num'>
+				{Utils.formatCurrency(orcamento.total_atual ?? 0)}
+			</td>
+			<td className='p-2 sm:p-3 hidden sm:table-cell'>
+				<span className='text-ink-faint text-xs'>—</span>
+			</td>
+			<td className='p-2 sm:p-3 hidden sm:table-cell'>
+				<Badge status={orcamento.status} />
+			</td>
+			<td className='p-2 sm:p-3 text-right'>
+				<span className='text-xs text-violet-600 font-semibold'>
+					Ver detalhes →
+				</span>
+			</td>
+		</tr>
+	);
+});
 
 /** KPIs do topo da lista, calculados em `Orders.tsx` sobre as ordens filtradas. */
 export interface OrdersSummary {
@@ -32,8 +86,12 @@ export interface OrdersSummary {
 }
 
 export type FilterPaymentStatus = "TODOS" | "PAGO" | "NAO_PAGO" | "PARCIAL";
-export type FilterOrderStatus = "TODOS" | "ABERTA" | "CONCLUIDA" | "CANCELADA";
+export type FilterOrderStatus = "TODOS" | "ABERTA" | "CONCLUIDA" | "CANCELADA" | "EM_ORCAMENTO" | "CONVERTIDO";
 export type FilterNF = "TODOS" | "COM_NF" | "SEM_NF";
+
+type ListRow =
+	| { type: "order"; data: Order }
+	| { type: "orcamento"; data: Orcamento };
 
 interface OrdersListProps {
 	orders: Order[];
@@ -75,6 +133,9 @@ interface OrdersListProps {
 	onOpenConfig: () => void;
 	onedriveConfig: { cid: string; folderPath: string } | null;
 	isRefreshing: boolean;
+	orcamentos: Orcamento[];
+	onNewOrcamento: () => void;
+	onOpenOrcamento: (orc: Orcamento) => void;
 }
 
 /**
@@ -117,6 +178,9 @@ export const OrdersList = ({
 	onOpenConfig,
 	onedriveConfig,
 	isRefreshing,
+	orcamentos,
+	onNewOrcamento,
+	onOpenOrcamento,
 }: OrdersListProps) => {
 	const clientOptions = useMemo(
 		() => [
@@ -126,7 +190,42 @@ export const OrdersList = ({
 		[clients]
 	);
 
-	const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+	const isOrcamentoFilter =
+		filterOrderStatus === "EM_ORCAMENTO" || filterOrderStatus === "CONVERTIDO";
+
+	const paginatedRows = useMemo((): ListRow[] => {
+		if (isOrcamentoFilter) {
+			const filtered = orcamentos.filter((o) => {
+				if (o.status !== filterOrderStatus) return false;
+				if (filterClient !== 0 && o.cliente_id !== filterClient) return false;
+				const dateStr = o.data ? o.data.split("T")[0] : "";
+				if (filterStart && dateStr < filterStart) return false;
+				if (filterEnd && dateStr > filterEnd) return false;
+				return true;
+			});
+			const start = (currentPage - 1) * pageSize;
+			return filtered
+				.slice(start, start + pageSize)
+				.map((o) => ({ type: "orcamento" as const, data: o }));
+		}
+		return paginatedOrders.map((o) => ({ type: "order" as const, data: o }));
+	}, [
+		isOrcamentoFilter,
+		orcamentos,
+		filterOrderStatus,
+		filterClient,
+		filterStart,
+		filterEnd,
+		currentPage,
+		pageSize,
+		paginatedOrders,
+	]);
+
+	const totalRowsForPagination = isOrcamentoFilter
+		? orcamentos.filter((o) => o.status === filterOrderStatus).length
+		: filteredOrders.length;
+
+	const totalPages = Math.max(1, Math.ceil(totalRowsForPagination / pageSize));
 
 	return (
 		// `lg:h-[calc(100dvh-6.5rem)]` trava a página inteira (estatísticas,
@@ -219,12 +318,14 @@ export const OrdersList = ({
 				<Select
 					className='!w-auto'
 					value={filterOrderStatus}
-					onChange={(e) => setFilterOrderStatus(e.target.value as any)}
+					onChange={(e) => { setFilterOrderStatus(e.target.value as any); setCurrentPage(1); }}
 				>
 					<option value='TODOS'>Status: Todas ({orders.length})</option>
 					<option value='ABERTA'>Abertas ({orders.filter((o) => o.status === "ABERTA").length})</option>
 					<option value='CONCLUIDA'>Concluídas ({orders.filter((o) => o.status === "CONCLUIDA").length})</option>
 					<option value='CANCELADA'>Canceladas ({orders.filter((o) => o.status === "CANCELADA").length})</option>
+					<option value='EM_ORCAMENTO'>Em Orçamento ({orcamentos.filter((o) => o.status === "EM_ORCAMENTO").length})</option>
+					<option value='CONVERTIDO'>Convertidos ({orcamentos.filter((o) => o.status === "CONVERTIDO").length})</option>
 				</Select>
 				<div className='flex items-center gap-2 sm:ml-auto'>
 					<button
@@ -247,6 +348,12 @@ export const OrdersList = ({
 						title='Configurações (Taxas)'
 					>
 						<Settings className='w-3.5 h-3.5' />
+					</button>
+					<button
+						onClick={onNewOrcamento}
+						className='bg-violet-600 text-white px-3 sm:px-4 h-8 rounded-[10px] hover:bg-violet-700 transition font-bold text-xs flex items-center gap-1.5 shadow-sm shadow-violet-600/20'
+					>
+						<FileText className='w-3.5 h-3.5' /> <span className='hidden sm:inline'>Novo</span> Orçamento
 					</button>
 					<button
 						onClick={onNewOrder}
@@ -307,8 +414,8 @@ export const OrdersList = ({
 			<div className='flex-1 min-h-0 flex flex-col gap-2'>
 				<DataTable
 					className='lg:flex-1 lg:min-h-0'
-					isEmpty={paginatedOrders.length === 0}
-					emptyTitle='Nenhuma ordem no período e filtros selecionados'
+					isEmpty={paginatedRows.length === 0}
+					emptyTitle={isOrcamentoFilter ? 'Nenhum orçamento encontrado' : 'Nenhuma ordem no período e filtros selecionados'}
 				>
 					<TableHead>
 						<tr>
@@ -324,18 +431,26 @@ export const OrdersList = ({
 						</tr>
 					</TableHead>
 					<tbody className='divide-y divide-slate-100/60 text-left text-sm text-slate-600'>
-						{paginatedOrders.map((order) => (
-							<OrderRow
-								key={order.id}
-								order={order}
-								isExpanded={expandedOrderId === order.id}
-								onToggleExpand={onToggleExpand}
-								onEdit={onEditOrder}
-								onDelete={onDelete}
-								onUpdateStatus={onUpdateStatus}
-								onedriveConfig={onedriveConfig}
-							/>
-						))}
+						{paginatedRows.map((row) =>
+							row.type === "order" ? (
+								<OrderRow
+									key={`order-${row.data.id}`}
+									order={row.data}
+									isExpanded={expandedOrderId === row.data.id}
+									onToggleExpand={onToggleExpand}
+									onEdit={onEditOrder}
+									onDelete={onDelete}
+									onUpdateStatus={onUpdateStatus}
+									onedriveConfig={onedriveConfig}
+								/>
+							) : (
+								<OrcamentoRow
+									key={`orc-${row.data.id}`}
+									orcamento={row.data}
+									onClick={() => onOpenOrcamento(row.data)}
+								/>
+							)
+						)}
 					</tbody>
 				</DataTable>
 				{/* Paginação + contagem de linhas — fora da casca da tabela, que
@@ -344,7 +459,7 @@ export const OrdersList = ({
 				<div className='flex-shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-white border border-slate-200/70 rounded-2xl shadow-card'>
 					<div className='flex items-center gap-3 text-xs text-slate-500'>
 						<span className='font-semibold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg border border-indigo-100'>
-							{filteredOrders.length} {filteredOrders.length === 1 ? 'ordem' : 'ordens'}
+							{totalRowsForPagination} {isOrcamentoFilter ? (totalRowsForPagination === 1 ? 'orçamento' : 'orçamentos') : (totalRowsForPagination === 1 ? 'ordem' : 'ordens')}
 						</span>
 						<span>|</span>
 						<label className='flex items-center gap-1.5'>

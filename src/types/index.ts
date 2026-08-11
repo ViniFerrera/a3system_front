@@ -102,3 +102,43 @@ export interface Machine {
 	proxima_manutencao?: string;
 	estoque_associado_ids?: number[];
 }
+
+export interface OrcamentoItem {
+	id?: number;
+	versao_id?: number;
+	servico: string;
+	material: string;
+	gramatura?: string;
+	tamanho?: string;
+	is_double_sided?: boolean;
+	cor: string;
+	quantidade: number;
+	unitPrice: number;
+	unit_price?: number;
+	total: number;
+	ruleApplied?: string;
+	rule_applied?: string;
+	maquina_id?: number;
+}
+
+export interface OrcamentoVersao {
+	id?: number;
+	orcamento_id: number;
+	versao: number;
+	total: number;
+	data_criacao: string;
+	itens: OrcamentoItem[];
+}
+
+export interface Orcamento {
+	id?: number;
+	cliente_id: number;
+	cliente_nome: string;
+	descricao?: string;
+	status: "EM_ORCAMENTO" | "CONVERTIDO";
+	ordem_id?: number;
+	data: string;
+	versoes?: OrcamentoVersao[];
+	versao_count?: number;
+	total_atual?: number;
+}

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Utils } from "@/utils";
-import { Order, Client, PriceRule } from "@/types";
+import { Order, Client, PriceRule, Orcamento } from "@/types";
 import { OrderFilterPayload } from "@/components/shortcuts/shortcutTypes";
 import { api } from "@/services/api";
 import { useLoading } from "@/components/ui/LoadingOverlay";
@@ -10,6 +10,8 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { OrderPreset } from "./orders/presetTypes";
 import { PresetManagerModal } from "./orders/PresetManagerModal";
 import { OrdersList } from "./orders/OrdersList";
+import { OrcamentoFormPage } from "./orders/OrcamentoFormPage";
+import { OrcamentoDetalhePage } from "./orders/OrcamentoDetalhePage";
 import {
 	OrderFormPage,
 	RascunhoState,
@@ -34,6 +36,8 @@ export const OrderModule = ({
 	newOrderSignal = 0,
 	pendingOrderFilter = null,
 	onPendingFilterApplied,
+	orcamentos = [],
+	setOrcamentos,
 }: {
 	clients: Client[];
 	priceTable: PriceRule[];
@@ -46,14 +50,19 @@ export const OrderModule = ({
 	/** Filtro congelado num atalho, entregue pelo App com um nonce novo a cada clique. */
 	pendingOrderFilter?: (OrderFilterPayload & { nonce: number }) | null;
 	onPendingFilterApplied?: () => void;
+	orcamentos?: Orcamento[];
+	setOrcamentos?: Function;
 }) => {
 	// Vista atual do módulo. O formulário é página, não modal — foi assim que a
 	// digitação parou de re-renderizar a lista inteira.
-	const [view, setView] = useState<"list" | "form">("list");
+	const [view, setView] = useState<"list" | "form" | "orcamento-form" | "orcamento-detalhe">("list");
 	const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 	// Nonce de montagem: cada abertura recria o `OrderFormPage` do zero, para o
 	// estado interno nascer limpo mesmo quando já estávamos na página.
 	const [formNonce, setFormNonce] = useState(0);
+
+	const [editingOrcamento, setEditingOrcamento] = useState<Orcamento | null>(null);
+	const [orcamentoNonce, setOrcamentoNonce] = useState(0);
 
 	const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
 	const [isQuickClientOpen, setIsQuickClientOpen] = useState(false);
@@ -107,7 +116,7 @@ export const OrderModule = ({
 		"TODOS" | "PAGO" | "NAO_PAGO" | "PARCIAL"
 	>("TODOS");
 	const [filterOrderStatus, setFilterOrderStatus] = useState<
-		"TODOS" | "ABERTA" | "CONCLUIDA" | "CANCELADA"
+		"TODOS" | "ABERTA" | "CONCLUIDA" | "CANCELADA" | "EM_ORCAMENTO" | "CONVERTIDO"
 	>("TODOS");
 	const [filterNF, setFilterNF] = useState<"TODOS" | "COM_NF" | "SEM_NF">("TODOS");
 
@@ -178,7 +187,7 @@ export const OrderModule = ({
 				const pag = o.status_pagamento || "NAO_PAGO";
 				if (pag !== filterPaymentStatus) return false;
 			}
-			if (filterOrderStatus !== "TODOS") {
+			if (filterOrderStatus !== "TODOS" && filterOrderStatus !== "EM_ORCAMENTO" && filterOrderStatus !== "CONVERTIDO") {
 				if (o.status !== filterOrderStatus) return false;
 			}
 			if (filterNF !== "TODOS") {
@@ -403,6 +412,44 @@ export const OrderModule = ({
 
 	// "Nova Ordem" na barra de filtros — abre o formulário sem ordem em edição.
 	const handleNewOrder = useCallback(() => abrirFormulario(), [abrirFormulario]);
+
+	// Handlers de orçamento
+	const handleNovoOrcamento = useCallback(() => {
+		setEditingOrcamento(null);
+		setOrcamentoNonce((n) => n + 1);
+		setView("orcamento-form");
+	}, []);
+
+	const handleOpenOrcamento = useCallback((orc: Orcamento) => {
+		setEditingOrcamento(orc);
+		setOrcamentoNonce((n) => n + 1);
+		setView("orcamento-detalhe");
+	}, []);
+
+	const aoSalvarOrcamento = useCallback((salvo: Orcamento, modo: "criado" | "editado") => {
+		setOrcamentos?.((prev: Orcamento[]) =>
+			modo === "criado" ? [salvo, ...prev] : prev.map((o) => (o.id === salvo.id ? salvo : o))
+		);
+		setEditingOrcamento(null);
+		setView("list");
+		toast.success(modo === "criado" ? `Orçamento #${salvo.id} criado.` : `Orçamento #${salvo.id} atualizado.`);
+	}, [setOrcamentos, toast]);
+
+	const aoOrcamentoConvertido = useCallback((novaOrdem: Order, orcamentoId: number) => {
+		const ordemProcessada = sanitizeOrderResponse(novaOrdem);
+		setOrders((prev: Order[]) => [ordemProcessada, ...prev]);
+		setOrcamentos?.((prev: Orcamento[]) =>
+			prev.map((o) =>
+				o.id === orcamentoId
+					? { ...o, status: "CONVERTIDO" as const, ordem_id: novaOrdem.id }
+					: o
+			)
+		);
+		setEditingOrcamento(null);
+		setView("list");
+		toast.success(`Orçamento convertido. Ordem #${novaOrdem.id} criada.`);
+	}, [setOrders, setOrcamentos, toast]);
+
 	const handleOpenConfig = useCallback(() => setIsConfigModalOpen(true), []);
 	const handleQuickClient = useCallback(() => setIsQuickClientOpen(true), []);
 	const handleManagePresets = useCallback(() => setIsPresetManagerOpen(true), []);
@@ -563,6 +610,27 @@ export const OrderModule = ({
 					rascunhoRef={rascunhoRef}
 					clienteRapidoCriado={clienteRapidoCriado}
 				/>
+			) : view === "orcamento-form" ? (
+				<OrcamentoFormPage
+					key={`orc-${editingOrcamento?.id ?? "novo"}-${orcamentoNonce}`}
+					editingOrcamento={editingOrcamento}
+					clients={clients}
+					priceTable={priceTable}
+					machines={machinesList}
+					onCancel={() => setView("list")}
+					onSaved={aoSalvarOrcamento}
+				/>
+			) : view === "orcamento-detalhe" ? (
+				<OrcamentoDetalhePage
+					key={`det-${editingOrcamento?.id}-${orcamentoNonce}`}
+					orcamento={editingOrcamento!}
+					clients={clients}
+					priceTable={priceTable}
+					machines={machinesList}
+					onCancel={() => { setEditingOrcamento(null); setView("list"); }}
+					onUpdated={(orc) => setOrcamentos?.((prev: Orcamento[]) => prev.map((o) => o.id === orc.id ? orc : o))}
+					onConverted={aoOrcamentoConvertido}
+				/>
 			) : (
 				/* VISTA DE LISTA — os estados de filtro e paginação continuam aqui e
 				   descem por prop, para sobreviverem à ida e à volta do formulário. */
@@ -601,6 +669,9 @@ export const OrderModule = ({
 					onOpenConfig={handleOpenConfig}
 					onedriveConfig={onedriveConfig}
 					isRefreshing={isRefreshing}
+					orcamentos={orcamentos}
+					onNewOrcamento={handleNovoOrcamento}
+					onOpenOrcamento={handleOpenOrcamento}
 				/>
 			)}
 

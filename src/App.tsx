@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { Printer, Menu, X } from "lucide-react";
 import { LoginPage } from "@/pages/Login";
-import { Client, StockItem, Order, PriceRule, Expense, Machine } from "@/types";
+import { Client, StockItem, Order, PriceRule, Expense, Machine, Orcamento } from "@/types";
 import { api } from "@/services/api";
 import { LoadingProvider } from "@/components/ui/LoadingOverlay";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -162,6 +162,7 @@ const AppInner = () => {
 	const [priceTable, setPriceTable] = useState<PriceRule[]>([]);
 	const [expenses, setExpenses] = useState<Expense[]>([]);
 	const [machinery, setMachinery] = useState<(Machine & { id: number })[]>([]);
+	const [orcamentos, setOrcamentos] = useState<Orcamento[]>([]);
 
 	// ─── Verifica token na URL (retorno do OAuth) e no localStorage ──────────
 	useEffect(() => {
@@ -218,6 +219,7 @@ const AppInner = () => {
 			fetchSafe("/expenses", setExpenses),
 			fetchSafe("/pricing", setPriceTable),
 			fetchSafe("/machinery", setMachinery),
+			fetchSafe("/orcamentos", setOrcamentos),
 		]).finally(() => setDadosCarregando(false));
 	}, [user]);
 
@@ -346,6 +348,8 @@ const AppInner = () => {
 										newOrderSignal={newOrderSignal}
 										pendingOrderFilter={pendingOrderFilter}
 										onPendingFilterApplied={limparFiltroPendente}
+										orcamentos={orcamentos}
+										setOrcamentos={setOrcamentos}
 									/>
 								))}
 								{painel("stock", <StockModule stock={stock} setStock={setStock} priceTable={priceTable} quickAction={quickAction} />)}

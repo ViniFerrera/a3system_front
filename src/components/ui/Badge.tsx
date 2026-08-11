@@ -12,11 +12,13 @@ export const Badge = ({ status }: { status: string }) => {
 		'SUCESSO': 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 ring-1 ring-emerald-500/10',
 		'SEM_DESTINATARIOS': 'bg-slate-100 text-slate-600 border border-slate-200 ring-1 ring-slate-500/10',
 		'ERRO': 'bg-red-50 text-red-700 border border-red-200/60 ring-1 ring-red-500/10',
-		'NAO_AUTORIZADO': 'bg-red-100 text-red-800 border border-red-300 ring-1 ring-red-500/20'
+		'NAO_AUTORIZADO': 'bg-red-100 text-red-800 border border-red-300 ring-1 ring-red-500/20',
+		'EM_ORCAMENTO': 'bg-violet-50 text-violet-700 border border-violet-200/60 ring-1 ring-violet-500/10',
+		'CONVERTIDO': 'bg-slate-100 text-slate-600 border border-slate-200 ring-1 ring-slate-500/10',
 	};
 	return (
 		<span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-2xs font-bold uppercase tracking-wider ${styles[status] || 'bg-gray-100 text-gray-600'}`}>
-			{status.replace('_', ' ')}
+			{status.replace(/_/g, ' ')}
 		</span>
 	);
 };
