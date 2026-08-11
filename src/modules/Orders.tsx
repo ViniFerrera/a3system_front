@@ -11,7 +11,6 @@ import { OrderPreset } from "./orders/presetTypes";
 import { PresetManagerModal } from "./orders/PresetManagerModal";
 import { OrdersList } from "./orders/OrdersList";
 import { OrcamentoFormPage } from "./orders/OrcamentoFormPage";
-import { OrcamentoDetalhePage } from "./orders/OrcamentoDetalhePage";
 import {
 	OrderFormPage,
 	RascunhoState,
@@ -426,14 +425,13 @@ export const OrderModule = ({
 		setView("orcamento-detalhe");
 	}, []);
 
+	// Atualiza apenas o array em memória — a navegação fica por conta do componente
+	// (ele permanece aberto após o save; só "Voltar" volta para a lista)
 	const aoSalvarOrcamento = useCallback((salvo: Orcamento, modo: "criado" | "editado") => {
 		setOrcamentos?.((prev: Orcamento[]) =>
 			modo === "criado" ? [salvo, ...prev] : prev.map((o) => (o.id === salvo.id ? salvo : o))
 		);
-		setEditingOrcamento(null);
-		setView("list");
-		toast.success(modo === "criado" ? `Orçamento #${salvo.id} criado.` : `Orçamento #${salvo.id} atualizado.`);
-	}, [setOrcamentos, toast]);
+	}, [setOrcamentos]);
 
 	const aoOrcamentoConvertido = useCallback((novaOrdem: Order, orcamentoId: number) => {
 		const ordemProcessada = sanitizeOrderResponse(novaOrdem);
@@ -610,25 +608,16 @@ export const OrderModule = ({
 					rascunhoRef={rascunhoRef}
 					clienteRapidoCriado={clienteRapidoCriado}
 				/>
-			) : view === "orcamento-form" ? (
+			) : view === "orcamento-form" || view === "orcamento-detalhe" ? (
 				<OrcamentoFormPage
 					key={`orc-${editingOrcamento?.id ?? "novo"}-${orcamentoNonce}`}
 					editingOrcamento={editingOrcamento}
 					clients={clients}
 					priceTable={priceTable}
 					machines={machinesList}
-					onCancel={() => setView("list")}
-					onSaved={aoSalvarOrcamento}
-				/>
-			) : view === "orcamento-detalhe" ? (
-				<OrcamentoDetalhePage
-					key={`det-${editingOrcamento?.id}-${orcamentoNonce}`}
-					orcamento={editingOrcamento!}
-					clients={clients}
-					priceTable={priceTable}
-					machines={machinesList}
+					presets={presets}
 					onCancel={() => { setEditingOrcamento(null); setView("list"); }}
-					onUpdated={(orc) => setOrcamentos?.((prev: Orcamento[]) => prev.map((o) => o.id === orc.id ? orc : o))}
+					onSaved={aoSalvarOrcamento}
 					onConverted={aoOrcamentoConvertido}
 				/>
 			) : (
