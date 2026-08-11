@@ -193,38 +193,65 @@ export const OrdersList = ({
 	const isOrcamentoFilter =
 		filterOrderStatus === "EM_ORCAMENTO" || filterOrderStatus === "CONVERTIDO";
 
-	const paginatedRows = useMemo((): ListRow[] => {
+	// Lista combinada já ordenada por data desc (antes de paginar)
+	const allRowsSorted = useMemo((): ListRow[] => {
+		// Filtro exclusivo de orçamentos (EM_ORCAMENTO / CONVERTIDO)
 		if (isOrcamentoFilter) {
-			const filtered = orcamentos.filter((o) => {
-				if (o.status !== filterOrderStatus) return false;
+			return orcamentos
+				.filter((o) => {
+					if (o.status !== filterOrderStatus) return false;
+					if (filterClient !== 0 && o.cliente_id !== filterClient) return false;
+					const dateStr = o.data ? o.data.split("T")[0] : "";
+					if (filterStart && dateStr < filterStart) return false;
+					if (filterEnd && dateStr > filterEnd) return false;
+					return true;
+				})
+				.map((o) => ({ type: "orcamento" as const, data: o }));
+		}
+
+		// Ordens já filtradas (por data, cliente, serviços, pagamento, NF, status)
+		const orderRows: ListRow[] = filteredOrders.map((o) => ({
+			type: "order" as const,
+			data: o,
+		}));
+
+		// Em filtros específicos de status de ordem, não mistura orçamentos
+		if (filterOrderStatus !== "TODOS") return orderRows;
+
+		// TODOS: adiciona orçamentos filtrados por data e cliente
+		const orcamentoRows: ListRow[] = orcamentos
+			.filter((o) => {
 				if (filterClient !== 0 && o.cliente_id !== filterClient) return false;
 				const dateStr = o.data ? o.data.split("T")[0] : "";
 				if (filterStart && dateStr < filterStart) return false;
 				if (filterEnd && dateStr > filterEnd) return false;
 				return true;
-			});
-			const start = (currentPage - 1) * pageSize;
-			return filtered
-				.slice(start, start + pageSize)
-				.map((o) => ({ type: "orcamento" as const, data: o }));
-		}
-		return paginatedOrders.map((o) => ({ type: "order" as const, data: o }));
+			})
+			.map((o) => ({ type: "orcamento" as const, data: o }));
+
+		// Ordena combinado por data desc; empate desempata por id desc
+		return [...orderRows, ...orcamentoRows].sort((a, b) => {
+			const dA = (a.data.data ?? "").substring(0, 10);
+			const dB = (b.data.data ?? "").substring(0, 10);
+			if (dB !== dA) return dB.localeCompare(dA);
+			return (Number(b.data.id) || 0) - (Number(a.data.id) || 0);
+		});
 	}, [
 		isOrcamentoFilter,
+		filteredOrders,
 		orcamentos,
 		filterOrderStatus,
 		filterClient,
 		filterStart,
 		filterEnd,
-		currentPage,
-		pageSize,
-		paginatedOrders,
 	]);
 
-	const totalRowsForPagination = isOrcamentoFilter
-		? orcamentos.filter((o) => o.status === filterOrderStatus).length
-		: filteredOrders.length;
+	const paginatedRows = useMemo(() => {
+		const start = (currentPage - 1) * pageSize;
+		return allRowsSorted.slice(start, start + pageSize);
+	}, [allRowsSorted, currentPage, pageSize]);
 
+	const totalRowsForPagination = allRowsSorted.length;
 	const totalPages = Math.max(1, Math.ceil(totalRowsForPagination / pageSize));
 
 	return (
