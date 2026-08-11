@@ -49,7 +49,6 @@ export const OrcamentoFormPage = ({
 
 	// Estado interno do orçamento — null enquanto ainda não foi salvo (criação)
 	const [orcamento, setOrcamento] = useState<Orcamento | null>(null);
-	const [isLoadingFull, setIsLoadingFull] = useState(false);
 	const [selectedVersaoId, setSelectedVersaoId] = useState<number | null>(null);
 
 	// Campos do formulário
@@ -69,7 +68,7 @@ export const OrcamentoFormPage = ({
 	// Carrega histórico completo quando editando um orçamento existente
 	useEffect(() => {
 		if (!editingOrcamento?.id) return;
-		setIsLoadingFull(true);
+		loading.show("Abrindo orçamento...");
 		api
 			.get(`/orcamentos/${editingOrcamento.id}`)
 			.then((res) => {
@@ -79,7 +78,7 @@ export const OrcamentoFormPage = ({
 				if (newest?.id) setSelectedVersaoId(newest.id);
 			})
 			.catch(() => toast.error("Erro ao carregar orçamento."))
-			.finally(() => setIsLoadingFull(false));
+			.finally(() => loading.hide());
 	}, [editingOrcamento?.id]);
 
 	// Sincroniza grid com a versão selecionada
@@ -161,12 +160,20 @@ export const OrcamentoFormPage = ({
 			? Utils.formatDate(formData.data)
 			: Utils.formatDate(new Date().toISOString().split("T")[0]);
 		const itensValidos = gridItems.filter((i) => i.servico);
-		const linhas = itensValidos
-			.map(
-				(i) =>
-					`• ${Utils.displayName(i.servico)} - ${Utils.displayName(i.material)} (${i.quantidade} unid.) — ${Utils.formatCurrency(i.total)}`
-			)
-			.join("\n");
+		const linhas = itensValidos.map((i) => {
+			const partes: string[] = [Utils.displayName(i.servico)];
+			if (i.is_double_sided) partes[0] += " (F/V)";
+			const specs = [
+				i.tamanho && i.tamanho !== "-" ? i.tamanho : null,
+				Utils.displayName(i.material),
+				i.gramatura && i.gramatura !== "-" ? i.gramatura : null,
+				i.cor && i.cor !== "-" ? Utils.displayName(i.cor) : null,
+			].filter(Boolean).join(" — ");
+			partes.push(specs);
+			partes.push(`${i.quantidade} unid.`);
+			partes.push(Utils.formatCurrency(i.total));
+			return `• ${partes.filter(Boolean).join(" — ")}`;
+		}).join("\n");
 		return `🖨️ *Orçamento A3 System*\nCliente: ${clienteAtual?.nome ?? "—"}\nData: ${dataFmt}\n\n📋 *Serviços:*\n${linhas}\n\n💰 *Total: ${Utils.formatCurrency(gridSubtotal)}*`;
 	}, [clienteAtual, formData.data, gridItems, gridSubtotal]);
 
@@ -323,14 +330,6 @@ export const OrcamentoFormPage = ({
 
 	const secao = "bg-white border border-slate-200/70 rounded-xl shadow-card p-4";
 	const rotulo = "block text-2xs font-bold text-ink-muted uppercase tracking-wide mb-1.5";
-
-	if (isLoadingFull) {
-		return (
-			<div className="flex items-center justify-center h-64">
-				<div className="w-8 h-8 rounded-full border-[3px] border-violet-500/30 border-t-violet-500 animate-spin" />
-			</div>
-		);
-	}
 
 	return (
 		<div className="flex flex-col gap-3 lg:sticky lg:top-4 lg:h-[calc(100dvh_-_6.5rem)] lg:-mb-8">

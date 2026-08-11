@@ -67,6 +67,7 @@ export const OrderModule = ({
 	const [isQuickClientOpen, setIsQuickClientOpen] = useState(false);
 	const [isPresetManagerOpen, setIsPresetManagerOpen] = useState(false);
 	const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
+	const [expandedOrcamentoId, setExpandedOrcamentoId] = useState<number | null>(null);
 	const [machinesList, setMachinesList] = useState<Machine[]>(machinery);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [presets, setPresets] = useState<OrderPreset[]>([]);
@@ -310,6 +311,27 @@ export const OrderModule = ({
 		setExpandedOrderId((prev) => (prev === id ? null : id));
 	}, []);
 
+	const handleToggleExpandOrcamento = useCallback((id: number) => {
+		setExpandedOrcamentoId((prev) => (prev === id ? null : id));
+	}, []);
+
+	const handleDeleteOrcamento = useCallback(async (id: number) => {
+		const ok = await confirm({
+			title: "Excluir orçamento?",
+			message: "O orçamento e todas as suas versões serão removidos. Esta ação não pode ser desfeita.",
+			confirmLabel: "Excluir",
+			danger: true,
+		});
+		if (!ok) return;
+		try {
+			await api.delete(`/orcamentos/${id}`);
+			setOrcamentos?.((prev: Orcamento[]) => prev.filter((o) => o.id !== id));
+			toast.success("Orçamento excluído.");
+		} catch {
+			toast.error("Erro ao excluir orçamento.");
+		}
+	}, [confirm, setOrcamentos, toast]);
+
 	const updateStatus = useCallback(async (order: Order, updates: Partial<Order>) => {
 		if (updates.status === "CONCLUIDA" && order.status !== "CONCLUIDA") {
 			const ok = await confirm({
@@ -420,10 +442,11 @@ export const OrderModule = ({
 	}, []);
 
 	const handleOpenOrcamento = useCallback((orc: Orcamento) => {
+		loading.show("Abrindo orçamento...");
 		setEditingOrcamento(orc);
 		setOrcamentoNonce((n) => n + 1);
 		setView("orcamento-detalhe");
-	}, []);
+	}, [loading]);
 
 	// Atualiza apenas o array em memória — a navegação fica por conta do componente
 	// (ele permanece aberto após o save; só "Voltar" volta para a lista)
@@ -650,6 +673,8 @@ export const OrderModule = ({
 					setPageSize={setPageSize}
 					expandedOrderId={expandedOrderId}
 					onToggleExpand={handleToggleExpand}
+					expandedOrcamentoId={expandedOrcamentoId}
+					onToggleExpandOrcamento={handleToggleExpandOrcamento}
 					onNewOrder={handleNewOrder}
 					onEditOrder={abrirFormulario}
 					onDelete={handleDelete}
@@ -661,6 +686,7 @@ export const OrderModule = ({
 					orcamentos={orcamentos}
 					onNewOrcamento={handleNovoOrcamento}
 					onOpenOrcamento={handleOpenOrcamento}
+					onDeleteOrcamento={handleDeleteOrcamento}
 				/>
 			)}
 
