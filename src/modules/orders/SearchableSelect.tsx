@@ -74,7 +74,7 @@ export const SearchableSelect = ({
 				<ChevronDown className='w-4 h-4 text-ink-faint flex-shrink-0' />
 			</div>
 			{isOpen && (
-				<div className='absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-[10px] shadow-xl max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100'>
+				<div className='absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-[10px] shadow-xl flex flex-col animate-in fade-in zoom-in-95 duration-100'>
 					<div className='p-2 border-b border-slate-200/60 bg-slate-50 sticky top-0'>
 						<div className='flex items-center gap-2 bg-white border border-slate-200 rounded-[6px] px-2 py-1.5'>
 							<Search className='w-3.5 h-3.5 text-slate-400' />
@@ -88,7 +88,7 @@ export const SearchableSelect = ({
 							/>
 						</div>
 					</div>
-					<div className='overflow-y-auto flex-1 custom-scrollbar'>
+					<div className='flex-1 custom-scrollbar'>
 						{filteredOptions.length > 0 ? (
 							filteredOptions.map((opt) => (
 								<div
