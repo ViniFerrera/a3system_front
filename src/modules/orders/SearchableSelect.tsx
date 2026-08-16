@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Search, AlertCircle } from "lucide-react";
 import { Client } from "@/types";
 
@@ -26,14 +27,45 @@ export const SearchableSelect = ({
 	const [isOpen, setIsOpen] = useState(autoFocus);
 	const [search, setSearch] = useState("");
 	const wrapperRef = useRef<HTMLDivElement>(null);
+	const triggerRef = useRef<HTMLDivElement>(null);
+	const dropdownRef = useRef<HTMLDivElement>(null);
+	// Renderizada via portal (document.body) porque a barra de filtros usa
+	// overflow-x-auto, que corta qualquer dropdown absolute que ultrapasse
+	// sua altura — precisa sair da árvore com overflow para ficar visível.
+	const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
 
 	const selectedOption = options.find((o) => o.id === value);
 
+	const updateCoords = useCallback(() => {
+		const rect = triggerRef.current?.getBoundingClientRect();
+		if (rect) {
+			setCoords({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+		}
+	}, []);
+
+	useLayoutEffect(() => {
+		if (isOpen) updateCoords();
+	}, [isOpen, updateCoords]);
+
+	useEffect(() => {
+		if (!isOpen) return;
+		const handleScrollOrResize = () => updateCoords();
+		window.addEventListener("scroll", handleScrollOrResize, true);
+		window.addEventListener("resize", handleScrollOrResize);
+		return () => {
+			window.removeEventListener("scroll", handleScrollOrResize, true);
+			window.removeEventListener("resize", handleScrollOrResize);
+		};
+	}, [isOpen, updateCoords]);
+
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
 			if (
 				wrapperRef.current &&
-				!wrapperRef.current.contains(event.target as Node)
+				!wrapperRef.current.contains(target) &&
+				dropdownRef.current &&
+				!dropdownRef.current.contains(target)
 			) {
 				setIsOpen(false);
 			}
@@ -61,6 +93,7 @@ export const SearchableSelect = ({
 			{/* h-8/px-2.5 espelham o CONTROL do kit (Input/Select): o gatilho fica
 			    alinhado com os campos vizinhos em vez de ficar um degrau mais alto. */}
 			<div
+				ref={triggerRef}
 				className='w-full h-8 px-2.5 border border-slate-200 rounded-[10px] bg-white text-sm flex justify-between items-center gap-2 cursor-pointer hover:border-slate-300 transition-colors'
 				onClick={() => setIsOpen(!isOpen)}
 			>
@@ -73,49 +106,55 @@ export const SearchableSelect = ({
 				</span>
 				<ChevronDown className='w-4 h-4 text-ink-faint flex-shrink-0' />
 			</div>
-			{isOpen && (
-				<div className='absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-[10px] shadow-xl flex flex-col animate-in fade-in zoom-in-95 duration-100'>
-					<div className='p-2 border-b border-slate-200/60 bg-slate-50 sticky top-0'>
-						<div className='flex items-center gap-2 bg-white border border-slate-200 rounded-[6px] px-2 py-1.5'>
-							<Search className='w-3.5 h-3.5 text-slate-400' />
-							<input
-								type='text'
-								className='w-full text-xs outline-none py-0.5 text-slate-700'
-								placeholder='Buscar nome ou telefone...'
-								value={search}
-								onChange={(e) => setSearch(e.target.value)}
-								autoFocus
-							/>
-						</div>
-					</div>
-					<div className='flex-1 custom-scrollbar'>
-						{filteredOptions.length > 0 ? (
-							filteredOptions.map((opt) => (
-								<div
-									key={opt.id}
-									className={`px-3 py-2.5 text-sm cursor-pointer border-l-2 border-transparent hover:bg-indigo-50 hover:border-indigo-500 transition-all ${
-										opt.id === value
-											? "bg-indigo-50 text-indigo-700 font-bold border-indigo-500"
-											: "text-slate-600"
-									}`}
-									onClick={() => {
-										onChange(opt.id);
-										setIsOpen(false);
-										setSearch("");
-									}}
-								>
-									{opt.label}
-								</div>
-							))
-						) : (
-							<div className='p-4 text-xs text-slate-400 text-center flex flex-col items-center gap-1'>
-								<AlertCircle className='w-4 h-4' />
-								Nenhum cliente encontrado.
+			{isOpen &&
+				createPortal(
+					<div
+						ref={dropdownRef}
+						className='fixed z-50 bg-white border border-slate-200 rounded-[10px] shadow-xl max-h-80 flex flex-col animate-in fade-in zoom-in-95 duration-100'
+						style={{ top: coords.top, left: coords.left, width: coords.width }}
+					>
+						<div className='p-2 border-b border-slate-200/60 bg-slate-50 sticky top-0'>
+							<div className='flex items-center gap-2 bg-white border border-slate-200 rounded-[6px] px-2 py-1.5'>
+								<Search className='w-3.5 h-3.5 text-slate-400' />
+								<input
+									type='text'
+									className='w-full text-xs outline-none py-0.5 text-slate-700'
+									placeholder='Buscar nome ou telefone...'
+									value={search}
+									onChange={(e) => setSearch(e.target.value)}
+									autoFocus
+								/>
 							</div>
-						)}
-					</div>
-				</div>
-			)}
+						</div>
+						<div className='overflow-y-auto flex-1 custom-scrollbar'>
+							{filteredOptions.length > 0 ? (
+								filteredOptions.map((opt) => (
+									<div
+										key={opt.id}
+										className={`px-3 py-2.5 text-sm cursor-pointer border-l-2 border-transparent hover:bg-indigo-50 hover:border-indigo-500 transition-all ${
+											opt.id === value
+												? "bg-indigo-50 text-indigo-700 font-bold border-indigo-500"
+												: "text-slate-600"
+										}`}
+										onClick={() => {
+											onChange(opt.id);
+											setIsOpen(false);
+											setSearch("");
+										}}
+									>
+										{opt.label}
+									</div>
+								))
+							) : (
+								<div className='p-4 text-xs text-slate-400 text-center flex flex-col items-center gap-1'>
+									<AlertCircle className='w-4 h-4' />
+									Nenhum cliente encontrado.
+								</div>
+							)}
+						</div>
+					</div>,
+					document.body
+				)}
 		</div>
 	);
 };
