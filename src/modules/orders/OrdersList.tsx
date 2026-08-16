@@ -3,7 +3,7 @@ import { Select } from "@/components/ui/Field";
 import { Utils } from "@/utils";
 import { Order, Client, Orcamento, OrcamentoVersao } from "@/types";
 import { Badge } from "@/components/ui/Badge";
-import { MultiSelect } from "@/components/ui/MultiSelect";
+import { ServiceMultiSelect } from "./ServiceMultiSelect";
 import { api } from "@/services/api";
 import {
 	Plus,
@@ -461,8 +461,8 @@ export const OrdersList = ({
 				</div>
 
 				{/* Serviços */}
-				<div className='w-36 flex-shrink-0'>
-					<MultiSelect
+				<div className='w-40 flex-shrink-0'>
+					<ServiceMultiSelect
 						options={uniqueServices}
 						selected={filterServices}
 						onChange={setFilterServices}
