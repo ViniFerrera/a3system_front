@@ -21,7 +21,6 @@ import { RetentionCard } from "./dashboard/RetentionCard";
 
 type OrderStatusFilter = "CONCLUIDA" | "ABERTA" | "CANCELADA" | "ALL";
 type PeriodPreset = "mtd" | "30d" | "3m" | "6m" | "12m" | "custom";
-type BottomPeriod = "7d" | "30d" | "3m" | "6m";
 
 const CustomTooltip = ({ active, payload, label }: any) => {
 	if (!active || !payload?.length) return null;
@@ -48,11 +47,10 @@ const toLocalDate = (d: Date) =>
 	`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 // ─── Compute dates from period preset ────────────────────────────────────────
-const periodToDates = (preset: PeriodPreset | BottomPeriod) => {
+const periodToDates = (preset: PeriodPreset) => {
 	const end = new Date();
 	const start = new Date();
 	if (preset === "mtd") start.setDate(1);
-	else if (preset === "7d") start.setDate(end.getDate() - 7);
 	else if (preset === "30d") start.setDate(end.getDate() - 30);
 	else if (preset === "3m") start.setMonth(end.getMonth() - 3);
 	else if (preset === "6m") start.setMonth(end.getMonth() - 6);
@@ -75,10 +73,6 @@ export const DashboardModule = ({
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 	const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string[]>([]);
 	const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("ALL");
-
-	// ── Filtro inferior (gráficos) ────────────────────────────────────────────
-	const [bottomPeriod, setBottomPeriod] = useState<BottomPeriod>("30d");
-	const bottomDates = useMemo(() => periodToDates(bottomPeriod), [bottomPeriod]);
 
 	// Quando preset muda, atualiza as datas
 	useEffect(() => {
@@ -267,23 +261,17 @@ export const DashboardModule = ({
 		[historico6mData]
 	);
 
-	// ── Dados do filtro inferior ──────────────────────────────────────────────
-	const bottomOrders = useMemo(() => orders.filter((o) => {
-		if (o.status === "CANCELADA") return false;
-		if (orderStatusFilter !== "ALL" && o.status !== orderStatusFilter) return false;
-		return filterByDate(Utils.effectiveOrderDate(o), bottomDates.start, bottomDates.end);
-	}), [orders, bottomDates, orderStatusFilter]);
-
 	// ── Gráfico Diário ────────────────────────────────────────────────────────
+	// Segue o filtro principal do topo (mesmo recorte de currentOrders).
 	const dailyData = useMemo(() => {
 		const daysMap = new Map<string, { receita: number; volume: number }>();
-		bottomOrders.forEach((o) => {
+		currentOrders.forEach((o) => {
 			const key = (Utils.effectiveOrderDate(o) || "").slice(0, 10);
 			const cur = daysMap.get(key) || { receita: 0, volume: 0 };
-			daysMap.set(key, { receita: cur.receita + o.total, volume: cur.volume + 1 });
+			daysMap.set(key, { receita: cur.receita + calcOrderTotal(o), volume: cur.volume + 1 });
 		});
-		const s = new Date(bottomDates.start);
-		const e = new Date(bottomDates.end);
+		const s = new Date(startDate);
+		const e = new Date(endDate);
 		const result = [];
 		let c = new Date(s);
 		while (c <= e) {
@@ -293,22 +281,22 @@ export const DashboardModule = ({
 			c.setDate(c.getDate() + 1);
 		}
 		return result.length > 31 ? result.filter((_, i) => i % Math.ceil(result.length / 30) === 0) : result;
-	}, [bottomOrders, bottomDates]);
+	}, [currentOrders, startDate, endDate]);
 
 	// ── Dia da Semana ─────────────────────────────────────────────────────────
 	const dayOfWeekData = useMemo(() => {
 		const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 		const map = new Map<number, { revenue: number; count: number }>();
 		days.forEach((_, i) => map.set(i, { revenue: 0, count: 0 }));
-		bottomOrders.forEach((o) => {
+		currentOrders.forEach((o) => {
 			const ds = (Utils.effectiveOrderDate(o) || "").slice(0, 10);
 			const [yy, mm, dd] = ds.split("-").map(Number);
 			const day = new Date(yy, mm - 1, dd).getDay();
 			const cur = map.get(day)!;
-			map.set(day, { revenue: cur.revenue + o.total, count: cur.count + 1 });
+			map.set(day, { revenue: cur.revenue + calcOrderTotal(o), count: cur.count + 1 });
 		});
 		return days.map((name, i) => ({ name, ...map.get(i)! }));
-	}, [bottomOrders]);
+	}, [currentOrders]);
 	const maxDayRevenue = Math.max(...dayOfWeekData.map((d) => d.revenue), 1);
 
 	// ── Top Serviços / Clientes ───────────────────────────────────────────────
@@ -360,12 +348,6 @@ export const DashboardModule = ({
 		{ key: "6m", label: "6 meses" },
 		{ key: "12m", label: "12 meses" },
 		{ key: "custom", label: "Personalizado" },
-	];
-	const bottomPresets: { key: BottomPeriod; label: string }[] = [
-		{ key: "7d", label: "7 dias" },
-		{ key: "30d", label: "30 dias" },
-		{ key: "3m", label: "3 meses" },
-		{ key: "6m", label: "6 meses" },
 	];
 	const statusButtons = [
 		{ key: "CONCLUIDA" as const, label: "Concluídas", icon: <CheckCircle2 className="w-3.5 h-3.5" />, active: "bg-emerald-500 text-white border-emerald-500", inactive: "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50", count: statusCounts.concluded },
@@ -509,25 +491,10 @@ export const DashboardModule = ({
 				<ConcentrationCard metrics={metrics} />
 			</div>
 
-			{/* ══ SEÇÃO INFERIOR — filtro próprio ══ */}
-			<div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
-				<div className="flex flex-wrap items-center gap-2">
-					<span className="text-xs font-bold text-indigo-600 uppercase tracking-wide mr-1">Visão Operacional —</span>
-					{bottomPresets.map((p) => (
-						<button key={p.key} onClick={() => setBottomPeriod(p.key)}
-							className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${bottomPeriod === p.key ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-indigo-500 border-indigo-200 hover:border-indigo-400"}`}
-						>{p.label}</button>
-					))}
-					<span className="text-xs text-indigo-400 ml-2">
-						{Utils.formatDate(bottomDates.start)} → {Utils.formatDate(bottomDates.end)}
-					</span>
-				</div>
-			</div>
-
 			{/* ── Evolução Diária ── */}
 			<div className="bg-white border border-slate-200/60 rounded-2xl shadow-card p-4 sm:p-6">
 				<h4 className="text-sm sm:text-base font-bold text-slate-800">Evolução Diária de Receita</h4>
-				<p className="text-2xs sm:text-xs text-slate-400 mt-0.5 mb-4 sm:mb-5">Faturamento dia a dia nos últimos {bottomPeriod === "7d" ? "7 dias" : bottomPeriod === "30d" ? "30 dias" : bottomPeriod === "3m" ? "3 meses" : "6 meses"}</p>
+				<p className="text-2xs sm:text-xs text-slate-400 mt-0.5 mb-4 sm:mb-5">Faturamento dia a dia no período selecionado ({Utils.formatDate(startDate)} → {Utils.formatDate(endDate)})</p>
 				<ResponsiveContainer width="100%" height={180}>
 					<AreaChart data={dailyData} margin={{ left: -10, right: 10 }}>
 						<defs>
