@@ -165,6 +165,14 @@ export interface Instituicao {
 	setores?: InstituicaoSetor[];
 }
 
+export interface InstituicaoColaborador {
+	id?: number;
+	instituicao_id: number;
+	setor_id: number;
+	nome: string;
+	ativo?: boolean;
+}
+
 export interface InstituicaoSetor {
 	id?: number;
 	instituicao_id: number;
@@ -174,6 +182,7 @@ export interface InstituicaoSetor {
 	auxiliar?: string;
 	ordem?: number;
 	ativo?: boolean;
+	colaboradores?: InstituicaoColaborador[];
 }
 
 export interface InstituicaoPreco {

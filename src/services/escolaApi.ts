@@ -35,6 +35,10 @@ export const EscolaApi = {
 		api.get<InstituicaoSetor[]>(`/escola/${instId}/setores`).then((r) => r.data),
 	putSetor: (instId: number, id: number, body: Partial<InstituicaoSetor>) =>
 		api.put(`/escola/${instId}/setores/${id}`, body).then((r) => r.data),
+	addColaborador: (instId: number, setorId: number, nome: string) =>
+		api.post(`/escola/${instId}/setores/${setorId}/colaboradores`, { nome }).then((r) => r.data),
+	removerColaborador: (instId: number, id: number) =>
+		api.delete(`/escola/${instId}/colaboradores/${id}`).then((r) => r.data),
 
 	getDashboard: (instId: number, competencia: string) =>
 		api.get<EscolaDashboardData>(`/escola/${instId}/dashboard`, { params: { competencia } }).then((r) => r.data),
