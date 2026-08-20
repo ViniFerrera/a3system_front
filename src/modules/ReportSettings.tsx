@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
 	Mail, Plus, Trash2, Send, Copy, Check, Eye, EyeOff,
 	RefreshCw, CheckCircle2, AlertTriangle, Clock,
-	History, ChevronLeft, ChevronRight,
+	History, ChevronLeft, ChevronRight, School,
 } from "lucide-react";
 import { Badge, Button, Input, PageHeader, PageLoader, useConfirm } from "@/components/ui";
 import { api } from "@/services/api";
@@ -11,12 +11,16 @@ interface CronConfig {
 	secret: string;
 	urlSemanal: string;
 	urlFechamento: string;
+	urlEscolaSemanal?: string;
+	urlEscolaMensal?: string;
 }
+
+type TipoRelatorio = "weekly" | "month-close" | "escola-weekly" | "escola-monthly";
 
 interface LogEnvio {
 	id: number;
 	created_at: string;
-	tipo: "weekly" | "month-close";
+	tipo: TipoRelatorio;
 	origem: "cron" | "teste";
 	status: "SUCESSO" | "SEM_DESTINATARIOS" | "ERRO" | "NAO_AUTORIZADO";
 	destinatarios: number | null;
@@ -69,7 +73,15 @@ const CampoCopiavel = ({ valor, rotulo }: { valor: string; rotulo: string }) => 
 	</div>
 );
 
-const rotuloTipo = (tipo: LogEnvio["tipo"]) => (tipo === "weekly" ? "Semanal" : "Fechamento");
+const rotuloTipo = (tipo: LogEnvio["tipo"]) => {
+	const mapa: Record<TipoRelatorio, string> = {
+		"weekly": "Semanal",
+		"month-close": "Fechamento",
+		"escola-weekly": "Escola · Semanal",
+		"escola-monthly": "Escola · Mensal",
+	};
+	return mapa[tipo] || tipo;
+};
 
 const formatarDataHora = (iso: string) =>
 	new Date(iso).toLocaleString("pt-BR", {
@@ -86,12 +98,14 @@ export const ReportSettingsModule = () => {
 	const confirm = useConfirm();
 	const [emails, setEmails] = useState<string[]>([]);
 	const [novoEmail, setNovoEmail] = useState("");
+	const [emailsEscola, setEmailsEscola] = useState<string[]>([]);
+	const [novoEmailEscola, setNovoEmailEscola] = useState("");
 	const [cron, setCron] = useState<CronConfig | null>(null);
 	const [secretVisivel, setSecretVisivel] = useState(false);
 	const [primeiraCarga, setPrimeiraCarga] = useState(true);
 	const [salvando, setSalvando] = useState(false);
 	const [rotacionando, setRotacionando] = useState(false);
-	const [testando, setTestando] = useState<"weekly" | "month-close" | null>(null);
+	const [testando, setTestando] = useState<TipoRelatorio | null>(null);
 	const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 	const [logs, setLogs] = useState<LogEnvio[]>([]);
 	const [logsTotal, setLogsTotal] = useState(0);
@@ -100,14 +114,18 @@ export const ReportSettingsModule = () => {
 
 	const carregar = useCallback(async () => {
 		try {
-			const [cfgEmails, cfgCron] = await Promise.all([
+			const [cfgEmails, cfgCron, cfgEmailsEscola] = await Promise.all([
 				api.get("/config/report_recipient_emails"),
 				api.get("/admin/reports/cron-config"),
+				api.get("/config/escola_report_recipients"),
 			]);
 			const bruto = cfgEmails.data?.value;
 			const lista = bruto ? JSON.parse(bruto) : [];
 			setEmails(Array.isArray(lista) ? lista : []);
 			setCron(cfgCron.data);
+			const brutoEscola = cfgEmailsEscola.data?.value;
+			const listaEscola = brutoEscola ? JSON.parse(brutoEscola) : [];
+			setEmailsEscola(Array.isArray(listaEscola) ? listaEscola : []);
 		} catch {
 			setMessage({ type: "error", text: "Erro ao carregar as configurações de relatório" });
 		} finally {
@@ -163,6 +181,37 @@ export const ReportSettingsModule = () => {
 		salvarEmails([...emails, email]);
 	};
 
+	const salvarEmailsEscola = async (lista: string[]) => {
+		setSalvando(true);
+		setMessage(null);
+		try {
+			await api.post("/config", {
+				key: "escola_report_recipients",
+				value: JSON.stringify(lista),
+			});
+			setEmailsEscola(lista);
+			setMessage({ type: "success", text: "Destinatários da escola atualizados" });
+		} catch {
+			setMessage({ type: "error", text: "Erro ao salvar destinatários da escola" });
+		} finally {
+			setSalvando(false);
+		}
+	};
+
+	const adicionarEscola = () => {
+		const email = novoEmailEscola.trim().toLowerCase();
+		if (!email.includes("@")) {
+			setMessage({ type: "error", text: "Informe um email válido" });
+			return;
+		}
+		if (emailsEscola.includes(email)) {
+			setMessage({ type: "error", text: "Este email já está na lista da escola" });
+			return;
+		}
+		setNovoEmailEscola("");
+		salvarEmailsEscola([...emailsEscola, email]);
+	};
+
 	const rotacionarSecret = async () => {
 		const ok = await confirm({
 			title: "Gerar novo secret",
@@ -189,7 +238,7 @@ export const ReportSettingsModule = () => {
 		}
 	};
 
-	const enviarTeste = async (tipo: "weekly" | "month-close") => {
+	const enviarTeste = async (tipo: TipoRelatorio) => {
 		setTestando(tipo);
 		setMessage(null);
 		try {
@@ -377,6 +426,98 @@ export const ReportSettingsModule = () => {
 						icon={<Send className="w-4 h-4" />}
 					>
 						Testar fechamento de mês
+					</Button>
+				</div>
+			</div>
+
+			{/* ── Relatórios da Escola ─────────────────────────────────────────── */}
+			<div className={CARD}>
+				<h3 className="text-base font-bold text-ink flex items-center gap-2 mb-2">
+					<School className="w-5 h-5 text-primary-500" /> Relatórios da Escola
+				</h3>
+				<p className="text-sm text-ink-faint mb-5">
+					Relatório semanal (segunda) e fechamento mensal (dia 09) das instituições. Se a lista
+					abaixo ficar vazia, o envio usa os destinatários gerais acima.
+				</p>
+
+				{/* Destinatários da escola */}
+				<p className="text-2xs font-bold text-ink-muted uppercase tracking-wide mb-2">Destinatários</p>
+				<div className="flex gap-2 mb-4">
+					<div className="flex-1">
+						<Input
+							type="email"
+							value={novoEmailEscola}
+							onChange={(e) => setNovoEmailEscola(e.target.value)}
+							onKeyDown={(e) => e.key === "Enter" && adicionarEscola()}
+							placeholder="email@exemplo.com"
+						/>
+					</div>
+					<Button onClick={adicionarEscola} loading={salvando} icon={<Plus className="w-4 h-4" />}>
+						Adicionar
+					</Button>
+				</div>
+				{emailsEscola.length === 0 ? (
+					<p className="text-sm text-ink-faint italic mb-5">
+						Nenhum destinatário próprio — os relatórios da escola vão para a lista geral acima.
+					</p>
+				) : (
+					<ul className="divide-y divide-slate-100 mb-5">
+						{emailsEscola.map((email) => (
+							<li key={email} className="flex items-center justify-between py-3">
+								<span className="text-sm text-ink">{email}</span>
+								<button
+									type="button"
+									onClick={() => salvarEmailsEscola(emailsEscola.filter((e) => e !== email))}
+									disabled={salvando}
+									aria-label={`Remover ${email}`}
+									className="text-danger-500 hover:text-danger-700 transition disabled:opacity-50"
+								>
+									<Trash2 className="w-4 h-4" />
+								</button>
+							</li>
+						))}
+					</ul>
+				)}
+
+				{/* URLs de cron da escola */}
+				{cron?.urlEscolaSemanal && cron?.urlEscolaMensal && (
+					<div className="space-y-4 pt-4 border-t border-slate-100">
+						<p className="text-sm text-ink-faint">
+							Crie dois jobs em <strong>cron-job.org</strong> (método <strong>POST</strong>, com o mesmo
+							header <code>X-Cron-Secret</code> da seção anterior).
+						</p>
+						<div>
+							<p className="text-2xs font-bold text-ink-muted uppercase tracking-wide mb-1.5">
+								Escola · Semanal — toda segunda-feira
+							</p>
+							<CampoCopiavel valor={cron.urlEscolaSemanal} rotulo="URL do semanal da escola" />
+						</div>
+						<div>
+							<p className="text-2xs font-bold text-ink-muted uppercase tracking-wide mb-1.5">
+								Escola · Mensal — dia 09
+							</p>
+							<CampoCopiavel valor={cron.urlEscolaMensal} rotulo="URL do mensal da escola" />
+						</div>
+					</div>
+				)}
+
+				{/* Testes da escola */}
+				<div className="flex flex-col sm:flex-row gap-3 mt-5 pt-5 border-t border-slate-100">
+					<Button
+						variant="secondary"
+						onClick={() => enviarTeste("escola-weekly")}
+						loading={testando === "escola-weekly"}
+						icon={<Send className="w-4 h-4" />}
+					>
+						Testar semanal da escola
+					</Button>
+					<Button
+						variant="secondary"
+						onClick={() => enviarTeste("escola-monthly")}
+						loading={testando === "escola-monthly"}
+						icon={<Send className="w-4 h-4" />}
+					>
+						Testar mensal da escola
 					</Button>
 				</div>
 			</div>
