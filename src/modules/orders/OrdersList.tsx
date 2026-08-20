@@ -12,6 +12,7 @@ import {
 	Calendar,
 	Settings,
 	RefreshCcw,
+	Eraser,
 	CheckCircle2,
 	BarChart2,
 	Wallet,
@@ -281,6 +282,7 @@ interface OrdersListProps {
 	onDelete: (id: number) => void;
 	onUpdateStatus: (order: Order, updates: Partial<Order>) => void;
 	onRefresh: () => void;
+	onClearFilters: () => void;
 	onOpenConfig: () => void;
 	onedriveConfig: { cid: string; folderPath: string } | null;
 	isRefreshing: boolean;
@@ -324,6 +326,7 @@ export const OrdersList = ({
 	onDelete,
 	onUpdateStatus,
 	onRefresh,
+	onClearFilters,
 	onOpenConfig,
 	onedriveConfig,
 	isRefreshing,
@@ -342,9 +345,9 @@ export const OrdersList = ({
 
 	const isOrcadoTab = filterPaymentStatus === "ORCADO";
 
-	// Lista combinada já ordenada por data desc (antes de paginar)
+	// Orçamentos e ordens ficam SEPARADOS: a aba "Orçado" mostra só orçamentos;
+	// qualquer outra aba (Todas/Pagas/Não Pagas/Parcial) mostra só ordens normais.
 	const allRowsSorted = useMemo((): ListRow[] => {
-		// Aba "Orçado" → só orçamentos
 		if (isOrcadoTab) {
 			return orcamentos
 				.filter((o) => {
@@ -356,48 +359,8 @@ export const OrdersList = ({
 				})
 				.map((o) => ({ type: "orcamento" as const, data: o }));
 		}
-
-		// Filtro de pagamento ativo (não TODOS) → só ordens, sem orçamentos
-		if (filterPaymentStatus !== "TODOS") {
-			return filteredOrders.map((o) => ({ type: "order" as const, data: o }));
-		}
-
-		// Status de ordem específico → só ordens
-		if (filterOrderStatus !== "TODOS") {
-			return filteredOrders.map((o) => ({ type: "order" as const, data: o }));
-		}
-
-		// TODOS + TODOS → mescla ordens + orçamentos por data desc
-		const orderRows: ListRow[] = filteredOrders.map((o) => ({
-			type: "order" as const,
-			data: o,
-		}));
-		const orcamentoRows: ListRow[] = orcamentos
-			.filter((o) => {
-				if (filterClient !== 0 && o.cliente_id !== filterClient) return false;
-				const dateStr = o.data ? o.data.split("T")[0] : "";
-				if (filterStart && dateStr < filterStart) return false;
-				if (filterEnd && dateStr > filterEnd) return false;
-				return true;
-			})
-			.map((o) => ({ type: "orcamento" as const, data: o }));
-
-		return [...orderRows, ...orcamentoRows].sort((a, b) => {
-			const dA = (a.data.data ?? "").substring(0, 10);
-			const dB = (b.data.data ?? "").substring(0, 10);
-			if (dB !== dA) return dB.localeCompare(dA);
-			return (Number(b.data.id) || 0) - (Number(a.data.id) || 0);
-		});
-	}, [
-		isOrcadoTab,
-		filterPaymentStatus,
-		filteredOrders,
-		orcamentos,
-		filterOrderStatus,
-		filterClient,
-		filterStart,
-		filterEnd,
-	]);
+		return filteredOrders.map((o) => ({ type: "order" as const, data: o }));
+	}, [isOrcadoTab, filteredOrders, orcamentos, filterClient, filterStart, filterEnd]);
 
 	const paginatedRows = useMemo(() => {
 		const start = (currentPage - 1) * pageSize;
@@ -507,6 +470,13 @@ export const OrdersList = ({
 						title='Atualizar Lista'
 					>
 						<RefreshCcw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+					</button>
+					<button
+						onClick={onClearFilters}
+						className='p-2 rounded-[10px] transition border border-slate-200 bg-white text-ink-muted hover:bg-slate-50 hover:text-primary-600'
+						title='Limpar filtros'
+					>
+						<Eraser className='w-3.5 h-3.5' />
 					</button>
 					<button
 						onClick={onOpenConfig}

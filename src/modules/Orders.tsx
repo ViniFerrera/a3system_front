@@ -113,7 +113,7 @@ export const OrderModule = ({
 	const [filterClient, setFilterClient] = useState(0);
 	const [filterServices, setFilterServices] = useState<string[]>([]);
 	const [filterPaymentStatus, setFilterPaymentStatus] = useState<
-		"TODOS" | "PAGO" | "NAO_PAGO" | "PARCIAL"
+		"TODOS" | "PAGO" | "NAO_PAGO" | "PARCIAL" | "ORCADO"
 	>("TODOS");
 	const [filterOrderStatus, setFilterOrderStatus] = useState<
 		"TODOS" | "ABERTA" | "CONCLUIDA" | "CANCELADA" | "EM_ORCAMENTO" | "CONVERTIDO"
@@ -167,6 +167,21 @@ export const OrderModule = ({
 			loading.hide();
 		}
 	}, [loading, setOrders, toast]);
+
+	// Limpa todos os filtros: volta ao período padrão (mês corrente) e zera os
+	// demais. O botão "borrachinha" ao lado do refresh chama isto.
+	const limparFiltros = useCallback(() => {
+		const d = new Date();
+		const mm = String(d.getMonth() + 1).padStart(2, "0");
+		setFilterStart(`${d.getFullYear()}-${mm}-01`);
+		setFilterEnd(`${d.getFullYear()}-${mm}-${String(d.getDate()).padStart(2, "0")}`);
+		setFilterClient(0);
+		setFilterServices([]);
+		setFilterPaymentStatus("TODOS");
+		setFilterOrderStatus("TODOS");
+		setFilterNF("TODOS");
+		setCurrentPage(1);
+	}, []);
 
 	const filteredOrders = useMemo(() => {
 		return orders.filter((o) => {
@@ -680,6 +695,7 @@ export const OrderModule = ({
 					onDelete={handleDelete}
 					onUpdateStatus={updateStatus}
 					onRefresh={handleRefreshOrders}
+					onClearFilters={limparFiltros}
 					onOpenConfig={handleOpenConfig}
 					onedriveConfig={onedriveConfig}
 					isRefreshing={isRefreshing}
