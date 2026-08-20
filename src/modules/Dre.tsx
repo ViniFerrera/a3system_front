@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { DataTable, PageHeader, Select, TableHead, Th } from "@/components/ui";
 import { Utils } from "@/utils";
-import { Order, Expense } from "@/types";
+import { Order, Expense, InstituicaoFatura } from "@/types";
+import { EscolaApi } from "@/services/escolaApi";
 import {
 	BarChart,
 	Bar,
@@ -151,6 +152,22 @@ export const DreModule = ({
 			ordensCanceladas: ordensCanceladas.length,
 		};
 	}, [filteredOrders, filteredExpenses]);
+
+	// ── Receita institucional (escola) — regime de caixa via faturas pagas ────
+	// Ordens da escola são excluídas de `orders` no backend; a receita entra no
+	// DRE só quando a fatura é recebida, como linha separada. Se não houver
+	// fatura paga no período, `receitaEscola` é 0 e o DRE fica idêntico ao atual.
+	const [faturasEscola, setFaturasEscola] = useState<InstituicaoFatura[]>([]);
+	useEffect(() => {
+		EscolaApi.getFaturasPagas().then(setFaturasEscola).catch(() => setFaturasEscola([]));
+	}, []);
+	const receitaEscola = useMemo(
+		() =>
+			faturasEscola
+				.filter((f) => (f.data_pagamento || "").startsWith(periodPrefix))
+				.reduce((acc, f) => acc + (Number(f.total) || 0), 0),
+		[faturasEscola, periodPrefix]
+	);
 
 	// ── Dados mensais para gráficos ─────────────────────────────────────────
 	const monthlyData = useMemo(() => {
@@ -431,6 +448,30 @@ export const DreModule = ({
 								{dre.margemLucro.toFixed(1)}%
 							</td>
 						</tr>
+
+						{/* RECEITA INSTITUCIONAL (regime de caixa via fatura) — só quando houver */}
+						{receitaEscola > 0 && (
+							<>
+								<tr className="bg-violet-50/60 border-t border-violet-200">
+									<td className="py-3 font-bold text-violet-700 flex items-center gap-2">
+										<PlusCircle className="w-4 h-4" /> (+) RECEITA INSTITUCIONAL (recebida)
+									</td>
+									<td className="num py-3 text-right font-bold text-violet-700">{fmt(receitaEscola)}</td>
+								</tr>
+								<tr className="border-b border-slate-100">
+									<td className="py-2 pl-8 text-ink-muted text-xs">Faturas da escola/empresa recebidas no período</td>
+									<td className="num py-2 text-right text-xs text-ink-muted">{fmt(receitaEscola)}</td>
+								</tr>
+								<tr className={`border-t-2 ${dre.resultadoOperacional + receitaEscola >= 0 ? "bg-success-100/60 border-success-300" : "bg-danger-100/60 border-danger-300"}`}>
+									<td className={`py-4 font-bold text-base ${dre.resultadoOperacional + receitaEscola >= 0 ? "text-success-700" : "text-danger-700"}`}>
+										=&nbsp; RESULTADO C/ INSTITUCIONAL
+									</td>
+									<td className={`num py-4 text-right font-bold text-base ${dre.resultadoOperacional + receitaEscola >= 0 ? "text-success-700" : "text-danger-700"}`}>
+										{fmt(dre.resultadoOperacional + receitaEscola)}
+									</td>
+								</tr>
+							</>
+						)}
 
 						{/* SEPARADOR */}
 						<tr><td colSpan={2} className="py-3"></td></tr>
