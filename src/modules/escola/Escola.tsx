@@ -82,6 +82,7 @@ export const EscolaModule: React.FC = () => {
 						setores={setores}
 						precos={precos}
 						onCriada={() => { setRefreshKey((k) => k + 1); setAba("ordens"); }}
+						onDadosMudaram={recarregarConfig}
 					/>
 				)}
 				{aba === "ordens" && <EscolaOrdensList instId={instId} setores={setores} refreshKey={refreshKey} />}

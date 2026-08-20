@@ -2,8 +2,9 @@ import React, { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui";
 import { useToast } from "@/components/ui";
+import { useLoading } from "@/components/ui/LoadingOverlay";
 import { Utils } from "@/utils";
-import { Plus, Trash2, Save, FileText } from "lucide-react";
+import { Plus, Trash2, Save, FileText, Check } from "lucide-react";
 import type { InstituicaoPreco, InstituicaoSetor } from "@/types";
 import { EscolaApi } from "@/services/escolaApi";
 import {
@@ -28,18 +29,51 @@ interface Props {
 	setores: InstituicaoSetor[];
 	precos: InstituicaoPreco[];
 	onCriada: () => void;
+	onDadosMudaram: () => void;
 }
 
-export const EscolaOrdemForm: React.FC<Props> = ({ instId, setores, precos, onCriada }) => {
+const NOVO = "__novo__";
+
+export const EscolaOrdemForm: React.FC<Props> = ({ instId, setores, precos, onCriada, onDadosMudaram }) => {
 	const toast = useToast();
+	const loading = useLoading();
 	const cats = useMemo(() => categoriasDisponiveis(precos), [precos]);
 
 	const [setorId, setSetorId] = useState<string>(setores[0]?.id ? String(setores[0].id) : "");
 	const [solicitante, setSolicitante] = useState("");
+	const [novoColab, setNovoColab] = useState("");
+	const [modoNovoColab, setModoNovoColab] = useState(false);
 	const [descricao, setDescricao] = useState("");
 	const [linhas, setLinhas] = useState<LinhaItem[]>([linhaVazia(cats[0] || "COPIA_PB")]);
 	const [arquivos, setArquivos] = useState<FileList | null>(null);
 	const [salvando, setSalvando] = useState(false);
+
+	const setorAtual = setores.find((s) => String(s.id) === setorId);
+	const colaboradores = setorAtual?.colaboradores || [];
+
+	const onSelectSolicitante = (v: string) => {
+		if (v === NOVO) { setModoNovoColab(true); setSolicitante(""); return; }
+		setModoNovoColab(false);
+		setSolicitante(v);
+	};
+
+	const confirmarNovoColab = async () => {
+		const nome = novoColab.trim();
+		if (!nome || !setorId) return;
+		loading.show("Adicionando colaborador...");
+		try {
+			await EscolaApi.addColaborador(instId, Number(setorId), nome);
+			onDadosMudaram();          // recarrega setores → novo colaborador aparece na lista
+			setSolicitante(nome);
+			setModoNovoColab(false);
+			setNovoColab("");
+			toast.success("Colaborador adicionado.");
+		} catch {
+			toast.error("Erro ao adicionar colaborador.");
+		} finally {
+			loading.hide();
+		}
+	};
 
 	const setLinha = (i: number, patch: Partial<LinhaItem>) =>
 		setLinhas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -83,6 +117,7 @@ export const EscolaOrdemForm: React.FC<Props> = ({ instId, setores, precos, onCr
 		if (arquivos) Array.from(arquivos).forEach((f) => form.append("files", f));
 
 		setSalvando(true);
+		loading.show("Criando ordem...");
 		try {
 			const ordem = await EscolaApi.criarOrdem(instId, form);
 			toast.success(`Ordem ${ordem.inst_codigo || ""} criada.`);
@@ -93,6 +128,7 @@ export const EscolaOrdemForm: React.FC<Props> = ({ instId, setores, precos, onCr
 			toast.error(e?.response?.data?.details || "Erro ao criar ordem.");
 		} finally {
 			setSalvando(false);
+			loading.hide();
 		}
 	};
 
@@ -101,7 +137,7 @@ export const EscolaOrdemForm: React.FC<Props> = ({ instId, setores, precos, onCr
 			<Card className="p-4">
 				<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 					<Field label="Setor" required>
-						<Select value={setorId} onChange={(e) => setSetorId(e.target.value)}>
+						<Select value={setorId} onChange={(e) => { setSetorId(e.target.value); setSolicitante(""); setModoNovoColab(false); }}>
 							<option value="">Selecione…</option>
 							{setores.map((s) => (
 								<option key={s.id} value={s.id}>{s.nome} ({s.codigo})</option>
@@ -109,7 +145,22 @@ export const EscolaOrdemForm: React.FC<Props> = ({ instId, setores, precos, onCr
 						</Select>
 					</Field>
 					<Field label="Solicitante">
-						<Input value={solicitante} onChange={(e) => setSolicitante(e.target.value)} placeholder="Nome de quem solicitou" />
+						{modoNovoColab ? (
+							<div className="flex items-center gap-2">
+								<Input autoFocus value={novoColab} onChange={(e) => setNovoColab(e.target.value)}
+									placeholder="Nome do novo colaborador"
+									onKeyDown={(e) => { if (e.key === "Enter") confirmarNovoColab(); }} />
+								<Button size="sm" variant="subtle" icon={<Check className="w-3.5 h-3.5" />} onClick={confirmarNovoColab} />
+							</div>
+						) : (
+							<Select value={solicitante} onChange={(e) => onSelectSolicitante(e.target.value)} disabled={!setorId}>
+								<option value="">Selecione…</option>
+								{colaboradores.map((c) => (
+									<option key={c.id} value={c.nome}>{c.nome}</option>
+								))}
+								<option value={NOVO}>＋ Novo colaborador</option>
+							</Select>
+						)}
 					</Field>
 					<Field label="Anexos">
 						<input
