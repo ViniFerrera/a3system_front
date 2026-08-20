@@ -5,22 +5,24 @@
 import { api } from "./api";
 import type { Instituicao, InstituicaoPreco, InstituicaoSetor, InstituicaoFatura, Order } from "../types";
 
+export interface SetorMetrica { setor: string; ordens: number; receita: number; impressoes: number }
+export interface ServicoMetrica { servico: string; ordens: number; receita: number; impressoes: number }
+
 export interface EscolaDashboardData {
-	competencia: string;
-	aReceber: number;
-	recebido: number;
-	totalMes: number;
-	nOrdens: number;
+	inicio: string;
+	fim: string;
+	servicosPeriodo: number;
 	ticketMedio: number;
-	qtdColor: number;
-	qtdPB: number;
+	nOrdens: number;
 	abertas: number;
 	concluidas: number;
-	porSetor: { setor: string; valor: number; ordens: number }[];
-	mixServico: { servico: string; valor: number }[];
-	evolucao: { competencia: string; total: number }[];
-	topSolicitantes: { solicitante: string; valor: number; ordens: number }[];
-	faturaStatus: "ABERTA" | "PAGA" | "INEXISTENTE";
+	qtdA4Color: number;
+	qtdA4PB: number;
+	porSetorA4PB: SetorMetrica[];
+	porSetorA4Color: SetorMetrica[];
+	porServico: ServicoMetrica[];
+	diaADia: { dia: string; volume: number; receita: number }[];
+	ultimos6Meses: { mes: string; volume: number; receita: number }[];
 }
 
 export const EscolaApi = {
@@ -40,8 +42,8 @@ export const EscolaApi = {
 	removerColaborador: (instId: number, id: number) =>
 		api.delete(`/escola/${instId}/colaboradores/${id}`).then((r) => r.data),
 
-	getDashboard: (instId: number, competencia: string) =>
-		api.get<EscolaDashboardData>(`/escola/${instId}/dashboard`, { params: { competencia } }).then((r) => r.data),
+	getDashboard: (instId: number, inicio: string, fim: string) =>
+		api.get<EscolaDashboardData>(`/escola/${instId}/dashboard`, { params: { inicio, fim } }).then((r) => r.data),
 
 	getOrdens: (instId: number, filtros: { setor?: number; mes?: string; status?: string } = {}) =>
 		api.get<Order[]>(`/escola/${instId}/ordens`, { params: filtros }).then((r) => r.data),
