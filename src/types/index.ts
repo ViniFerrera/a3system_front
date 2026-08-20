@@ -78,6 +78,13 @@ export interface Order {
 	data_pagamento?: string;
 	anexos: string[];
 	nota_fiscal?: boolean;
+	// Campos de ordem institucional (escola/empresa). NULL em ordem normal.
+	inst_id?: number;
+	inst_setor_id?: number;
+	inst_codigo?: string;
+	inst_solicitante?: string;
+	inst_comprovante_url?: string;
+	inst_pasta_url?: string;
 }
 
 export interface Expense {
@@ -141,4 +148,55 @@ export interface Orcamento {
 	versoes?: OrcamentoVersao[];
 	versao_count?: number;
 	total_atual?: number;
+}
+
+// ─── Clientes institucionais (escola/empresa com tabela de preços própria) ───
+
+export interface Instituicao {
+	id?: number;
+	tipo: "ESCOLA" | "EMPRESA";
+	nome: string;
+	cliente_id?: number;
+	cor_dashboard?: string;
+	logo_url?: string;
+	pasta_raiz?: string;
+	ativo?: boolean;
+	observacoes?: string;
+	setores?: InstituicaoSetor[];
+}
+
+export interface InstituicaoSetor {
+	id?: number;
+	instituicao_id: number;
+	nome: string;
+	codigo: string;
+	coordenacao?: string;
+	auxiliar?: string;
+	ordem?: number;
+	ativo?: boolean;
+}
+
+export interface InstituicaoPreco {
+	id?: number;
+	instituicao_id: number;
+	categoria: string;
+	label?: string;
+	gramatura?: string;
+	tamanho?: string;
+	cor?: "PB" | "COLOR";
+	faixa_min?: number;
+	faixa_max?: number;
+	valor_unitario: number;
+	ativo?: boolean;
+	[key: string]: any;
+}
+
+export interface InstituicaoFatura {
+	id?: number;
+	instituicao_id: number;
+	competencia: string;
+	total: number;
+	status: "ABERTA" | "PAGA";
+	data_pagamento?: string;
+	gerada_em?: string;
 }
