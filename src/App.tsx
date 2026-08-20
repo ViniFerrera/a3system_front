@@ -31,6 +31,7 @@ const NotaFiscalModule = lazy(() => import("@/modules/NotaFiscal").then((m) => (
 const DreModule = lazy(() => import("@/modules/Dre").then((m) => ({ default: m.DreModule })));
 const EstudoModule = lazy(() => import("@/modules/Estudo").then((m) => ({ default: m.EstudoModule })));
 const ReportSettingsModule = lazy(() => import("@/modules/ReportSettings").then((m) => ({ default: m.ReportSettingsModule })));
+const EscolaModule = lazy(() => import("@/modules/escola/Escola").then((m) => ({ default: m.EscolaModule })));
 
 // ─── Helpers de Auth ─────────────────────────────────────────────────────────
 interface JwtUser {
@@ -352,6 +353,7 @@ const AppInner = () => {
 										setOrcamentos={setOrcamentos}
 									/>
 								))}
+								{painel("escola", <EscolaModule />)}
 								{painel("stock", <StockModule stock={stock} setStock={setStock} priceTable={priceTable} quickAction={quickAction} />)}
 								{painel("machinery", <MachineryModule machinery={machinery} setMachinery={setMachinery} stock={stock} />)}
 								{painel("pricing", <PricingModule data={priceTable} setData={setPriceTable} />)}
