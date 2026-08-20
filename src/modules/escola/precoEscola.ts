@@ -25,6 +25,14 @@ export const CATEGORIA_ORDEM = [
 	"ENCADERNACAO", "PLASTIFICACAO", "PAPEL_FOTO",
 ];
 
+// Ordem das categorias na tela de CONFIG (3 colunas). Fixas primeiro, resto
+// alfabético por rótulo. Distinta de CATEGORIA_ORDEM (seletor da ordem).
+export const CATEGORIA_ORDEM_CONFIG = [
+	"COPIA_IMPR_COLOR", "COPIA_PB", "IMPRESSAO_PB",
+	"COUCHE_PB", "COUCHE_COLOR", "PLASTIFICACAO",
+	"ADESIVO_COMUM", "ADESIVO_FOTO", "ENCADERNACAO", "PAPEL_FOTO",
+];
+
 const ativos = (precos: InstituicaoPreco[]) => precos.filter((p) => p.ativo !== false);
 const norm = (v: unknown) => (v === undefined || v === null || v === "" ? null : v);
 const uniq = (arr: (string | undefined)[]) =>
