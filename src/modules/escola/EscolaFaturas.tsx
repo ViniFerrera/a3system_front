@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge, Button, DataTable, TableHead, Th } from "@/components/ui";
 import { useToast, useConfirm } from "@/components/ui";
+import { useLoading } from "@/components/ui/LoadingOverlay";
 import { Utils } from "@/utils";
 import { FileSpreadsheet, RefreshCw, CheckCircle2 } from "lucide-react";
 import type { InstituicaoFatura } from "@/types";
@@ -20,6 +21,7 @@ interface Props {
 export const EscolaFaturas: React.FC<Props> = ({ instId, refreshKey }) => {
 	const toast = useToast();
 	const confirm = useConfirm();
+	const loading = useLoading();
 	const [faturas, setFaturas] = useState<InstituicaoFatura[]>([]);
 	const [competencia, setCompetencia] = useState(mesCorrente);
 	const [carregando, setCarregando] = useState(true);
@@ -27,19 +29,22 @@ export const EscolaFaturas: React.FC<Props> = ({ instId, refreshKey }) => {
 
 	const carregar = useCallback(async () => {
 		setCarregando(true);
+		loading.show("Carregando faturas...");
 		try {
 			setFaturas(await EscolaApi.getFaturas(instId));
 		} catch {
 			toast.error("Erro ao carregar faturas.");
 		} finally {
 			setCarregando(false);
+			loading.hide();
 		}
-	}, [instId, toast]);
+	}, [instId, toast, loading]);
 
 	useEffect(() => { carregar(); }, [carregar, refreshKey]);
 
 	const gerar = async () => {
 		setOcupado(true);
+		loading.show("Gerando fatura...");
 		try {
 			const r: any = await EscolaApi.gerarFatura(instId, competencia);
 			toast.success(`Fatura de ${competencia} gerada: ${Utils.formatCurrency(r.total || 0)}`);
@@ -48,6 +53,7 @@ export const EscolaFaturas: React.FC<Props> = ({ instId, refreshKey }) => {
 			toast.error(e?.response?.data?.details || "Erro ao gerar fatura.");
 		} finally {
 			setOcupado(false);
+			loading.hide();
 		}
 	};
 
@@ -58,12 +64,15 @@ export const EscolaFaturas: React.FC<Props> = ({ instId, refreshKey }) => {
 			confirmLabel: "Recebi",
 		});
 		if (!ok) return;
+		loading.show("Registrando recebimento...");
 		try {
 			await EscolaApi.receberFatura(instId, f.id!, Utils.localIsoNow().slice(0, 10));
 			toast.success("Recebimento registrado.");
 			carregar();
 		} catch (e: any) {
 			toast.error(e?.response?.data?.details || "Erro ao registrar recebimento.");
+		} finally {
+			loading.hide();
 		}
 	};
 

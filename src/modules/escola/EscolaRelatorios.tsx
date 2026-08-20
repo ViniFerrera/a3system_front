@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui";
 import { useToast } from "@/components/ui";
+import { useLoading } from "@/components/ui/LoadingOverlay";
 import { CalendarDays, CalendarRange, Download } from "lucide-react";
 import { EscolaApi } from "@/services/escolaApi";
 
@@ -17,12 +18,14 @@ interface Props {
 
 export const EscolaRelatorios: React.FC<Props> = ({ instId }) => {
 	const toast = useToast();
+	const loading = useLoading();
 	const [competencia, setCompetencia] = useState(mesCorrente);
 	const [ate, setAte] = useState(hoje);
 	const [ocupado, setOcupado] = useState<"" | "semanal" | "mensal">("");
 
 	const baixar = async (tipo: "semanal" | "mensal") => {
 		setOcupado(tipo);
+		loading.show("Gerando relatório...");
 		try {
 			const periodo = tipo === "mensal" ? competencia : ate;
 			const blob = await EscolaApi.baixarRelatorio(instId, tipo, periodo);
@@ -33,6 +36,7 @@ export const EscolaRelatorios: React.FC<Props> = ({ instId }) => {
 			toast.error(e?.response?.data?.details || "Erro ao gerar relatório.");
 		} finally {
 			setOcupado("");
+			loading.hide();
 		}
 	};
 

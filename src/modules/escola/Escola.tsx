@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { PageHeader, SegmentedControl, PageLoader } from "@/components/ui";
 import { useToast } from "@/components/ui";
+import { useLoading } from "@/components/ui/LoadingOverlay";
 import { LayoutDashboard, Plus, FileText, FileSpreadsheet, CalendarRange, Settings, School } from "lucide-react";
 import type { Instituicao, InstituicaoPreco, InstituicaoSetor } from "@/types";
 import { EscolaApi } from "@/services/escolaApi";
@@ -15,6 +16,7 @@ type Aba = "dashboard" | "nova" | "ordens" | "faturas" | "relatorios" | "config"
 
 export const EscolaModule: React.FC = () => {
 	const toast = useToast();
+	const loading = useLoading();
 	const [inst, setInst] = useState<Instituicao | null>(null);
 	const [setores, setSetores] = useState<InstituicaoSetor[]>([]);
 	const [precos, setPrecos] = useState<InstituicaoPreco[]>([]);
@@ -42,9 +44,14 @@ export const EscolaModule: React.FC = () => {
 
 	const recarregarConfig = useCallback(async () => {
 		if (!inst?.id) return;
-		setSetores(await EscolaApi.getSetores(inst.id));
-		setPrecos(await EscolaApi.getPrecos(inst.id));
-	}, [inst]);
+		loading.show("Atualizando...");
+		try {
+			setSetores(await EscolaApi.getSetores(inst.id));
+			setPrecos(await EscolaApi.getPrecos(inst.id));
+		} finally {
+			loading.hide();
+		}
+	}, [inst, loading]);
 
 	if (carregando) return <PageLoader message="Carregando escola..." />;
 	if (!inst?.id) {

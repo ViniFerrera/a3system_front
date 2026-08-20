@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge, Button, DataTable, TableHead, Th, Field, Select } from "@/components/ui";
 import { useToast, useConfirm } from "@/components/ui";
+import { useLoading } from "@/components/ui/LoadingOverlay";
 import { Utils } from "@/utils";
 import { CheckCircle2, Download, FileText, Filter } from "lucide-react";
 import type { InstituicaoSetor, Order } from "@/types";
@@ -16,6 +17,7 @@ interface Props {
 export const EscolaOrdensList: React.FC<Props> = ({ instId, setores, refreshKey }) => {
 	const toast = useToast();
 	const confirm = useConfirm();
+	const loading = useLoading();
 	const [ordens, setOrdens] = useState<Order[]>([]);
 	const [carregando, setCarregando] = useState(true);
 	const [fSetor, setFSetor] = useState("");
@@ -24,6 +26,7 @@ export const EscolaOrdensList: React.FC<Props> = ({ instId, setores, refreshKey 
 
 	const carregar = useCallback(async () => {
 		setCarregando(true);
+		loading.show("Carregando ordens...");
 		try {
 			const data = await EscolaApi.getOrdens(instId, {
 				setor: fSetor ? Number(fSetor) : undefined,
@@ -35,8 +38,9 @@ export const EscolaOrdensList: React.FC<Props> = ({ instId, setores, refreshKey 
 			toast.error("Erro ao carregar ordens.");
 		} finally {
 			setCarregando(false);
+			loading.hide();
 		}
-	}, [instId, fSetor, fStatus, fMes, toast]);
+	}, [instId, fSetor, fStatus, fMes, toast, loading]);
 
 	useEffect(() => { carregar(); }, [carregar, refreshKey]);
 
@@ -47,6 +51,7 @@ export const EscolaOrdensList: React.FC<Props> = ({ instId, setores, refreshKey 
 			confirmLabel: "Concluir",
 		});
 		if (!ok) return;
+		loading.show("Concluindo ordem...");
 		try {
 			await EscolaApi.atualizarOrdem(instId, o.id!, {
 				status: "CONCLUIDA", data_conclusao: Utils.localIsoNow(),
@@ -55,10 +60,13 @@ export const EscolaOrdensList: React.FC<Props> = ({ instId, setores, refreshKey 
 			carregar();
 		} catch (e: any) {
 			toast.error(e?.response?.data?.details || "Erro ao concluir.");
+		} finally {
+			loading.hide();
 		}
 	};
 
 	const baixarComprovante = async (o: Order) => {
+		loading.show("Gerando comprovante...");
 		try {
 			const blob = await EscolaApi.baixarComprovante(instId, o.id!);
 			const url = URL.createObjectURL(blob as Blob);
@@ -66,6 +74,8 @@ export const EscolaOrdensList: React.FC<Props> = ({ instId, setores, refreshKey 
 			setTimeout(() => URL.revokeObjectURL(url), 60000);
 		} catch {
 			toast.error("Erro ao gerar comprovante.");
+		} finally {
+			loading.hide();
 		}
 	};
 
