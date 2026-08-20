@@ -8,6 +8,32 @@ import type { InstituicaoPreco, InstituicaoSetor } from "@/types";
 import { EscolaApi } from "@/services/escolaApi";
 import { CATEGORIA_LABELS, CATEGORIA_ORDEM_CONFIG } from "./precoEscola";
 
+// Campo de preço: "R$" fixo à esquerda e sempre duas casas decimais (formata no
+// blur). Emite o valor normalizado com ponto decimal.
+const PrecoInput: React.FC<{ valorInicial: number; onChange: (v: string) => void }> = ({ valorInicial, onChange }) => {
+	const [txt, setTxt] = useState<string>(Number(valorInicial || 0).toFixed(2));
+	return (
+		<div className="relative">
+			<span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-ink-faint pointer-events-none">R$</span>
+			<input
+				type="text" inputMode="decimal" value={txt}
+				onChange={(e) => {
+					const v = e.target.value.replace(/[^\d.,]/g, "");
+					setTxt(v);
+					onChange(v.replace(",", "."));
+				}}
+				onBlur={() => {
+					const n = Number(txt.replace(",", "."));
+					const f = (isNaN(n) ? 0 : n).toFixed(2);
+					setTxt(f);
+					onChange(f);
+				}}
+				className="w-full h-8 pl-8 pr-2 text-sm text-right bg-white border border-slate-200 rounded-[10px] text-ink outline-none transition-all hover:border-slate-300 focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+			/>
+		</div>
+	);
+};
+
 interface Props {
 	instId: number;
 	precos: InstituicaoPreco[];
@@ -114,10 +140,9 @@ export const EscolaConfig: React.FC<Props> = ({ instId, precos, setores, onChang
 											{[p.gramatura, p.tamanho, p.cor === "PB" ? "P&B" : p.cor === "COLOR" ? "Color" : "",
 											  p.faixa_min != null ? `até ${p.faixa_max}` : ""].filter(Boolean).join(" · ") || "—"}
 										</span>
-										<div className="w-24">
-											<Input type="number" step="0.01"
-												defaultValue={p.valor_unitario}
-												onChange={(e) => setValores((v) => ({ ...v, [p.id!]: e.target.value }))} />
+										<div className="w-28">
+											<PrecoInput valorInicial={p.valor_unitario}
+												onChange={(v) => setValores((val) => ({ ...val, [p.id!]: v }))} />
 										</div>
 										<Button size="sm" variant="ghost" icon={<Save className="w-3.5 h-3.5" />} onClick={() => salvarPreco(p)} />
 									</div>

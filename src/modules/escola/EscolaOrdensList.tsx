@@ -4,7 +4,7 @@ import { Badge, Button, DataTable, TableHead, Th, Field, Select } from "@/compon
 import { useToast, useConfirm } from "@/components/ui";
 import { useLoading } from "@/components/ui/LoadingOverlay";
 import { Utils } from "@/utils";
-import { CheckCircle2, Download, FileText, Filter } from "lucide-react";
+import { CheckCircle2, Download, FileText, Filter, ChevronDown, ChevronUp, List } from "lucide-react";
 import type { InstituicaoSetor, Order } from "@/types";
 import { EscolaApi } from "@/services/escolaApi";
 
@@ -20,6 +20,7 @@ export const EscolaOrdensList: React.FC<Props> = ({ instId, setores, refreshKey 
 	const loading = useLoading();
 	const [ordens, setOrdens] = useState<Order[]>([]);
 	const [carregando, setCarregando] = useState(true);
+	const [expandido, setExpandido] = useState<number | null>(null);
 	const [fSetor, setFSetor] = useState("");
 	const [fStatus, setFStatus] = useState("");
 	const [fMes, setFMes] = useState("");
@@ -119,24 +120,94 @@ export const EscolaOrdensList: React.FC<Props> = ({ instId, setores, refreshKey 
 					</tr>
 				</TableHead>
 				<tbody>
-					{ordens.map((o) => (
-						<tr key={o.id} className="border-t border-slate-100 hover:bg-slate-50">
-							<td className="px-3 py-2 num font-semibold text-ink">{o.inst_codigo}</td>
-							<td className="px-3 py-2 text-ink-muted">{(o as any).setor_nome}</td>
-							<td className="px-3 py-2 text-ink-muted">{o.inst_solicitante || "—"}</td>
-							<td className="px-3 py-2 num text-ink-muted">{(o.data || "").slice(0, 10).split("-").reverse().join("/")}</td>
-							<td className="px-3 py-2"><Badge status={o.status || ""} /></td>
-							<td className="px-3 py-2 num text-right font-semibold text-ink">{Utils.formatCurrency(o.total)}</td>
-							<td className="px-3 py-2">
-								<div className="flex justify-end gap-1">
-									<Button size="sm" variant="ghost" icon={<Download className="w-3.5 h-3.5" />} onClick={() => baixarComprovante(o)} title="Comprovante" />
-									{o.status === "ABERTA" && (
-										<Button size="sm" variant="subtle" icon={<CheckCircle2 className="w-3.5 h-3.5" />} onClick={() => concluir(o)}>Concluir</Button>
-									)}
-								</div>
-							</td>
-						</tr>
-					))}
+					{ordens.map((o) => {
+						const aberto = expandido === o.id;
+						return (
+							<React.Fragment key={o.id}>
+								<tr
+									className={`border-t border-slate-100 cursor-pointer transition-colors ${aberto ? "bg-primary-50/40" : "hover:bg-slate-50"}`}
+									onClick={() => setExpandido(aberto ? null : (o.id ?? null))}
+								>
+									<td className="px-3 py-2 num font-semibold text-ink">{o.inst_codigo}</td>
+									<td className="px-3 py-2 text-ink-muted">{(o as any).setor_nome}</td>
+									<td className="px-3 py-2 text-ink-muted">{o.inst_solicitante || "—"}</td>
+									<td className="px-3 py-2 num text-ink-muted">{(o.data || "").slice(0, 10).split("-").reverse().join("/")}</td>
+									<td className="px-3 py-2"><Badge status={o.status || ""} /></td>
+									<td className="px-3 py-2 num text-right font-semibold text-ink">{Utils.formatCurrency(o.total)}</td>
+									<td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+										<div className="flex justify-end items-center gap-1">
+											<Button size="sm" variant="ghost" icon={<Download className="w-3.5 h-3.5" />} onClick={() => baixarComprovante(o)} title="Comprovante" />
+											{o.status === "ABERTA" && (
+												<Button size="sm" variant="subtle" icon={<CheckCircle2 className="w-3.5 h-3.5" />} onClick={() => concluir(o)}>Concluir</Button>
+											)}
+											<button onClick={() => setExpandido(aberto ? null : (o.id ?? null))}
+												className="p-1.5 text-slate-400 hover:text-primary-600">
+												{aberto ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+											</button>
+										</div>
+									</td>
+								</tr>
+								{aberto && (
+									<tr className="bg-slate-50/60">
+										<td colSpan={7} className="px-4 py-4 border-b border-primary-100">
+											<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+												<div className="md:col-span-2 bg-white p-4 rounded-[10px] border-l-4 border-primary-500 shadow-sm">
+													<h5 className="text-2xs font-bold text-ink-muted uppercase mb-3 flex items-center gap-2">
+														<List className="w-4 h-4 text-primary-500" /> Itens da solicitação
+													</h5>
+													<ul className="space-y-2">
+														{(o.items || []).map((it, idx) => (
+															<li key={idx} className="flex justify-between text-xs border-b border-slate-50 last:border-0 pb-2">
+																<span className="text-ink-muted">
+																	<strong className="text-primary-600">{it.quantidade}x</strong>{" "}
+																	{Utils.displayName(it.servico)}
+																	{Utils.displayName(it.material) ? ` — ${Utils.displayName(it.material)}` : ""}
+																	{Utils.displayName(it.tamanho) ? ` · ${Utils.displayName(it.tamanho)}` : ""}
+																	{Utils.displayName(it.cor) && (
+																		<span className="text-ink-faint text-2xs ml-1">({Utils.displayName(it.cor)})</span>
+																	)}
+																	<span className="text-ink-faint text-2xs ml-1">· {Utils.formatCurrency(Number((it as any).unit_price ?? it.unitPrice ?? 0))}/un</span>
+																</span>
+																<span className="num font-bold text-ink-muted">{Utils.formatCurrency(it.total)}</span>
+															</li>
+														))}
+														{(o.items || []).length === 0 && <li className="text-xs text-ink-faint">Sem itens.</li>}
+													</ul>
+													<div className="num flex justify-end mt-3 pt-2 border-t border-slate-100 text-sm font-bold text-primary-700">
+														Total: {Utils.formatCurrency(o.total)}
+													</div>
+												</div>
+												<div className="space-y-3">
+													<div className="bg-white p-4 rounded-[10px] border-l-4 border-slate-400 shadow-sm">
+														<h5 className="text-2xs font-bold text-ink-muted uppercase mb-2">Dados</h5>
+														<div className="space-y-1.5 text-xs">
+															<div className="flex justify-between"><span className="text-ink-faint">Setor</span><span className="font-semibold text-ink">{(o as any).setor_nome || "—"}</span></div>
+															<div className="flex justify-between"><span className="text-ink-faint">Solicitante</span><span className="font-semibold text-ink">{o.inst_solicitante || "—"}</span></div>
+															<div className="flex justify-between"><span className="text-ink-faint">Data</span><span className="font-semibold text-ink">{Utils.formatDateTime(o.data)}</span></div>
+															<div className="flex justify-between items-center"><span className="text-ink-faint">Status</span><Badge status={o.status || ""} /></div>
+														</div>
+													</div>
+													<div className="bg-white p-4 rounded-[10px] border-l-4 border-amber-400 shadow-sm">
+														<h5 className="text-2xs font-bold text-ink-muted uppercase mb-2">Observações</h5>
+														<p className="text-xs text-ink-muted italic leading-relaxed">{o.descricao || "Nenhuma observação registrada."}</p>
+													</div>
+													<div className="flex flex-wrap gap-2">
+														<Button size="sm" variant="secondary" icon={<Download className="w-3.5 h-3.5" />} onClick={() => baixarComprovante(o)}>Comprovante</Button>
+														{(o as any).inst_pasta_url && (
+															<a href={(o as any).inst_pasta_url} target="_blank" rel="noopener noreferrer"
+																className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:underline px-2">
+																Abrir pasta
+															</a>
+														)}
+													</div>
+												</div>
+											</div>
+										</td>
+									</tr>
+								)}
+							</React.Fragment>
+						);
+					})}
 				</tbody>
 			</DataTable>
 		</div>

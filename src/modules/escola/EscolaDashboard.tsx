@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-	ComposedChart, LineChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+	ComposedChart, LineChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
 	ResponsiveContainer, Legend, LabelList,
 } from "recharts";
 import { Card } from "@/components/ui/Card";
@@ -24,22 +24,26 @@ const rotuloMes = (ym: string) => {
 };
 const rotuloDia = (ymd: string) => ymd.slice(5).split("-").reverse().join("/");
 
+// Escala com folga no topo para o rótulo acima da barra/ponto não ser cortado.
+const comFolga = (max: number) => Math.ceil((max || 1) * 1.18);
+
 const tooltip3 = (value: number, name: string) =>
 	name === "Receita" ? Utils.formatCurrency(value) :
 	name === "Impressões" ? `${value} impressões` : `${value} ordens`;
 
-// Gráfico de 3 métricas: barras = impressões (esq.), linha = receita (dir.),
-// rótulo = nº de ordens sobre cada barra.
+// Gráfico de 3 métricas (vertical): barras = impressões (esq.), linha = receita
+// (dir.), rótulo = nº de ordens sobre cada barra. Usado no gráfico de Serviços.
 const Grafico3: React.FC<{ titulo: string; sub?: string; dados: { nome: string; ordens: number; receita: number; impressoes: number }[] }> =
 	({ titulo, sub, dados }) => (
 	<Card className="p-5">
 		<h4 className="text-base font-bold text-ink">{titulo}</h4>
 		{sub && <p className="text-xs text-ink-faint mt-0.5 mb-3">{sub}</p>}
-		<ResponsiveContainer width="100%" height={270}>
-			<ComposedChart data={dados} margin={{ left: -5, right: 5, top: 20 }}>
+		<ResponsiveContainer width="100%" height={280}>
+			<ComposedChart data={dados} margin={{ left: 0, right: 8, top: 28 }}>
 				<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
 				<XAxis dataKey="nome" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} interval={0} />
-				<YAxis yAxisId="q" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
+				<YAxis yAxisId="q" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }}
+					domain={[0, (max: number) => comFolga(max)]} />
 				<YAxis yAxisId="r" orientation="right" axisLine={false} tickLine={false}
 					tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
 				<Tooltip formatter={tooltip3 as any}
@@ -55,6 +59,47 @@ const Grafico3: React.FC<{ titulo: string; sub?: string; dados: { nome: string; 
 		</ResponsiveContainer>
 	</Card>
 );
+
+// Tooltip do funil — mostra as três métricas do setor.
+const FunilTooltip = ({ active, payload }: any) => {
+	if (!active || !payload?.length) return null;
+	const d = payload[0].payload as { nome: string; ordens: number; receita: number; impressoes: number };
+	return (
+		<div style={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)", fontSize: 12, background: "#fff", padding: "8px 12px" }}>
+			<p className="font-bold text-ink mb-0.5">{d.nome}</p>
+			<p className="text-ink-muted">{d.impressoes} impressões</p>
+			<p className="text-ink-muted">{Utils.formatCurrency(d.receita)}</p>
+			<p className="text-ink-muted">{d.ordens} ordens</p>
+		</div>
+	);
+};
+
+// Funil horizontal: barras deitadas ordenadas do maior para o menor por
+// impressões. Rótulo à direita = impressões; receita/ordens no tooltip.
+const GraficoFunil: React.FC<{ titulo: string; sub?: string; dados: { nome: string; ordens: number; receita: number; impressoes: number }[] }> =
+	({ titulo, sub, dados }) => {
+	const ordenado = [...dados].sort((a, b) => b.impressoes - a.impressoes);
+	const height = Math.max(180, ordenado.length * 46);
+	return (
+		<Card className="p-5">
+			<h4 className="text-base font-bold text-ink">{titulo}</h4>
+			{sub && <p className="text-xs text-ink-faint mt-0.5 mb-3">{sub}</p>}
+			<ResponsiveContainer width="100%" height={height}>
+				<BarChart layout="vertical" data={ordenado} margin={{ left: 8, right: 56, top: 4, bottom: 4 }}>
+					<CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+					<XAxis type="number" hide domain={[0, (max: number) => comFolga(max)]} />
+					<YAxis type="category" dataKey="nome" width={92} axisLine={false} tickLine={false}
+						tick={{ fill: "#64748b", fontSize: 11 }} />
+					<Tooltip content={<FunilTooltip />} cursor={{ fill: "rgba(99,102,241,.06)" }} />
+					<Bar dataKey="impressoes" name="Impressões" fill="#818cf8" radius={[0, 6, 6, 0]} barSize={22}>
+						<LabelList dataKey="impressoes" position="right" formatter={(v: any) => `${v}`}
+							style={{ fontSize: 11, fill: "#475569", fontWeight: 700 }} />
+					</Bar>
+				</BarChart>
+			</ResponsiveContainer>
+		</Card>
+	);
+};
 
 const dadosSetor = (arr: SetorMetrica[]) => arr.map((s) => ({ nome: s.setor, ordens: s.ordens, receita: s.receita, impressoes: s.impressoes }));
 const dadosServico = (arr: ServicoMetrica[]) => arr.map((s) => ({ nome: s.servico, ordens: s.ordens, receita: s.receita, impressoes: s.impressoes }));
@@ -124,7 +169,7 @@ export const EscolaDashboard: React.FC<Props> = ({ instId, refreshKey }) => {
 							<h4 className="text-base font-bold text-ink">Dia a dia</h4>
 							<p className="text-xs text-ink-faint mt-0.5 mb-3">Volume e receita por dia no período</p>
 							<ResponsiveContainer width="100%" height={260}>
-								<LineChart data={data.diaADia} margin={{ left: -5, right: 5 }}>
+								<LineChart data={data.diaADia} margin={{ left: 0, right: 8, top: 6 }}>
 									<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
 									<XAxis dataKey="dia" tickFormatter={rotuloDia} axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} />
 									<YAxis yAxisId="v" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
@@ -143,23 +188,24 @@ export const EscolaDashboard: React.FC<Props> = ({ instId, refreshKey }) => {
 						<Grafico3 titulo="Serviços" sub="Ordens, receita e impressões por serviço" dados={dadosServico(data.porServico)} />
 					</div>
 
-					{/* (c) Por setor A4 */}
+					{/* (c) Por setor A4 — funil horizontal */}
 					<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-						<Grafico3 titulo="A4 P&B por setor" sub="Ordens, receita e impressões (A4 P&B)" dados={dadosSetor(data.porSetorA4PB)} />
-						<Grafico3 titulo="A4 Color por setor" sub="Ordens, receita e impressões (A4 Color)" dados={dadosSetor(data.porSetorA4Color)} />
+						<GraficoFunil titulo="A4 P&B por setor" sub="Impressões por setor (maior → menor)" dados={dadosSetor(data.porSetorA4PB)} />
+						<GraficoFunil titulo="A4 Color por setor" sub="Impressões por setor (maior → menor)" dados={dadosSetor(data.porSetorA4Color)} />
 					</div>
 
 					{/* (d) Evolução 6 meses */}
 					<Card className="p-5">
 						<h4 className="text-base font-bold text-ink">Evolução — últimos 6 meses</h4>
 						<p className="text-xs text-ink-faint mt-0.5 mb-3">Receita (barra) e volume de ordens (linha)</p>
-						<ResponsiveContainer width="100%" height={300}>
-							<ComposedChart data={data.ultimos6Meses} margin={{ left: -5, right: 5, top: 22 }}>
+						<ResponsiveContainer width="100%" height={320}>
+							<ComposedChart data={data.ultimos6Meses} margin={{ left: 8, right: 12, top: 30 }}>
 								<CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
 								<XAxis dataKey="mes" tickFormatter={rotuloMes} axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
 								<YAxis yAxisId="r" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }}
-									tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-								<YAxis yAxisId="v" orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
+									tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} domain={[0, (max: number) => comFolga(max)]} />
+								<YAxis yAxisId="v" orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }}
+									domain={[0, (max: number) => comFolga(max)]} />
 								<Tooltip formatter={(value: number, name: string) => name === "Receita" ? Utils.formatCurrency(value) : `${value} ordens`}
 									labelFormatter={rotuloMes}
 									contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)", fontSize: "12px" }} />
